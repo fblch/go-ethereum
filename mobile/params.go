@@ -72,3 +72,18 @@ func FoundationBootnodes() *Enodes {
 	}
 	return nodes
 }
+
+// ADDED by Jakub Pajek
+// RopstenBootnodes returns the enode URLs of the P2P bootstrap nodes running on the
+// Ropsten test network, operated by the foundation (running the V5 discovery protocol?).
+func RopstenBootnodes() *Enodes {
+	nodes := &Enodes{nodes: make([]*enode.Node, len(params.RopstenBootnodes))}
+	for i, url := range params.RopstenBootnodes {
+		var err error
+		nodes.nodes[i], err = enode.Parse(enode.ValidSchemes, url)
+		if err != nil {
+			panic("invalid node URL: " + err.Error())
+		}
+	}
+	return nodes
+}
