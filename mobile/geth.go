@@ -24,6 +24,15 @@ import (
 	"fmt"
 	"path/filepath"
 
+	// ADDED by Jakub Pajek BEG
+	"errors"
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/log"
+
+	// ADDED by Jakub Pajek END
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -35,6 +44,7 @@ import (
 	// ADDED by Jakub Pajek BEG
 	"github.com/ethereum/go-ethereum/eth"
 	// ADDED by Jakub Pajek END
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/nat"
@@ -107,6 +117,24 @@ type NodeConfig struct {
 	// DiscoveryV5 specifies whether the new topic-discovery based V5 discovery
 	// protocol should be started or not.
 	DiscoveryV5 bool
+
+	// ADDED by Jakub Pajek
+	// UseLightweightKDF lowers the memory and CPU requirements of the key store
+	// scrypt KDF at the expense of security.
+	UseLightweightKDF bool
+
+	// ADDED by Jakub Pajek
+	// MinerGasLimit sets target gas ceiling for mined blocks.
+	MinerGasLimit int64 // uint64 in truth, but Java can't handle that...
+
+	// ADDED by Jakub Pajek
+	// MinerGasPrice sets minimum gas price for mining a transaction.
+	MinerGasPrice *BigInt
+
+	// ADDED by Jakub Pajek
+	// MinerGasPrice sets block extra data set by the miner (default = client version).
+	// Maximum size is 32 bytes.
+	MinerExtraData string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -118,9 +146,13 @@ var defaultNodeConfig = &NodeConfig{
 	EthereumNetworkID:     1,
 	EthereumDatabaseCache: 16,
 	// ADDED by Jakub Pajek BEG
-	SyncMode:    int64(downloader.LightSync),
-	NoDiscovery: true,
-	DiscoveryV5: true,
+	SyncMode:          int64(downloader.LightSync),
+	NoDiscovery:       true,
+	DiscoveryV5:       true,
+	UseLightweightKDF: false,
+	MinerGasLimit:     int64(ethconfig.Defaults.Miner.GasCeil),
+	MinerGasPrice:     NewBigInt(ethconfig.Defaults.Miner.GasPrice.Int64()),
+	MinerExtraData:    "",
 	// ADDED by Jakub Pajek END
 }
 
@@ -149,6 +181,8 @@ func (conf *NodeConfig) String() string {
 // Node represents a Geth Ethereum node instance.
 type Node struct {
 	node *node.Node
+	// ADDED by Jakub Pajek
+	eth *eth.Ethereum
 }
 
 // NewNode creates and configures a new Geth node.
@@ -171,6 +205,12 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config.SyncMode == SyncModeDefault {
 		config.SyncMode = defaultNodeConfig.SyncMode
 	}
+	if config.MinerGasLimit <= 0 {
+		config.MinerGasLimit = defaultNodeConfig.MinerGasLimit
+	}
+	if config.MinerGasPrice == nil || config.MinerGasPrice.Sign() <= 0 {
+		config.MinerGasPrice = defaultNodeConfig.MinerGasPrice
+	}
 	// ADDED by Jakub Pajek END
 
 	// Create the empty networking stack
@@ -179,6 +219,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		Version:     params.VersionWithMeta,
 		DataDir:     datadir,
 		KeyStoreDir: filepath.Join(datadir, "keystore"), // Mobile should never use internal keystores!
+		// ADDED by Jakub Pajek BEG
+		UseLightweightKDF: config.UseLightweightKDF,
+		// ADDED by Jakub Pajek END
 		P2P: p2p.Config{
 			// MODIFIED by Jakub Pajek BEG
 			//NoDiscovery:      true,
@@ -231,6 +274,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		}
 	}
 	// Register the Ethereum protocol if requested
+	// ADDED by Jakub Pajek BEG
+	var ethBackend *eth.Ethereum = nil
+	// ADDED by Jakub Pajek END
 	if config.EthereumEnabled {
 		ethConf := ethconfig.Defaults
 		ethConf.Genesis = genesis
@@ -240,6 +286,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// MODIFIED by Jakub Pajek END
 		ethConf.NetworkId = uint64(config.EthereumNetworkID)
 		ethConf.DatabaseCache = config.EthereumDatabaseCache
+		// ADDED by Jakub Pajek BEG
+		ethConf.Miner.GasCeil = uint64(config.MinerGasLimit)
+		ethConf.Miner.GasPrice = new(big.Int).SetBytes(config.MinerGasPrice.GetBytes())
+		ethConf.Miner.ExtraData = []byte(config.MinerExtraData)
+		// ADDED by Jakub Pajek END
 		// MODIFIED by Jakub Pajek BEG
 		/*
 			lesBackend, err := les.New(rawStack, &ethConf)
@@ -269,6 +320,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			if err != nil {
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
+			ethBackend = backend
 			// If netstats reporting is requested, do it
 			if config.EthereumNetStats != "" {
 				if err := ethstats.New(rawStack, backend.APIBackend, backend.Engine(), config.EthereumNetStats); err != nil {
@@ -278,7 +330,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		}
 		// MODIFIED by Jakub Pajek END
 	}
-	return &Node{rawStack}, nil
+	// MODIFIED by Jakub Pajek
+	//return &Node{rawStack}, nil
+	return &Node{rawStack, ethBackend}, nil
 }
 
 // Close terminates a running node along with all it's services, tearing internal state
@@ -291,6 +345,127 @@ func (n *Node) Close() error {
 func (n *Node) Start() error {
 	// TODO: recreate the node so it can be started multiple times
 	return n.node.Start()
+}
+
+// ADDED by Jakub Pajek
+// Start creates a live P2P sealer node and starts running it.
+func (n *Node) StartSealer() error {
+	// Check if n is a configured as a full node
+	if n.eth == nil {
+		return errors.New("Light clients do not support mining")
+	}
+	// Check if the sealer account exists
+	if !n.HasSealerAccount() {
+		return errors.New("sealer account does not exist")
+	}
+	// Unlock the sealer account
+	if err := n.UnlockSealerAccount(); err != nil {
+		return err
+	}
+	// Start up the node itself
+	if err := n.node.Start(); err != nil {
+		return err
+	}
+	// Start mining
+	threads := 0
+	if err := n.eth.StartMining(threads); err != nil {
+		log.Error("Failed to start mining", "err", err)
+		n.node.Close()
+		return err
+	}
+
+	// From cmd/geth/main.go:startNode()
+	/*
+		// Register wallet event handlers to open and auto-derive wallets
+		events := make(chan accounts.WalletEvent, 16)
+		stack.AccountManager().Subscribe(events)
+
+		// Create a client to interact with local geth node.
+		rpcClient, err := stack.Attach()
+		if err != nil {
+			utils.Fatalf("Failed to attach to self: %v", err)
+		}
+		ethClient := ethclient.NewClient(rpcClient)
+
+		go func() {
+			// Open any wallets already attached
+			for _, wallet := range stack.AccountManager().Wallets() {
+				if err := wallet.Open(""); err != nil {
+					log.Warn("Failed to open wallet", "url", wallet.URL(), "err", err)
+				}
+			}
+			// Listen for wallet event till termination
+			for event := range events {
+				switch event.Kind {
+				case accounts.WalletArrived:
+					if err := event.Wallet.Open(""); err != nil {
+						log.Warn("New wallet appeared, failed to open", "url", event.Wallet.URL(), "err", err)
+					}
+				case accounts.WalletOpened:
+					status, _ := event.Wallet.Status()
+					log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
+
+					var derivationPaths []accounts.DerivationPath
+					if event.Wallet.URL().Scheme == "ledger" {
+						derivationPaths = append(derivationPaths, accounts.LegacyLedgerBaseDerivationPath)
+					}
+					derivationPaths = append(derivationPaths, accounts.DefaultBaseDerivationPath)
+
+					event.Wallet.SelfDerive(derivationPaths, ethClient)
+
+				case accounts.WalletDropped:
+					log.Info("Old wallet dropped", "url", event.Wallet.URL())
+					event.Wallet.Close()
+				}
+			}
+		}()
+
+		// Spawn a standalone goroutine for status synchronization monitoring,
+		// close the node when synchronization is complete if user required.
+		if ctx.GlobalBool(utils.ExitWhenSyncedFlag.Name) {
+			go func() {
+				sub := stack.EventMux().Subscribe(downloader.DoneEvent{})
+				defer sub.Unsubscribe()
+				for {
+					event := <-sub.Chan()
+					if event == nil {
+						continue
+					}
+					done, ok := event.Data.(downloader.DoneEvent)
+					if !ok {
+						continue
+					}
+					if timestamp := time.Unix(int64(done.Latest.Time), 0); time.Since(timestamp) < 10*time.Minute {
+						log.Info("Synchronisation completed", "latestnum", done.Latest.Number, "latesthash", done.Latest.Hash(),
+							"age", common.PrettyAge(timestamp))
+						stack.Close()
+					}
+				}
+			}()
+		}
+
+		// Start auxiliary services if enabled
+		if ctx.GlobalBool(utils.MiningEnabledFlag.Name) || ctx.GlobalBool(utils.DeveloperFlag.Name) {
+			// Mining only makes sense if a full Ethereum node is running
+			if ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
+				utils.Fatalf("Light clients do not support mining")
+			}
+			ethBackend, ok := backend.(*eth.EthAPIBackend)
+			if !ok {
+				utils.Fatalf("Ethereum service not running: %v", err)
+			}
+			// Set the gas price to the limits from the CLI and start mining
+			gasprice := utils.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
+			ethBackend.TxPool().SetGasPrice(gasprice)
+			// start mining
+			threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name)
+			if err := ethBackend.StartMining(threads); err != nil {
+				utils.Fatalf("Failed to start mining: %v", err)
+			}
+		}
+	*/
+
+	return nil
 }
 
 // Stop terminates a running node along with all its services. If the node was not started,
@@ -318,4 +493,67 @@ func (n *Node) GetNodeInfo() *NodeInfo {
 // GetPeersInfo returns an array of metadata objects describing connected peers.
 func (n *Node) GetPeersInfo() *PeerInfos {
 	return &PeerInfos{n.node.Server().PeersInfo()}
+}
+
+// ADDED by Jakub Pajek
+// TODO stop using hardcoded password for the sealer account.
+var sealerAccountPassword string = "fbdc1234"
+
+// ADDED by Jakub Pajek
+// HasSealerAccount reports whether the sealer account (first account) is present.
+func (n *Node) HasSealerAccount() bool {
+	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	return len(ks.Accounts()) > 0
+}
+
+// ADDED by Jakub Pajek
+// GetSealerAccount returns the sealser account (first account).
+func (n *Node) GetSealerAccount() (account *Account, _ error) {
+	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	accounts := ks.Accounts()
+	if len(accounts) <= 0 {
+		return nil, errors.New("sealer account does not exist")
+	}
+	return &Account{accounts[0]}, nil
+}
+
+// ADDED by Jakub Pajek
+// DeleteSealerAccount deletes the sealer account (first account) if the passphrase is correct.
+func (n *Node) DeleteSealerAccount() error {
+	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	accounts := ks.Accounts()
+	if len(accounts) <= 0 {
+		return errors.New("sealer account does not exist")
+	}
+	return ks.Delete(accounts[0], sealerAccountPassword)
+}
+
+// ADDED by Jakub Pajek
+// CreateSealerAccount generates a new sealer key and stores it into the key directory
+// in node's internal keystore, encrypting it with the passphrase.
+func (n *Node) CreateSealerAccount() (*Account, error) {
+	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	if len(ks.Accounts()) > 0 {
+		return nil, errors.New("sealer account already exists")
+	}
+	account, err := ks.NewAccount(sealerAccountPassword)
+	if err != nil {
+		return nil, err
+	}
+	return &Account{account}, nil
+}
+
+// ADDED by Jakub Pajek
+// UnlockSealerAccount unlocks the sealer account (first account).
+func (n *Node) UnlockSealerAccount() error {
+	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	accounts := ks.Accounts()
+	if len(accounts) <= 0 {
+		return errors.New("sealer account does not exist")
+	}
+	err := ks.Unlock(accounts[0], sealerAccountPassword)
+	if err == nil {
+		log.Info("Unlocked account", "address", accounts[0].Address.Hex())
+	}
+	return err
 }
