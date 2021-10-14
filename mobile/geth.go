@@ -105,6 +105,10 @@ type NodeConfig struct {
 	PprofAddress string
 
 	// ADDED by Jakub Pajek
+	// UserIdent, if set, is used as an additional component in the devp2p node identifier.
+	UserIdent string
+
+	// ADDED by Jakub Pajek
 	// SyncMode represents the synchronisation mode of the blockchain downloader.
 	SyncMode int64 // uint32 in truth, but Java can't handle that...
 
@@ -146,6 +150,7 @@ var defaultNodeConfig = &NodeConfig{
 	EthereumNetworkID:     1,
 	EthereumDatabaseCache: 16,
 	// ADDED by Jakub Pajek BEG
+	UserIdent:         "",
 	SyncMode:          int64(downloader.LightSync),
 	NoDiscovery:       true,
 	DiscoveryV5:       true,
@@ -202,6 +207,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		debug.StartPProf(config.PprofAddress, true)
 	}
 	// ADDED by Jakub Pajek BEG
+	if config.UserIdent == "" {
+		config.UserIdent = defaultNodeConfig.UserIdent
+	}
 	if config.SyncMode == SyncModeDefault {
 		config.SyncMode = defaultNodeConfig.SyncMode
 	}
@@ -215,7 +223,10 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 
 	// Create the empty networking stack
 	nodeConf := &node.Config{
-		Name:        clientIdentifier,
+		Name: clientIdentifier,
+		// ADDED by Jakub Pajek BEG
+		UserIdent: config.UserIdent,
+		// ADDED by Jakub Pajek END
 		Version:     params.VersionWithMeta,
 		DataDir:     datadir,
 		KeyStoreDir: filepath.Join(datadir, "keystore"), // Mobile should never use internal keystores!
@@ -241,6 +252,13 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// ADDED by Jakub Pajek BEG
+	// Node doesn't by default populate account manager backends
+	if err := setAccountManagerBackends(rawStack); err != nil {
+		return nil, fmt.Errorf("Failed to set account manager backends: %v", err)
+	}
+	// ADDED by Jakub Pajek END
 
 	debug.Memsize.Add("node", rawStack)
 
@@ -555,4 +573,69 @@ func (n *Node) UnlockSealerAccount() error {
 		log.Info("Unlocked account", "address", accounts[0].Address.Hex())
 	}
 	return err
+}
+
+// ADDED by Jakub Pajek
+// Copied from cmd/geth/config.go:setAccountManagerBackends()
+func setAccountManagerBackends(stack *node.Node) error {
+	conf := stack.Config()
+	am := stack.AccountManager()
+	keydir := stack.KeyStoreDir()
+	scryptN := keystore.StandardScryptN
+	scryptP := keystore.StandardScryptP
+	if conf.UseLightweightKDF {
+		scryptN = keystore.LightScryptN
+		scryptP = keystore.LightScryptP
+	}
+
+	// Assemble the supported backends
+	/*
+		if len(conf.ExternalSigner) > 0 {
+			log.Info("Using external signer", "url", conf.ExternalSigner)
+			if extapi, err := external.NewExternalBackend(conf.ExternalSigner); err == nil {
+				am.AddBackend(extapi)
+				return nil
+			} else {
+				return fmt.Errorf("error connecting to external signer: %v", err)
+			}
+		}
+	*/
+
+	// For now, we're using EITHER external signer OR local signers.
+	// If/when we implement some form of lockfile for USB and keystore wallets,
+	// we can have both, but it's very confusing for the user to see the same
+	// accounts in both externally and locally, plus very racey.
+	am.AddBackend(keystore.NewKeyStore(keydir, scryptN, scryptP))
+	/*
+		if conf.USB {
+			// Start a USB hub for Ledger hardware wallets
+			if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
+				log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
+			} else {
+				am.AddBackend(ledgerhub)
+			}
+			// Start a USB hub for Trezor hardware wallets (HID version)
+			if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
+				log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
+			} else {
+				am.AddBackend(trezorhub)
+			}
+			// Start a USB hub for Trezor hardware wallets (WebUSB version)
+			if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
+				log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
+			} else {
+				am.AddBackend(trezorhub)
+			}
+		}
+		if len(conf.SmartCardDaemonPath) > 0 {
+			// Start a smart card hub
+			if schub, err := scwallet.NewHub(conf.SmartCardDaemonPath, scwallet.Scheme, keydir); err != nil {
+				log.Warn(fmt.Sprintf("Failed to start smart card hub, disabling: %v", err))
+			} else {
+				am.AddBackend(schub)
+			}
+		}
+	*/
+
+	return nil
 }
