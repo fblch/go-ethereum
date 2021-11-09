@@ -99,9 +99,14 @@ func (w *wizard) makeGenesis() {
 				}
 			}
 		}
-		genesis.ExtraData = make([]byte, 32+len(signers)*common.AddressLength+65)
+		// MODIFIED by Jakub Pajek
+		//genesis.ExtraData = make([]byte, 32+len(signers)*common.AddressLength+65)
+		genesis.ExtraData = make([]byte, 32+len(signers)*(common.AddressLength+1)+65)
 		for i, signer := range signers {
-			copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
+			//copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
+			index := 32 + i*(common.AddressLength+1)
+			copy(genesis.ExtraData[index:], signer[:])
+			genesis.ExtraData[index+common.AddressLength] = 0xff // extraVoterMarker
 		}
 
 	default:
