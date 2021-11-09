@@ -19,6 +19,7 @@ package clique
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -60,8 +61,17 @@ var (
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
 
-	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
-	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
+	extraVoterMarker  byte = 0xff // Magic value in extra-data to mark address as a voter
+	extraSignerMarker byte = 0xee // Magic value in extra-data to mark address as a signer
+
+	nonceVoterVote  = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new voter
+	nonceSignerVote = hexutil.MustDecode("0xeeeeeeeeeeeeeeee") // Magic nonce number to vote on adding a new signer
+	nonceDropVote   = hexutil.MustDecode("0x1111111111111111") // Magic nonce number to vote on removing a voter/signer
+	nonceNoneVote   = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to denote lack of a vote.
+
+	proposalVoterVote  = binary.BigEndian.Uint64(nonceVoterVote)  // Magic proposal number to vote on adding a new voter
+	proposalSignerVote = binary.BigEndian.Uint64(nonceSignerVote) // Magic proposal number to vote on adding a new signer
+	proposalDropVote   = binary.BigEndian.Uint64(nonceDropVote)   // Magic proposal number to vote on removing a voter/signer.
 
 	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 
@@ -82,13 +92,17 @@ var (
 	// block has a beneficiary set to non-zeroes.
 	errInvalidCheckpointBeneficiary = errors.New("beneficiary in checkpoint block non-zero")
 
-	// errInvalidVote is returned if a nonce value is something else that the two
-	// allowed constants of 0x00..0 or 0xff..f.
-	errInvalidVote = errors.New("vote nonce not 0x00..0 or 0xff..f")
+	// errInvalidVote is returned if a nonce value is something else than the four
+	// allowed constants of 0x00..0, 0x11..1, 0xee..e or 0xff..f.
+	errInvalidVote = errors.New("vote nonce not 0x00..0, 0x11..1, 0xee..e or 0xff..f")
 
 	// errInvalidCheckpointVote is returned if a checkpoint/epoch transition block
 	// has a vote nonce set to non-zeroes.
 	errInvalidCheckpointVote = errors.New("vote nonce in checkpoint block non-zero")
+
+	// errInvalidNoneVoteBeneficiary is returned if a non-voting
+	// block has a beneficiary set to non-zeroes.
+	errInvalidNoneVoteBeneficiary = errors.New("beneficiary in non-voting block non-zero")
 
 	// errMissingVanity is returned if a block's extra-data section is shorter than
 	// 32 bytes, which is required to store the signer vanity.
@@ -98,17 +112,17 @@ var (
 	// to contain a 65 byte secp256k1 signature.
 	errMissingSignature = errors.New("extra-data 65 byte signature suffix missing")
 
-	// errExtraSigners is returned if non-checkpoint block contain signer data in
-	// their extra-data fields.
-	errExtraSigners = errors.New("non-checkpoint block contains extra signer list")
+	// errExtraPermissions is returned if non-checkpoint block contain permission
+	// data in their extra-data fields.
+	errExtraPermissions = errors.New("non-checkpoint block contains extra permissions list")
 
-	// errInvalidCheckpointSigners is returned if a checkpoint block contains an
-	// invalid list of signers (i.e. non divisible by 20 bytes).
-	errInvalidCheckpointSigners = errors.New("invalid signer list on checkpoint block")
+	// errInvalidCheckpointPermissions is returned if a checkpoint block contains
+	// an invalid list of permissions (i.e. non divisible by 20+1 bytes).
+	errInvalidCheckpointPermissions = errors.New("invalid permissions list on checkpoint block")
 
-	// errMismatchingCheckpointSigners is returned if a checkpoint block contains a
-	// list of signers different than the one the local node calculated.
-	errMismatchingCheckpointSigners = errors.New("mismatching signer list on checkpoint block")
+	// errMismatchingCheckpointPermissions is returned if a checkpoint block contains
+	// a list of permissions different than the one the local node calculated.
+	errMismatchingCheckpointPermissions = errors.New("mismatching permissions list on checkpoint block")
 
 	// errInvalidMixDigest is returned if a block's mix digest is non-zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
@@ -127,9 +141,12 @@ var (
 	// the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
 
-	// errInvalidVotingChain is returned if an authorization list is attempted to
+	// errInvalidVotingChain is returned if a permissions list is attempted to
 	// be modified via out-of-range or non-contiguous headers.
 	errInvalidVotingChain = errors.New("invalid voting chain")
+
+	// errUnauthorizedVoter is returned if a vote is cast by a non-authorized entity.
+	errUnauthorizedVoter = errors.New("unauthorized voter")
 
 	// errUnauthorizedSigner is returned if a header is signed by a non-authorized entity.
 	errUnauthorizedSigner = errors.New("unauthorized signer")
@@ -176,7 +193,7 @@ type Clique struct {
 	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
 	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
 
-	proposals map[common.Address]bool // Current list of proposals we are pushing
+	proposals map[common.Address]uint64 // Current list of proposals we are pushing
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
@@ -187,7 +204,7 @@ type Clique struct {
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
-// signers set to the ones provided by the user.
+// permissions set to the ones provided by the user.
 func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
@@ -203,7 +220,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 		db:         db,
 		recents:    recents,
 		signatures: signatures,
-		proposals:  make(map[common.Address]bool),
+		proposals:  make(map[common.Address]uint64),
 	}
 }
 
@@ -258,12 +275,19 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if checkpoint && header.Coinbase != (common.Address{}) {
 		return errInvalidCheckpointBeneficiary
 	}
-	// Nonces must be 0x00..0 or 0xff..f, zeroes enforced on checkpoints
-	if !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
+	// Nonces must be 0x00..0, 0x11..1, 0xee..e or 0xff..f, zeroes enforced on checkpoints
+	if !bytes.Equal(header.Nonce[:], nonceVoterVote) &&
+		!bytes.Equal(header.Nonce[:], nonceSignerVote) &&
+		!bytes.Equal(header.Nonce[:], nonceDropVote) &&
+		!bytes.Equal(header.Nonce[:], nonceNoneVote) {
 		return errInvalidVote
 	}
-	if checkpoint && !bytes.Equal(header.Nonce[:], nonceDropVote) {
+	if checkpoint && !bytes.Equal(header.Nonce[:], nonceNoneVote) {
 		return errInvalidCheckpointVote
+	}
+	// If no vote is cast, beneficiary must be zero
+	if bytes.Equal(header.Nonce[:], nonceNoneVote) && header.Coinbase != (common.Address{}) {
+		return errInvalidNoneVoteBeneficiary
 	}
 	// Check that the extra-data contains both the vanity and signature
 	if len(header.Extra) < extraVanity {
@@ -272,13 +296,13 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if len(header.Extra) < extraVanity+extraSeal {
 		return errMissingSignature
 	}
-	// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
-	signersBytes := len(header.Extra) - extraVanity - extraSeal
-	if !checkpoint && signersBytes != 0 {
-		return errExtraSigners
+	// Ensure that the extra-data contains permissions list on checkpoint, but none otherwise
+	permissionBytes := len(header.Extra) - extraVanity - extraSeal
+	if !checkpoint && permissionBytes != 0 {
+		return errExtraPermissions
 	}
-	if checkpoint && signersBytes%common.AddressLength != 0 {
-		return errInvalidCheckpointSigners
+	if checkpoint && permissionBytes%(common.AddressLength+1) != 0 {
+		return errInvalidCheckpointPermissions
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -350,15 +374,21 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if err != nil {
 		return err
 	}
-	// If the block is a checkpoint block, verify the signer list
+	// If the block is a checkpoint block, verify the permissions list
 	if number%c.config.Epoch == 0 {
-		signers := make([]byte, len(snap.Signers)*common.AddressLength)
+		permissions := make([]byte, len(snap.Signers)*(common.AddressLength+1))
 		for i, signer := range snap.signers() {
-			copy(signers[i*common.AddressLength:], signer[:])
+			index := i * (common.AddressLength + 1)
+			copy(permissions[index:], signer[:])
+			if _, ok := snap.Voters[signer]; ok {
+				permissions[index+common.AddressLength] = extraVoterMarker
+			} else {
+				permissions[index+common.AddressLength] = extraSignerMarker
+			}
 		}
 		extraSuffix := len(header.Extra) - extraSeal
-		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
-			return errMismatchingCheckpointSigners
+		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], permissions) {
+			return errMismatchingCheckpointPermissions
 		}
 	}
 	// All basic checks passed, verify the seal and return
@@ -395,11 +425,16 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
 
-				signers := make([]common.Address, (len(checkpoint.Extra)-extraVanity-extraSeal)/common.AddressLength)
+				signers := make([]common.Address, (len(checkpoint.Extra)-extraVanity-extraSeal)/(common.AddressLength+1))
+				voters := make([]common.Address, 0, len(signers))
 				for i := 0; i < len(signers); i++ {
-					copy(signers[i][:], checkpoint.Extra[extraVanity+i*common.AddressLength:])
+					index := extraVanity + i*(common.AddressLength+1)
+					copy(signers[i][:], checkpoint.Extra[index:])
+					if checkpoint.Extra[index+common.AddressLength] == extraVoterMarker {
+						voters = append(voters, signers[i])
+					}
 				}
-				snap = newSnapshot(c.config, c.signatures, number, hash, signers)
+				snap = newSnapshot(c.config, c.signatures, number, hash, voters, signers)
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -491,6 +526,12 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 			return errWrongDifficulty
 		}
 	}
+	// If a vote is cast, check the signer against voters
+	if !bytes.Equal(header.Nonce[:], nonceNoneVote) {
+		if _, ok := snap.Voters[signer]; !ok {
+			return errUnauthorizedVoter
+		}
+	}
 	return nil
 }
 
@@ -508,27 +549,34 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		return err
 	}
 	if number%c.config.Epoch != 0 {
-		c.lock.RLock()
+		// Only voters can cast votes
+		// TODOJAKUB c.signer should be protected by c.lock.Lock()?
+		if _, ok := snap.Voters[c.signer]; ok {
+			c.lock.RLock()
 
-		// Gather all the proposals that make sense voting on
-		addresses := make([]common.Address, 0, len(c.proposals))
-		for address, authorize := range c.proposals {
-			if snap.validVote(address, authorize) {
-				addresses = append(addresses, address)
+			// Gather all the proposals that make sense voting on
+			addresses := make([]common.Address, 0, len(c.proposals))
+			for address, proposal := range c.proposals {
+				if snap.validVote(address, proposal) {
+					addresses = append(addresses, address)
+				}
 			}
-		}
-		// If there's pending proposals, cast a vote on them
-		if len(addresses) > 0 {
-			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if c.proposals[header.Coinbase] {
-				copy(header.Nonce[:], nonceAuthVote)
-			} else {
-				copy(header.Nonce[:], nonceDropVote)
+			// If there's pending proposals, cast a vote on them
+			if len(addresses) > 0 {
+				header.Coinbase = addresses[rand.Intn(len(addresses))]
+				if c.proposals[header.Coinbase] == proposalVoterVote {
+					copy(header.Nonce[:], nonceVoterVote)
+				} else if c.proposals[header.Coinbase] == proposalSignerVote {
+					copy(header.Nonce[:], nonceSignerVote)
+				} else if c.proposals[header.Coinbase] == proposalDropVote {
+					copy(header.Nonce[:], nonceDropVote)
+				}
 			}
+			c.lock.RUnlock()
 		}
-		c.lock.RUnlock()
 	}
 	// Set the correct difficulty
+	// TODOJAKUB c.signer should be protected by c.lock.Lock()?
 	header.Difficulty = calcDifficulty(snap, c.signer)
 
 	// Ensure the extra data has all its components
@@ -540,6 +588,11 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if number%c.config.Epoch == 0 {
 		for _, signer := range snap.signers() {
 			header.Extra = append(header.Extra, signer[:]...)
+			if _, ok := snap.Voters[signer]; ok {
+				header.Extra = append(header.Extra, extraVoterMarker)
+			} else {
+				header.Extra = append(header.Extra, extraSignerMarker)
+			}
 		}
 	}
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
@@ -668,6 +721,7 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 	if err != nil {
 		return nil
 	}
+	// TODOJAKUB c.signer should be protected by c.lock.Lock()?
 	return calcDifficulty(snap, c.signer)
 }
 
