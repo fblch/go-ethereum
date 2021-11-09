@@ -59,6 +59,17 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getVoters',
+			call: 'clique_getVoters',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getVoterstHash',
+			call: 'clique_getVotersAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'propose',
 			call: 'clique_propose',
 			params: 2
