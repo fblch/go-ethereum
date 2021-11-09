@@ -513,7 +513,7 @@ func (n *Node) GetPeersInfo() *PeerInfos {
 }
 
 // ADDED by Jakub Pajek
-// TODO stop using hardcoded password for the sealer account.
+// TODOJAKUB stop using hardcoded password for the sealer account.
 var sealerAccountPassword string = "fbdc1234"
 
 // ADDED by Jakub Pajek
