@@ -93,25 +93,77 @@ func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
 	return snap.signers(), nil
 }
 
+// GetVoters retrieves the list of authorized voters at the specified block.
+func (api *API) GetVoters(number *rpc.BlockNumber) ([]common.Address, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the voters from its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.voters(), nil
+}
+
+// GetVotersAtHash retrieves the list of authorized voters at the specified block.
+func (api *API) GetVotersAtHash(hash common.Hash) ([]common.Address, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.voters(), nil
+}
+
 // Proposals returns the current proposals the node tries to uphold and vote on.
-func (api *API) Proposals() map[common.Address]bool {
+func (api *API) Proposals() map[common.Address]string {
 	api.clique.lock.RLock()
 	defer api.clique.lock.RUnlock()
 
-	proposals := make(map[common.Address]bool)
-	for address, auth := range api.clique.proposals {
-		proposals[address] = auth
+	proposals := make(map[common.Address]string)
+	for address, proposal := range api.clique.proposals {
+		switch proposal {
+		case proposalVoterVote:
+			proposals[address] = "voter"
+		case proposalSignerVote:
+			proposals[address] = "signer"
+		case proposalDropVote:
+			proposals[address] = "drop"
+		default:
+			proposals[address] = "<invalid>"
+		}
 	}
 	return proposals
 }
 
 // Propose injects a new authorization proposal that the signer will attempt to
 // push through.
-func (api *API) Propose(address common.Address, auth bool) {
+func (api *API) Propose(address common.Address, proposal string) error {
 	api.clique.lock.Lock()
 	defer api.clique.lock.Unlock()
 
-	api.clique.proposals[address] = auth
+	switch proposal {
+	case "voter":
+		api.clique.proposals[address] = proposalVoterVote
+	case "signer":
+		api.clique.proposals[address] = proposalSignerVote
+	case "drop":
+		api.clique.proposals[address] = proposalDropVote
+	default:
+		return fmt.Errorf("invalid proposal %s", proposal)
+	}
+	return nil
 }
 
 // Discard drops a currently running proposal, stopping the signer from casting
