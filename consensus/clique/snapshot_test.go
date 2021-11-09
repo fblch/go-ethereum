@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+// TODOJAKUB add support for new permission model testing (voter/signer)
+
 package clique
 
 import (
@@ -52,7 +54,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	for i, signer := range signers {
 		auths[i] = ap.address(signer)
 	}
-	sort.Sort(signersAscending(auths))
+	sort.Sort(addressesAscending(auths))
 	for i, auth := range auths {
 		copy(header.Extra[extraVanity+i*common.AddressLength:], auth.Bytes())
 	}
@@ -419,7 +421,8 @@ func TestClique(t *testing.T) {
 			gen.SetCoinbase(accounts.address(tt.votes[j].voted))
 			if tt.votes[j].auth {
 				var nonce types.BlockNonce
-				copy(nonce[:], nonceAuthVote)
+				// TODOJAKUB just changed nonceAuthVote to nonceSignerVote without checking the logic
+				copy(nonce[:], nonceSignerVote)
 				gen.SetNonce(nonce)
 			}
 		})
