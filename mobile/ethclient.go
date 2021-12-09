@@ -313,3 +313,18 @@ func (ec *EthereumClient) EstimateGas(ctx *Context, msg *CallMsg) (gas int64, _ 
 func (ec *EthereumClient) SendTransaction(ctx *Context, tx *Transaction) error {
 	return ec.client.SendTransaction(ctx.context, tx.tx)
 }
+
+// ADDED by Jakub Pajek
+// Clique
+
+// Added by Jakub Pajek
+// CliqueIsSigner checks if a given address is a signer (has right to sign blocks)
+func (ec *EthereumClient) CliqueIsSigner(ctx *Context, address *Address) (bool, error) {
+	return ec.client.CliqueIsSigner(ctx.context, address.address)
+}
+
+// Added by Jakub Pajek
+// CliqueIsVoter checks if a given address is a voter (has right to vote for)
+func (ec *EthereumClient) CliqueIsVoter(ctx *Context, address *Address) (bool, error) {
+	return ec.client.CliqueIsVoter(ctx.context, address.address)
+}
