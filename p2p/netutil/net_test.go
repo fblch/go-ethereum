@@ -96,6 +96,30 @@ func TestIsLAN(t *testing.T) {
 	)
 }
 
+// ADDED by Jakub Pajek
+func TestIsToneLAN(t *testing.T) {
+	checkContains(t, IsToneLAN,
+		[]string{ // included
+			"10.0.1.1",
+			"10.22.0.3",
+		},
+		[]string{ // excluded
+			"0.0.0.0",
+			"0.2.0.8",
+			"127.0.0.1",
+			"172.31.252.251",
+			"192.168.1.4",
+			"fe80::f4a1:8eff:fec5:9d9d",
+			"febf::ab32:2233",
+			"fc00::4",
+			"192.0.2.1",
+			"1.0.0.0",
+			"172.32.0.1",
+			"fec0::2233",
+		},
+	)
+}
+
 func TestIsSpecialNetwork(t *testing.T) {
 	checkContains(t, IsSpecialNetwork,
 		[]string{ // included
@@ -156,6 +180,8 @@ func TestCheckRelayIP(t *testing.T) {
 		{"192.168.0.1", "192.168.0.1", nil},
 		{"192.168.0.1", "23.55.1.242", nil},
 		{"23.55.1.242", "23.55.1.242", nil},
+		// ADDED by Jakub Pajek
+		{"23.55.1.242", "10.0.1.1", nil},
 	}
 
 	for _, test := range tests {
