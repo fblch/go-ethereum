@@ -113,6 +113,10 @@ type NodeConfig struct {
 	SyncMode int64 // uint32 in truth, but Java can't handle that...
 
 	// ADDED by Jakub Pajek
+	// NAT specifies port mapping mechanism (any|none|upnp|pmp|extip:<IP>)
+	NAT string
+
+	// ADDED by Jakub Pajek
 	// NoDiscovery can be used to disable the peer discovery mechanism.
 	// Disabling is useful for protocol debugging (manual topology).
 	NoDiscovery bool
@@ -152,6 +156,7 @@ var defaultNodeConfig = &NodeConfig{
 	// ADDED by Jakub Pajek BEG
 	UserIdent:         "",
 	SyncMode:          int64(downloader.LightSync),
+	NAT:               "any",
 	NoDiscovery:       true,
 	DiscoveryV5:       true,
 	UseLightweightKDF: false,
@@ -213,11 +218,19 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config.SyncMode == SyncModeDefault {
 		config.SyncMode = defaultNodeConfig.SyncMode
 	}
+	if config.NAT == "" {
+		config.NAT = defaultNodeConfig.NAT
+	}
 	if config.MinerGasLimit <= 0 {
 		config.MinerGasLimit = defaultNodeConfig.MinerGasLimit
 	}
 	if config.MinerGasPrice == nil || config.MinerGasPrice.Sign() <= 0 {
 		config.MinerGasPrice = defaultNodeConfig.MinerGasPrice
+	}
+
+	natif, err := nat.Parse(config.NAT)
+	if err != nil {
+		return nil, err
 	}
 	// ADDED by Jakub Pajek END
 
@@ -235,15 +248,16 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// ADDED by Jakub Pajek END
 		P2P: p2p.Config{
 			// MODIFIED by Jakub Pajek BEG
+			//NAT:              nat.Any(),
 			//NoDiscovery:      true,
 			//DiscoveryV5:      true,
+			NAT:            natif,
 			NoDiscovery:    config.NoDiscovery,
 			DiscoveryV5:    config.DiscoveryV5,
 			BootstrapNodes: config.BootstrapNodes.nodes,
 			// MODIFIED by Jakub Pajek END
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
 			ListenAddr:       ":0",
-			NAT:              nat.Any(),
 			MaxPeers:         config.MaxPeers,
 		},
 	}
