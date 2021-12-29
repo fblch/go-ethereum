@@ -113,6 +113,15 @@ type NodeConfig struct {
 	SyncMode int64 // uint32 in truth, but Java can't handle that...
 
 	// ADDED by Jakub Pajek
+	// If ListenAddr is set to a non-nil address, the server
+	// will listen for incoming connections.
+	//
+	// If the port is zero, the operating system will pick a port. The
+	// ListenAddr field will be updated with the actual address when
+	// the server is started.
+	ListenAddr string
+
+	// ADDED by Jakub Pajek
 	// NAT specifies port mapping mechanism (any|none|upnp|pmp|extip:<IP>)
 	NAT string
 
@@ -156,6 +165,7 @@ var defaultNodeConfig = &NodeConfig{
 	// ADDED by Jakub Pajek BEG
 	UserIdent:         "",
 	SyncMode:          int64(downloader.LightSync),
+	ListenAddr:        ":0",
 	NAT:               "any",
 	NoDiscovery:       true,
 	DiscoveryV5:       true,
@@ -218,6 +228,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config.SyncMode == SyncModeDefault {
 		config.SyncMode = defaultNodeConfig.SyncMode
 	}
+	if config.ListenAddr == "" {
+		config.ListenAddr = defaultNodeConfig.ListenAddr
+	}
 	if config.NAT == "" {
 		config.NAT = defaultNodeConfig.NAT
 	}
@@ -248,16 +261,17 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// ADDED by Jakub Pajek END
 		P2P: p2p.Config{
 			// MODIFIED by Jakub Pajek BEG
+			//ListenAddr:       ":0",
 			//NAT:              nat.Any(),
 			//NoDiscovery:      true,
 			//DiscoveryV5:      true,
+			ListenAddr:     config.ListenAddr,
 			NAT:            natif,
 			NoDiscovery:    config.NoDiscovery,
 			DiscoveryV5:    config.DiscoveryV5,
 			BootstrapNodes: config.BootstrapNodes.nodes,
 			// MODIFIED by Jakub Pajek END
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
-			ListenAddr:       ":0",
 			MaxPeers:         config.MaxPeers,
 		},
 	}
