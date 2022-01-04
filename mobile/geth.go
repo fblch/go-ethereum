@@ -56,9 +56,6 @@ const (
 	// Sync mode defaults to light sync (not full sync!)
 	SyncModeDefault int64 = int64(downloader.FullSync)
 
-	// Quickly download the headers, full sync only at the chain
-	SyncModeFast = int64(downloader.FastSync)
-
 	// Download the chain and the state via compact snapshots
 	SyncModeSnap = int64(downloader.SnapSync)
 
