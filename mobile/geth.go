@@ -399,7 +399,7 @@ func (n *Node) Start() error {
 
 // ADDED by Jakub Pajek
 // Start creates a live P2P sealer node and starts running it.
-func (n *Node) StartSealer() error {
+func (n *Node) StartSealer(passphrase string) error {
 	// Check if n is a configured as a full node
 	if n.eth == nil {
 		return errors.New("Light clients do not support mining")
@@ -409,7 +409,7 @@ func (n *Node) StartSealer() error {
 		return errors.New("sealer account does not exist")
 	}
 	// Unlock the sealer account
-	if err := n.UnlockSealerAccount(); err != nil {
+	if err := n.UnlockSealerAccount(passphrase); err != nil {
 		return err
 	}
 	// Start up the node itself
@@ -546,10 +546,6 @@ func (n *Node) GetPeersInfo() *PeerInfos {
 }
 
 // ADDED by Jakub Pajek
-// TODOJAKUB stop using hardcoded password for the sealer account.
-var sealerAccountPassword string = "fbdc1234"
-
-// ADDED by Jakub Pajek
 // HasSealerAccount reports whether the sealer account (first account) is present.
 func (n *Node) HasSealerAccount() bool {
 	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
@@ -569,24 +565,24 @@ func (n *Node) GetSealerAccount() (account *Account, _ error) {
 
 // ADDED by Jakub Pajek
 // DeleteSealerAccount deletes the sealer account (first account) if the passphrase is correct.
-func (n *Node) DeleteSealerAccount() error {
+func (n *Node) DeleteSealerAccount(passphrase string) error {
 	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	accounts := ks.Accounts()
 	if len(accounts) <= 0 {
 		return errors.New("sealer account does not exist")
 	}
-	return ks.Delete(accounts[0], sealerAccountPassword)
+	return ks.Delete(accounts[0], passphrase)
 }
 
 // ADDED by Jakub Pajek
 // CreateSealerAccount generates a new sealer key and stores it into the key directory
 // in node's internal keystore, encrypting it with the passphrase.
-func (n *Node) CreateSealerAccount() (*Account, error) {
+func (n *Node) CreateSealerAccount(passphrase string) (*Account, error) {
 	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	if len(ks.Accounts()) > 0 {
 		return nil, errors.New("sealer account already exists")
 	}
-	account, err := ks.NewAccount(sealerAccountPassword)
+	account, err := ks.NewAccount(passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -595,13 +591,13 @@ func (n *Node) CreateSealerAccount() (*Account, error) {
 
 // ADDED by Jakub Pajek
 // UnlockSealerAccount unlocks the sealer account (first account).
-func (n *Node) UnlockSealerAccount() error {
+func (n *Node) UnlockSealerAccount(passphrase string) error {
 	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	accounts := ks.Accounts()
 	if len(accounts) <= 0 {
 		return errors.New("sealer account does not exist")
 	}
-	err := ks.Unlock(accounts[0], sealerAccountPassword)
+	err := ks.Unlock(accounts[0], passphrase)
 	if err == nil {
 		log.Info("Unlocked account", "address", accounts[0].Address.Hex())
 	}
