@@ -56,6 +56,10 @@ const (
 
 // Clique proof-of-authority protocol constants.
 var (
+	FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
+
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
@@ -551,7 +555,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	c.lock.RLock()
 	if number%c.config.Epoch != 0 {
 		// Only voters can cast votes
-		// TODOJAKUB c.signer should be protected by c.lock.Lock()?
+		// TODOJAKUB c.signer should be protected by c.lock.RLock()?
 		if _, ok := snap.Voters[c.signer]; ok {
 			// Gather all the proposals that make sense voting on
 			addresses := make([]common.Address, 0, len(c.proposals))
@@ -614,19 +618,40 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	return nil
 }
 
-// Finalize implements consensus.Engine, ensuring no uncles are set, nor block
-// rewards given.
+// Finalize implements consensus.Engine, accumulating the block rewards,
+// ensuring no uncles are set, setting the final state on the header.
 func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
-	// No block rewards in PoA, so the state remains as is and uncles are dropped
+	// Resolve the authorization key
+	signer, err := ecrecover(header, c.signatures)
+	if err != nil {
+		log.Warn("Failed to retrieve block author", "number", header.Number.Uint64(), "hash", header.Hash(), "err", err)
+	}
+	// Accumulate any block rewards (excluding uncle rewards) and commit the final state root
+	if signer != (common.Address{}) {
+		accumulateRewards(chain.Config(), state, header, uncles, signer)
+	}
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
 }
 
-// FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
-// nor block rewards given, and returns the final block.
+// FinalizeAndAssemble implements consensus.Engine, accumulating the block rewards,
+// ensuring no uncles are set, setting the final state and assembling the block.
 func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Finalize block
-	c.Finalize(chain, header, state, txs, uncles)
+	//c.Finalize(chain, header, state, txs, uncles)
+	{
+		// TODOJAKUB c.signer should be protected by c.lock.RLock()?
+		signer := c.signer
+		if signer == (common.Address{}) {
+			return nil, errors.New("signer not set")
+		}
+		// Accumulate any block rewards (excluding uncle rewards) and commit the final state root
+		if signer != (common.Address{}) {
+			accumulateRewards(chain.Config(), state, header, uncles, signer)
+		}
+		header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		header.UncleHash = types.CalcUncleHash(nil)
+	}
 
 	// Assemble and return the final block for sealing
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
@@ -800,4 +825,20 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())
 	}
+}
+
+// AccumulateRewards credits the signer of the given block with the mining
+// reward. The total reward consists of the static block reward only.
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, signer common.Address) {
+	// Select the correct block reward based on chain progression
+	blockReward := FrontierBlockReward
+	if config.IsByzantium(header.Number) {
+		blockReward = ByzantiumBlockReward
+	}
+	if config.IsConstantinople(header.Number) {
+		blockReward = ConstantinopleBlockReward
+	}
+	// Accumulate the rewards for the miner
+	reward := new(big.Int).Set(blockReward)
+	state.AddBalance(signer, reward)
 }
