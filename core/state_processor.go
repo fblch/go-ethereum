@@ -79,6 +79,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		statedb.Prepare(tx.Hash(), i)
+		// MEMO by Jakub Pajek: mining reward (tx fee)
 		receipt, err := applyTransaction(msg, p.config, nil, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -98,6 +99,7 @@ func applyTransaction(msg types.Message, config *params.ChainConfig, author *com
 	evm.Reset(txContext, statedb)
 
 	// Apply the transaction to the current state (included in the env).
+	// MEMO by Jakub Pajek: mining reward (tx fee)
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
