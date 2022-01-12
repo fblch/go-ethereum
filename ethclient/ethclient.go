@@ -605,7 +605,7 @@ func (p *rpcProgress) toSyncProgress() *ethereum.SyncProgress {
 // ADDED by Jakub Pajek
 // Clique
 
-// Added by Jakub Pajek
+// ADDED by Jakub Pajek
 // CliqueIsSigner checks if a given address is a signer (has right to sign blocks)
 func (ec *Client) CliqueIsSigner(ctx context.Context, address common.Address) (bool, error) {
 	var signers []common.Address
@@ -621,7 +621,7 @@ func (ec *Client) CliqueIsSigner(ctx context.Context, address common.Address) (b
 	return false, nil
 }
 
-// Added by Jakub Pajek
+// ADDED by Jakub Pajek
 // CliqueIsVoter checks if a given address is a voter (has right to vote for)
 func (ec *Client) CliqueIsVoter(ctx context.Context, address common.Address) (bool, error) {
 	var voters []common.Address
