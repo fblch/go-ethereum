@@ -257,7 +257,13 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _ := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			// MODIFIED by Jakub Pajek BEG (clique static block rewards)
+			//block, _ := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts, false)
+			if err != nil {
+				panic(fmt.Sprintf("finalize and assemble block error: %v", err))
+			}
+			// MODIFIED by Jakub Pajek END (clique static block rewards)
 
 			// Write state changes to db
 			root, err := statedb.Commit(config.IsEIP158(b.header.Number))

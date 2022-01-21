@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
@@ -111,6 +112,13 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			Difficulty: new(big.Int),
 		}
 		copy(genspec.ExtraData[32:], addr[:])
+		// ADDED by Jakub Pajek BEG (clique static block rewards)
+		// Inject signer's address into the consensus engine so that FinalizeAndAssemble
+		// called from GenerateChain below can correctly assign static block rewards.
+		engine.Authorize(addr, func(account accounts.Account, s string, data []byte) ([]byte, error) {
+			return crypto.Sign(crypto.Keccak256(data), key)
+		})
+		// ADDED by Jakub Pajek END (clique static block rewards)
 		genesis := genspec.MustCommit(testdb)
 
 		genEngine := beacon.New(engine)
