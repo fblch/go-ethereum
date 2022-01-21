@@ -54,9 +54,18 @@ type ForkChoice struct {
 	// local td is equal to the extern one. It can be nil for light
 	// client
 	preserve func(header *types.Header) bool
+
+	// ADDED by Jakub Pajek (deterministic fork choice rules)
+	// deterministic is a helper function used during fork choice.
+	// Determines whether miners should use determinictic fork choice
+	// rules, which is the case for clique in order to avoid deadlocks.
+	// It can be nil for light client.
+	deterministic func() bool
 }
 
-func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool) *ForkChoice {
+// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+//func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool) *ForkChoice {
+func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool, deterministic func() bool) *ForkChoice {
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -66,42 +75,73 @@ func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) 
 		chain:    chainReader,
 		rand:     mrand.New(mrand.NewSource(seed.Int64())),
 		preserve: preserve,
+		// ADDED by Jakub Pajek (deterministic fork choice rules)
+		deterministic: deterministic,
 	}
 }
 
+// MODIFIED by Jakub Pajek (deterministic fork choice rules)
 // ReorgNeeded returns whether the reorg should be applied
 // based on the given external header and local canonical chain.
-// In the td mode, the new head is chosen if the corresponding
-// total difficulty is higher. In the extern mode, the trusted
-// header is always selected as the head.
+//
+// In the extern mode, the trusted header is always selected as the head.
+//
+// In the deterministic td mode, the new head is chosen if (in order):
+//   - the corresponding total difficulty is higher, or
+//   - in case of a tie, if the corresponding block number is lower, or
+//   - in case of a tie, if the corresponding block used more gas, of
+//   - in case of a tie, if the corresponding header hash is lower.
+//
+// In the deterministic td mode, the new head is chosen if (in order):
+//   - the corresponding total difficulty is higher, or
+//   - in case of a tie, if the corresponding block number is lower, or
+//   - in case of a tie, randomly (reduces the vulnerability to selfish mining).
 func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header) (bool, error) {
 	var (
-		localTD  = f.chain.GetTd(current.Hash(), current.Number.Uint64())
-		externTd = f.chain.GetTd(header.Hash(), header.Number.Uint64())
+		localHash    = current.Hash()
+		externHash   = header.Hash()
+		localNumber  = current.Number.Uint64()
+		externNumber = header.Number.Uint64()
+		localTD      = f.chain.GetTd(localHash, localNumber)
+		externTd     = f.chain.GetTd(externHash, externNumber)
 	)
 	if localTD == nil || externTd == nil {
 		return false, errors.New("missing td")
 	}
+	// Extern mode:
 	// Accept the new header as the chain head if the transition
 	// is already triggered. We assume all the headers after the
 	// transition come from the trusted consensus layer.
 	if ttd := f.chain.Config().TerminalTotalDifficulty; ttd != nil && ttd.Cmp(externTd) <= 0 {
 		return true, nil
 	}
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
+	// TD mode:
+	// If the total difficulty is higher than our known, add it to the canonical chain.
 	reorg := externTd.Cmp(localTD) > 0
 	if !reorg && externTd.Cmp(localTD) == 0 {
-		number, headNumber := header.Number.Uint64(), current.Number.Uint64()
-		if number < headNumber {
+		// If the total difficulty is the same, choose block with lower block number.
+		if externNumber < localNumber {
 			reorg = true
-		} else if number == headNumber {
-			var currentPreserve, externPreserve bool
-			if f.preserve != nil {
-				currentPreserve, externPreserve = f.preserve(current), f.preserve(header)
+		} else if externNumber == localNumber {
+			if f.deterministic != nil && f.deterministic() {
+				// Deterministic TD mode:
+				// If the block number is the same, choose block with the most gas used.
+				if header.GasUsed > current.GasUsed {
+					reorg = true
+				} else if header.GasUsed == current.GasUsed {
+					// If gas used is the same, choose block with lower hash.
+					reorg = externHash.Big().Cmp(localHash.Big()) < 0
+				}
+			} else {
+				// Non-deterministic TD mode (original):
+				// Reduce the vulnerability to selfish mining.
+				// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
+				var currentPreserve, externPreserve bool
+				if f.preserve != nil {
+					currentPreserve, externPreserve = f.preserve(current), f.preserve(header)
+				}
+				reorg = !currentPreserve && (externPreserve || f.rand.Float64() < 0.5)
 			}
-			reorg = !currentPreserve && (externPreserve || f.rand.Float64() < 0.5)
 		}
 	}
 	return reorg, nil
