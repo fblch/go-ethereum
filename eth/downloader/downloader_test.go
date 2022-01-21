@@ -74,7 +74,9 @@ func newTesterWithNotification(t *testing.T, success func()) *downloadTester {
 	}
 	gspec.MustCommit(db)
 
-	chain, err := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil)
+	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+	//chain, err := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{}, nil, nil, nil)
 	if err != nil {
 		panic(err)
 	}
