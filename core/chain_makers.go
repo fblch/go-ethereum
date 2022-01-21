@@ -315,7 +315,9 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			gen(i, b)
 		}
 		if b.engine != nil {
-			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts, b.withdrawals)
+			// MODIFIED by Jakub Pajek (clique static block rewards)
+			//block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts, b.withdrawals)
+			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts, b.withdrawals, false)
 			if err != nil {
 				panic(err)
 			}

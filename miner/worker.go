@@ -1118,7 +1118,9 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, *big.Int, e
 			log.Warn("Block building is interrupted", "allowance", common.PrettyDuration(w.newpayloadTimeout))
 		}
 	}
-	block, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts, params.withdrawals)
+	// MODIFIED by Jakub Pajek (clique static block rewards)
+	//block, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts, params.withdrawals)
+	block, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts, params.withdrawals, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1213,7 +1215,9 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
 		// Withdrawals are set to nil here, because this is only called in PoW.
-		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts, nil)
+		// MODIFIED by Jakub Pajek (clique static block rewards)
+		//block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts, nil)
+		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts, nil, false)
 		if err != nil {
 			return err
 		}
