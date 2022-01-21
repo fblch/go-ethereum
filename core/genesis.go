@@ -524,8 +524,12 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
 	return &Genesis{
-		Config:     &config,
-		ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
+		Config: &config,
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
+		// Avoid import cycles in clique_test.go
+		//ExtraData: append(append(append(make([]byte, 32), faucet[:]...), clique.ExtraVoterMarker), make([]byte, crypto.SignatureLength)...),
+		ExtraData:  append(append(append(make([]byte, 32), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
 		GasLimit:   gasLimit,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(1),

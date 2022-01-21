@@ -104,7 +104,9 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			engine = clique.New(params.AllCliqueProtocolChanges.Clique, testdb)
 		)
 		genspec := &Genesis{
-			ExtraData: make([]byte, 32+common.AddressLength+crypto.SignatureLength),
+			// MODIFIED by Jakub Pajek (clique permissions)
+			//ExtraData: make([]byte, 32+common.AddressLength+crypto.SignatureLength),
+			ExtraData: make([]byte, 32+common.AddressLength+1+crypto.SignatureLength),
 			Alloc: map[common.Address]GenesisAccount{
 				addr: {Balance: big.NewInt(1)},
 			},
@@ -112,6 +114,8 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			Difficulty: new(big.Int),
 		}
 		copy(genspec.ExtraData[32:], addr[:])
+		// ADDED by Jakub Pajek (clique permissions)
+		genspec.ExtraData[32+common.AddressLength] = clique.ExtraVoterMarker
 		// ADDED by Jakub Pajek BEG (clique static block rewards)
 		// Inject signer's address into the consensus engine so that FinalizeAndAssemble
 		// called from GenerateChain below can correctly assign static block rewards.

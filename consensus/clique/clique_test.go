@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// TODOJAKUB add support for new permission model testing (voter/signer)
-
 package clique
 
 import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -47,13 +46,24 @@ func TestReimportMirroredState(t *testing.T) {
 		signer = new(types.HomesteadSigner)
 	)
 	genspec := &core.Genesis{
-		ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
+		ExtraData: make([]byte, extraVanity+common.AddressLength+1+extraSeal),
 		Alloc: map[common.Address]core.GenesisAccount{
 			addr: {Balance: big.NewInt(10000000000000000)},
 		},
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
 	copy(genspec.ExtraData[extraVanity:], addr[:])
+	// ADDED by Jakub Pajek (clique permissions)
+	genspec.ExtraData[32+common.AddressLength] = ExtraVoterMarker
+	// ADDED by Jakub Pajek BEG (clique static block rewards)
+	// Inject signer's address into the consensus engine so that FinalizeAndAssemble
+	// called from GenerateChain below can correctly assign static block rewards.
+	engine.Authorize(addr, func(account accounts.Account, s string, data []byte) ([]byte, error) {
+		return crypto.Sign(crypto.Keccak256(data), key)
+	})
+	// ADDED by Jakub Pajek END (clique static block rewards)
 	genesis := genspec.MustCommit(db)
 
 	// Generate a batch of blocks, each properly signed
