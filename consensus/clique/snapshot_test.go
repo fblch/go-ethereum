@@ -397,12 +397,19 @@ func TestClique(t *testing.T) {
 		}
 		// Create the genesis block with the initial set of signers
 		genesis := &core.Genesis{
-			ExtraData: make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
+			// MODIFIED by Jakub Pajek (clique permissions)
+			//ExtraData: make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
+			ExtraData: make([]byte, extraVanity+(common.AddressLength+1)*len(signers)+extraSeal),
 			BaseFee:   big.NewInt(params.InitialBaseFee),
 		}
+		// MODIFIED by Jakub Pajek BEG (clique permissions)
 		for j, signer := range signers {
-			copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
+			//copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
+			index := extraVanity + j*(common.AddressLength+1)
+			copy(genesis.ExtraData[index:], signer[:])
+			genesis.ExtraData[index+common.AddressLength] = ExtraVoterMarker
 		}
+		// MODIFIED by Jakub Pajek END (clique permissions)
 		// Create a pristine blockchain with the genesis injected
 		db := rawdb.NewMemoryDatabase()
 		genesis.Commit(db)
