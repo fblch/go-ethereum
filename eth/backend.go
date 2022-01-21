@@ -198,7 +198,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if config.OverrideShanghai != nil {
 		overrides.OverrideShanghai = config.OverrideShanghai
 	}
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
+	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+	//eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, eth.shouldPreserve, &config.TxLookupLimit)
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, eth.shouldPreserve, eth.isDeterministic, &config.TxLookupLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -398,6 +400,16 @@ func (s *Ethereum) shouldPreserve(header *types.Header) bool {
 		return false
 	}
 	return s.isLocalBlock(header)
+}
+
+// ADDED by Jakub Pajek (deterministic fork choice rules)
+// isDeterministic returns true if deterministic chain reorg rules should
+// be used, which is the case for clique in order to avoid deadlocks.
+func (s *Ethereum) isDeterministic() bool {
+	if _, ok := s.engine.(*clique.Clique); ok {
+		return true
+	}
+	return false
 }
 
 // SetEtherbase sets the mining reward address.
