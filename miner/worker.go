@@ -1094,7 +1094,9 @@ func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
 	if !params.noTxs {
 		w.fillTransactions(nil, work)
 	}
-	return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts)
+	// MODIFIED by Jakub Pajek (clique static block rewards)
+	//return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts)
+	return w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, work.unclelist(), work.receipts, false)
 }
 
 // commitWork generates several new sealing tasks based on the parent block
@@ -1152,7 +1154,9 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
-		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
+		// MODIFIED by Jakub Pajek (clique static block rewards)
+		//block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
+		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts, false)
 		if err != nil {
 			return err
 		}
