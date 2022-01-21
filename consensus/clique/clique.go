@@ -65,8 +65,8 @@ var (
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
 
-	extraVoterMarker  byte = 0xff // Magic value in extra-data to mark address as a voter
-	extraSignerMarker byte = 0xee // Magic value in extra-data to mark address as a signer
+	ExtraVoterMarker  byte = 0xff // Magic value in extra-data to mark address as a voter
+	ExtraSignerMarker byte = 0xee // Magic value in extra-data to mark address as a signer
 
 	nonceVoterVote  = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new voter
 	nonceSignerVote = hexutil.MustDecode("0xeeeeeeeeeeeeeeee") // Magic nonce number to vote on adding a new signer
@@ -385,9 +385,9 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 			index := i * (common.AddressLength + 1)
 			copy(permissions[index:], signer[:])
 			if _, ok := snap.Voters[signer]; ok {
-				permissions[index+common.AddressLength] = extraVoterMarker
+				permissions[index+common.AddressLength] = ExtraVoterMarker
 			} else {
-				permissions[index+common.AddressLength] = extraSignerMarker
+				permissions[index+common.AddressLength] = ExtraSignerMarker
 			}
 		}
 		extraSuffix := len(header.Extra) - extraSeal
@@ -434,7 +434,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 				for i := 0; i < len(signers); i++ {
 					index := extraVanity + i*(common.AddressLength+1)
 					copy(signers[i][:], checkpoint.Extra[index:])
-					if checkpoint.Extra[index+common.AddressLength] == extraVoterMarker {
+					if checkpoint.Extra[index+common.AddressLength] == ExtraVoterMarker {
 						voters = append(voters, signers[i])
 					}
 				}
@@ -593,9 +593,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		for _, signer := range snap.signers() {
 			header.Extra = append(header.Extra, signer[:]...)
 			if _, ok := snap.Voters[signer]; ok {
-				header.Extra = append(header.Extra, extraVoterMarker)
+				header.Extra = append(header.Extra, ExtraVoterMarker)
 			} else {
-				header.Extra = append(header.Extra, extraSignerMarker)
+				header.Extra = append(header.Extra, ExtraSignerMarker)
 			}
 		}
 	}
