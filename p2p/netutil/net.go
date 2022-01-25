@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-// MODIFIED by Jakub Pajek
+// MODIFIED by Jakub Pajek (mobile connectivity)
 var lan4, lan6, special4, special6, toneLan4, toneLan6 Netlist
 
 func init() {
@@ -65,10 +65,10 @@ func init() {
 	special6.Add("2001:db8::/32")
 	special6.Add("2002::/16")
 
-	// ADDED by Jakub Pajek
+	// ADDED by Jakub Pajek (mobile connectivity)
 	toneLan4.Add("10.0.0.0/8") // Private Use
 
-	// ADDED by Jakub Pajek
+	// ADDED by Jakub Pajek (mobile connectivity)
 	// toneLan6 left blank for now
 	//toneLan6.Add(...) // Link-Local
 }
@@ -143,7 +143,7 @@ func (l *Netlist) Contains(ip net.IP) bool {
 	return false
 }
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (mobile connectivity)
 // IsToneLAN reports whether an IP is a local TONE network address.
 func IsToneLAN(ip net.IP) bool {
 	if v4 := ip.To4(); v4 != nil {
@@ -189,7 +189,9 @@ var (
 // There are four rules:
 //   - Special network addresses are never valid.
 //   - Loopback addresses are OK if relayed by a loopback host.
-//   - LAN addresses are OK if relayed by a LAN host. (MODIFIED by Jakub Pajek: with exception of Tone LAN addresses)
+//   - LAN addresses are OK if relayed by a LAN host.
+//     MODIFIED by Jakub Pajek (mobile connectivity)
+//     With exception of Tone LAN addresses, which can be relayed by WAN host.
 //   - All other addresses are always acceptable.
 func CheckRelayIP(sender, addr net.IP) error {
 	if len(addr) != net.IPv4len && len(addr) != net.IPv6len {
@@ -204,7 +206,7 @@ func CheckRelayIP(sender, addr net.IP) error {
 	if addr.IsLoopback() && !sender.IsLoopback() {
 		return errLoopback
 	}
-	// MODIFIED by Jakub Pajek
+	// MODIFIED by Jakub Pajek (mobile connectivity)
 	// Allow Tone devices to relay their LAN addresses to WAN bootnodes,
 	// because Tone devices can directly connect to eachother behind NAT.
 	//if IsLAN(addr) && !IsLAN(sender) {
