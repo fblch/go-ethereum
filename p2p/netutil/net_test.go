@@ -96,7 +96,7 @@ func TestIsLAN(t *testing.T) {
 	)
 }
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (mobile connectivity)
 func TestIsToneLAN(t *testing.T) {
 	checkContains(t, IsToneLAN,
 		[]string{ // included
@@ -180,7 +180,7 @@ func TestCheckRelayIP(t *testing.T) {
 		{"192.168.0.1", "192.168.0.1", nil},
 		{"192.168.0.1", "23.55.1.242", nil},
 		{"23.55.1.242", "23.55.1.242", nil},
-		// ADDED by Jakub Pajek
+		// ADDED by Jakub Pajek (mobile connectivity)
 		{"23.55.1.242", "10.0.1.1", nil},
 	}
 
