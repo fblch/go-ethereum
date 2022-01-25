@@ -1012,7 +1012,7 @@ func doAndroidArchive(cmdline []string) {
 	build.MustRun(tc.Go("mod", "download"))
 
 	// Build the Android archive and Maven resources
-	// MODIFIED by Jakub Pajek
+	// MODIFIED by Jakub Pajek (mobile node)
 	// Build arm64-v8a .so libraries only
 	//build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
 	build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android/arm64", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
