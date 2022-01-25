@@ -82,7 +82,7 @@ func FoundationBootnodes() *Enodes {
 	return nodes
 }
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (mobile node)
 // RopstenBootnodes returns the enode URLs of the P2P bootstrap nodes running on the
 // Ropsten test network, operated by the foundation (running the V5 discovery protocol?).
 func RopstenBootnodes() *Enodes {
