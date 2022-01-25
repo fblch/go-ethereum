@@ -315,16 +315,16 @@ func (ec *EthereumClient) SendTransaction(ctx *Context, tx *Transaction) error {
 	return ec.client.SendTransaction(ctx.context, tx.tx)
 }
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (clique permissions)
 // Clique
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (clique permissions)
 // CliqueIsSigner checks if a given address is a signer (has right to sign blocks)
 func (ec *EthereumClient) CliqueIsSigner(ctx *Context, address *Address) (bool, error) {
 	return ec.client.CliqueIsSigner(ctx.context, address.address)
 }
 
-// ADDED by Jakub Pajek
+// ADDED by Jakub Pajek (clique permissions)
 // CliqueIsVoter checks if a given address is a voter (has right to vote for)
 func (ec *EthereumClient) CliqueIsVoter(ctx *Context, address *Address) (bool, error) {
 	return ec.client.CliqueIsVoter(ctx.context, address.address)
