@@ -1082,7 +1082,9 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 
 		// Rewind may have occurred, skip in that case.
 		if bc.CurrentHeader().Number.Cmp(head.Number()) >= 0 {
-			reorg, err := bc.forker.ReorgNeeded(bc.CurrentSnapBlock(), head.Header())
+			// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+			//reorg, err := bc.forker.ReorgNeeded(bc.CurrentSnapBlock(), head.Header())
+			reorg, err := bc.forker.ReorgNeeded(bc.CurrentSnapBlock(), head.Header(), false)
 			if err != nil {
 				log.Warn("Reorg failed", "err", err)
 				return false
@@ -1436,7 +1438,9 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		return NonStatTy, err
 	}
 	currentBlock := bc.CurrentBlock()
-	reorg, err := bc.forker.ReorgNeeded(currentBlock, block.Header())
+	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+	//reorg, err := bc.forker.ReorgNeeded(currentBlock, block.Header())
+	reorg, err := bc.forker.ReorgNeeded(currentBlock, block.Header(), false)
 	if err != nil {
 		return NonStatTy, err
 	}
@@ -1584,7 +1588,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals, setHead bool)
 			current = bc.CurrentBlock()
 		)
 		for block != nil && bc.skipBlock(err, it) {
-			reorg, err = bc.forker.ReorgNeeded(current, block.Header())
+			// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+			//reorg, err = bc.forker.ReorgNeeded(current, block.Header())
+			reorg, err = bc.forker.ReorgNeeded(current, block.Header(), false)
 			if err != nil {
 				return it.index, err
 			}
@@ -1594,6 +1600,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals, setHead bool)
 				// In eth2 the forker always returns true for reorg decision (blindly trusting
 				// the external consensus engine), but in order to prevent the unnecessary
 				// reorgs when importing known blocks, the special case is handled here.
+				// TODO (?) by Jakub Pajek (deterministic fork choice rules)
 				if block.NumberU64() > current.Number.Uint64() || bc.GetCanonicalHash(block.NumberU64()) != block.Hash() {
 					break
 				}
@@ -1944,7 +1951,9 @@ func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (i
 	//
 	// If the externTd was larger than our local TD, we now need to reimport the previous
 	// blocks to regenerate the required state
-	reorg, err := bc.forker.ReorgNeeded(current, lastBlock.Header())
+	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+	//reorg, err := bc.forker.ReorgNeeded(current, lastBlock.Header())
+	reorg, err := bc.forker.ReorgNeeded(current, lastBlock.Header(), false)
 	if err != nil {
 		return it.index, err
 	}
