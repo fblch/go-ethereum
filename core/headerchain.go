@@ -284,7 +284,9 @@ func (hc *HeaderChain) writeHeadersAndSetHead(headers []*types.Header, forker *F
 		}
 	)
 	// Ask the fork choicer if the reorg is necessary
-	if reorg, err := forker.ReorgNeeded(hc.CurrentHeader(), lastHeader); err != nil {
+	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+	//if reorg, err := forker.ReorgNeeded(hc.CurrentHeader(), lastHeader); err != nil {
+	if reorg, err := forker.ReorgNeeded(hc.CurrentHeader(), lastHeader, false); err != nil {
 		return nil, err
 	} else if !reorg {
 		if inserted != 0 {
@@ -294,6 +296,7 @@ func (hc *HeaderChain) writeHeadersAndSetHead(headers []*types.Header, forker *F
 	}
 	// Special case, all the inserted headers are already on the canonical
 	// header chain, skip the reorg operation.
+	// TODO (?) by Jakub Pajek (deterministic fork choice rules)
 	if hc.GetCanonicalHash(lastHeader.Number.Uint64()) == lastHash && lastHeader.Number.Uint64() <= hc.CurrentHeader().Number.Uint64() {
 		return result, nil
 	}
