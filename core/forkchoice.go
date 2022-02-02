@@ -96,7 +96,8 @@ func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) 
 //   - the corresponding total difficulty is higher, or
 //   - in case of a tie, if the corresponding block number is lower, or
 //   - in case of a tie, randomly (reduces the vulnerability to selfish mining).
-func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header) (bool, error) {
+//func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header) (bool, error) {
+func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header, dummy bool) (bool, error) {
 	var (
 		localHash    = current.Hash()
 		externHash   = header.Hash()
