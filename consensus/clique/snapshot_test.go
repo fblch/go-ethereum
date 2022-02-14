@@ -15,6 +15,7 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // TODOJAKUB add support for new permission model testing (voter/signer)
+// TODOJAKUB add support for new voting model testing (multiple votes)
 
 package clique
 
@@ -429,7 +430,9 @@ func TestClique(t *testing.T) {
 			if tt.votes[j].auth {
 				var nonce types.BlockNonce
 				// TODOJAKUB just changed nonceAuthVote to nonceSignerVote without checking the logic
-				copy(nonce[:], nonceSignerVote)
+				//copy(nonce[:], nonceSignerVote)
+				// TODOJAKUB just changed nonceSignerVote to nonceNone without checking the logic
+				copy(nonce[:], nonceNone)
 				gen.SetNonce(nonce)
 			}
 		})

@@ -252,80 +252,89 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		snap.Recents[number] = signer
 
 		// If a vote is cast...
-		if !bytes.Equal(header.Nonce[:], nonceNoneVote) {
+		extraBytes := len(header.Extra) - extraVanity - extraSeal
+		if number%s.config.Epoch != 0 && extraBytes > 0 {
 			// ...check the signer against voters
 			if _, ok := snap.Voters[signer]; !ok {
 				return nil, errUnauthorizedVoter
 			}
 
-			// Header authorized, discard any previous votes from the voter
-			for i, vote := range snap.Votes {
-				if vote.Voter == signer && vote.Address == header.Coinbase {
-					// Uncast the vote from the cached tally
-					snap.uncast(vote.Address, vote.Proposal)
+			// TODOJAKUB what if vote/vote, vote/drop, drop/vote, etc
+			// For every vote...
+			voteCount := extraBytes / (common.AddressLength + 1)
+			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
+				index := extraVanity + voteIdx*(common.AddressLength+1)
+				var address common.Address
+				copy(address[:], header.Extra[index:])
 
-					// Uncast the vote from the chronological list
-					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-					break // only one vote allowed
-				}
-			}
-			// Tally up the new vote from the voter
-			var proposal uint64
-			switch {
-			case bytes.Equal(header.Nonce[:], nonceVoterVote):
-				proposal = proposalVoterVote
-			case bytes.Equal(header.Nonce[:], nonceSignerVote):
-				proposal = proposalSignerVote
-			case bytes.Equal(header.Nonce[:], nonceDropVote):
-				proposal = proposalDropVote
-			default:
-				return nil, errInvalidVote
-			}
-			if snap.cast(header.Coinbase, proposal) {
-				snap.Votes = append(snap.Votes, &Vote{
-					Voter:    signer,
-					Block:    number,
-					Address:  header.Coinbase,
-					Proposal: proposal,
-				})
-			}
-			// If the vote passed, update the list of voters/signers
-			//if tally := snap.Tally[header.Coinbase]; tally.Votes > 0 {
-			if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Voters)/2 {
-				if tally.Proposal == proposalVoterVote {
-					snap.Voters[header.Coinbase] = struct{}{}
-					snap.Signers[header.Coinbase] = struct{}{}
-				} else if tally.Proposal == proposalSignerVote {
-					snap.Signers[header.Coinbase] = struct{}{}
-				} else {
-					delete(snap.Voters, header.Coinbase)
-					delete(snap.Signers, header.Coinbase)
+				// Header authorized, discard any previous votes from the voter
+				for i, vote := range snap.Votes {
+					if vote.Voter == signer && vote.Address == address {
+						// Uncast the vote from the cached tally
+						snap.uncast(vote.Address, vote.Proposal)
 
-					// Signer list shrunk, delete any leftover recent caches
-					if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
-						delete(snap.Recents, number-limit)
+						// Uncast the vote from the chronological list
+						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+						break // only one vote allowed
 					}
-					// Discard any previous votes the deauthorized voter cast
+				}
+				// Tally up the new vote from the voter
+				var proposal uint64
+				switch header.Extra[index+common.AddressLength] {
+				case ExtraVoterVote:
+					proposal = proposalVoterVote
+				case ExtraSignerVote:
+					proposal = proposalSignerVote
+				case ExtraDropVote:
+					proposal = proposalDropVote
+				default:
+					return nil, errInvalidVote
+				}
+				if snap.cast(address, proposal) {
+					snap.Votes = append(snap.Votes, &Vote{
+						Voter:    signer,
+						Block:    number,
+						Address:  address,
+						Proposal: proposal,
+					})
+				}
+				// If the vote passed, update the list of voters/signers
+				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
+					if tally.Proposal == proposalVoterVote {
+						snap.Voters[address] = struct{}{}
+						snap.Signers[address] = struct{}{}
+					} else if tally.Proposal == proposalSignerVote {
+						snap.Signers[address] = struct{}{}
+					} else {
+						delete(snap.Voters, address)
+						delete(snap.Signers, address)
+
+						// Signer list shrunk, delete any leftover recent caches
+						if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
+							delete(snap.Recents, number-limit)
+						}
+						// Discard any previous votes the deauthorized voter cast
+						for i := 0; i < len(snap.Votes); i++ {
+							if snap.Votes[i].Voter == address {
+								// Uncast the vote from the cached tally
+								snap.uncast(snap.Votes[i].Address, snap.Votes[i].Proposal)
+
+								// Uncast the vote from the chronological list
+								snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+
+								i--
+							}
+						}
+					}
+					// Discard any previous votes around the just changed account
 					for i := 0; i < len(snap.Votes); i++ {
-						if snap.Votes[i].Voter == header.Coinbase {
-							// Uncast the vote from the cached tally
-							snap.uncast(snap.Votes[i].Address, snap.Votes[i].Proposal)
-
-							// Uncast the vote from the chronological list
+						if snap.Votes[i].Address == address {
 							snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-
 							i--
 						}
 					}
+					delete(snap.Tally, address)
 				}
-				// Discard any previous votes around the just changed account
-				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Address == header.Coinbase {
-						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-						i--
-					}
-				}
-				delete(snap.Tally, header.Coinbase)
 			}
 			// If we're taking too much time (ecrecover), notify the user once a while
 			if time.Since(logged) > 8*time.Second {
