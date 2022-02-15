@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -126,22 +127,39 @@ func (api *API) GetVotersAtHash(hash common.Hash) ([]common.Address, error) {
 	return snap.voters(), nil
 }
 
+type prop struct {
+	Block    uint64 `json:"block"`
+	Proposal string `json:"proposal"`
+}
+
 // Proposals returns the current proposals the node tries to uphold and vote on.
-func (api *API) Proposals() map[common.Address]string {
+func (api *API) Proposals() map[common.Address]prop {
 	api.clique.lock.RLock()
 	defer api.clique.lock.RUnlock()
 
-	proposals := make(map[common.Address]string)
+	proposals := make(map[common.Address]prop)
 	for address, proposal := range api.clique.proposals {
-		switch proposal {
+		switch proposal.Proposal {
 		case proposalVoterVote:
-			proposals[address] = "voter"
+			proposals[address] = prop{
+				Proposal: "voter",
+				Block:    proposal.Block,
+			}
 		case proposalSignerVote:
-			proposals[address] = "signer"
+			proposals[address] = prop{
+				Proposal: "signer",
+				Block:    proposal.Block,
+			}
 		case proposalDropVote:
-			proposals[address] = "drop"
+			proposals[address] = prop{
+				Proposal: "drop",
+				Block:    proposal.Block,
+			}
 		default:
-			proposals[address] = "<invalid>"
+			proposals[address] = prop{
+				Proposal: "<invalid>",
+				Block:    proposal.Block,
+			}
 		}
 	}
 	return proposals
@@ -153,16 +171,34 @@ func (api *API) Propose(address common.Address, proposal string) error {
 	api.clique.lock.Lock()
 	defer api.clique.lock.Unlock()
 
+	header := api.chain.CurrentHeader()
 	switch proposal {
 	case "voter":
-		api.clique.proposals[address] = proposalVoterVote
+		api.clique.proposals[address] = Proposal{
+			Proposal: proposalVoterVote,
+			Block:    header.Number.Uint64(),
+		}
 	case "signer":
-		api.clique.proposals[address] = proposalSignerVote
+		api.clique.proposals[address] = Proposal{
+			Proposal: proposalSignerVote,
+			Block:    header.Number.Uint64(),
+		}
 	case "drop":
-		api.clique.proposals[address] = proposalDropVote
+		api.clique.proposals[address] = Proposal{
+			Proposal: proposalDropVote,
+			Block:    header.Number.Uint64(),
+		}
 	default:
 		return fmt.Errorf("invalid proposal %s", proposal)
 	}
+
+	// Save proposals to disk
+	if err := api.clique.storeProposals(); err != nil {
+		log.Warn("Failed to store clique proposals to disk", "err", err)
+	} else {
+		log.Trace("Stored clique proposals disk")
+	}
+
 	return nil
 }
 
@@ -172,7 +208,16 @@ func (api *API) Discard(address common.Address) {
 	api.clique.lock.Lock()
 	defer api.clique.lock.Unlock()
 
-	delete(api.clique.proposals, address)
+	if _, ok := api.clique.proposals[address]; ok {
+		delete(api.clique.proposals, address)
+
+		// Save proposals to disk
+		if err := api.clique.storeProposals(); err != nil {
+			log.Warn("Failed to store clique proposals to disk", "err", err)
+		} else {
+			log.Trace("Stored clique proposals disk")
+		}
+	}
 }
 
 type status struct {
