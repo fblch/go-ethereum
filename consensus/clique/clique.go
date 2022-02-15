@@ -19,6 +19,7 @@ package clique
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -185,6 +186,13 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	return signer, nil
 }
 
+// Proposal represents a single proposal that an authorized voter will vote on
+// to modify the list of permissions.
+type Proposal struct {
+	Block    uint64 `json:"block"`    // Block number the proposal came in (expire old proposals)
+	Proposal uint64 `json:"proposal"` // Whether to authorize or deauthorize the voted account
+}
+
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
@@ -194,7 +202,7 @@ type Clique struct {
 	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
 	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
 
-	proposals map[common.Address]uint64 // Current list of proposals we are pushing
+	proposals map[common.Address]Proposal // Current list of proposals we are pushing
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
@@ -202,6 +210,28 @@ type Clique struct {
 
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
+}
+
+// loadProposals loads existing proposals from the database.
+func loadProposals(db ethdb.Database) (map[common.Address]Proposal, error) {
+	blob, err := db.Get([]byte("clique-proposals"))
+	if err != nil {
+		return nil, err
+	}
+	var proposals map[common.Address]Proposal
+	if err := json.Unmarshal(blob, &proposals); err != nil {
+		return nil, err
+	}
+	return proposals, nil
+}
+
+// storeProposals inserts existing proposals into the database.
+func (c *Clique) storeProposals() error {
+	blob, err := json.Marshal(c.proposals)
+	if err != nil {
+		return err
+	}
+	return c.db.Put([]byte("clique-proposals"), blob)
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
@@ -216,12 +246,21 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	signatures, _ := lru.NewARC(inmemorySignatures)
 
+	// If an on-disk proposals can be found, use that
+	proposals, err := loadProposals(db)
+	if err != nil {
+		log.Warn("Failed to load clique proposals from disk", "err", err)
+		proposals = make(map[common.Address]Proposal)
+	} else {
+		log.Trace("Loaded clique proposals from disk")
+	}
+
 	return &Clique{
 		config:     &conf,
 		db:         db,
 		recents:    recents,
 		signatures: signatures,
-		proposals:  make(map[common.Address]uint64),
+		proposals:  proposals,
 	}
 }
 
@@ -587,27 +626,42 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// Only voters can cast votes
 		// TODOJAKUB c.signer should be protected by c.lock.RLock()?
 		if _, ok := snap.Voters[c.signer]; ok {
-			c.lock.RLock()
+			// Write lock needed for proposal purging
+			c.lock.Lock() //c.lock.RLock()
 
 			// Gather all the proposals that make sense voting on
-			addresses := make([]common.Address, 0, len(c.proposals))
+			// On that occasion, also purge already passed and old proposals
+			addresses, purged := make([]common.Address, 0, len(c.proposals)), 0
 			for address, proposal := range c.proposals {
-				if snap.validVote(address, proposal) {
+				if snap.validVote(address, proposal.Proposal) {
 					addresses = append(addresses, address)
+				} else if number > proposal.Block && number-proposal.Block > params.FullImmutabilityThreshold {
+					delete(c.proposals, address)
+					purged++
+				}
+			}
+			// If there's purged proposals, save to disk
+			if purged > 0 {
+				log.Trace("Purged old clique proposals", "total", len(c.proposals), "purged", purged)
+				if err := c.storeProposals(); err != nil {
+					log.Warn("Failed to store clique proposals to disk", "err", err)
+				} else {
+					log.Trace("Stored clique proposals disk")
 				}
 			}
 			// If there's pending proposals, cast votes on them
 			for _, address := range addresses {
 				header.Extra = append(header.Extra, address[:]...)
-				if c.proposals[address] == proposalVoterVote {
+				if c.proposals[address].Proposal == proposalVoterVote {
 					header.Extra = append(header.Extra, ExtraVoterVote)
-				} else if c.proposals[address] == proposalSignerVote {
+				} else if c.proposals[address].Proposal == proposalSignerVote {
 					header.Extra = append(header.Extra, ExtraSignerVote)
-				} else if c.proposals[address] == proposalDropVote {
+				} else if c.proposals[address].Proposal == proposalDropVote {
 					header.Extra = append(header.Extra, ExtraDropVote)
 				}
 			}
-			c.lock.RUnlock()
+			// Write lock needed for proposal purging
+			c.lock.Unlock() //c.lock.RUnlock()
 		}
 	}
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
