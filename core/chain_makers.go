@@ -233,7 +233,9 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if b.header.Difficulty == nil {
 			if config.TerminalTotalDifficulty == nil {
 				// Clique chain
-				b.header.Difficulty = big.NewInt(2)
+				// MODIFIED by Jakub Pajek (1-n scale difficulties)
+				//b.header.Difficulty = big.NewInt(2)
+				b.header.Difficulty = big.NewInt(1) // single in-turn signer
 			} else {
 				// Post-merge chain
 				b.header.Difficulty = big.NewInt(0)
