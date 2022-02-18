@@ -135,7 +135,9 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 				header.ParentHash = preBlocks[i-1].Hash()
 			}
 			header.Extra = make([]byte, 32+crypto.SignatureLength)
-			header.Difficulty = big.NewInt(2)
+			// MODIFIED by Jakub Pajek (1-n scale difficulties)
+			//header.Difficulty = big.NewInt(2)
+			header.Difficulty = big.NewInt(1) // single in-turn signer
 
 			sig, _ := crypto.Sign(genEngine.SealHash(header).Bytes(), key)
 			copy(header.Extra[len(header.Extra)-crypto.SignatureLength:], sig)
