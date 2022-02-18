@@ -19,6 +19,7 @@ package clique
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -259,7 +260,9 @@ func (api *API) Status() (*status, error) {
 		if h == nil {
 			return nil, fmt.Errorf("missing block %d", n)
 		}
-		if h.Difficulty.Cmp(diffInTurn) == 0 {
+		// MODIFIED by Jakub Pajek (1-n scale difficulties)
+		//if h.Difficulty.Cmp(diffInTurn) == 0 {
+		if h.Difficulty.Cmp(big.NewInt(int64(len(snap.Signers)))) == 0 {
 			optimals++
 		}
 		diff += h.Difficulty.Uint64()
