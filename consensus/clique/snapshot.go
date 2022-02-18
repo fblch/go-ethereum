@@ -372,11 +372,40 @@ func (s *Snapshot) signers() []common.Address {
 	return sigs
 }
 
-// inturn returns if a signer at a given block height is in-turn or not.
-func (s *Snapshot) inturn(number uint64, signer common.Address) bool {
+// calcDifficulty returns a diffuculty for a signer at a given block height.
+//
+// Returned difficulty values are between 0 and SIGNER_COUNT inclusive.
+// * The in-turn signer for a given block (marked in pharenthesis below) gets
+//   the highest difficulty equal to SIGNER_COUNT.
+// * Unauthorized addresses get difficulty 0.
+// * The closer a succeeding signer is to the in-turn signer for a given block,
+//   the higher the difficulty.
+// * The closer a preceding signer is to the in-turn signer for a given block,
+//   the lower the difficulty.
+//
+// Assuming five signers, denoted as s0...s4, the difficulty matrix is as follows:
+//
+// 		s0	s1	s2	s3	s4
+// ---+-------------------
+//	0 |	(5)	4	3	2	1
+//	1 |	1	(5)	4	3	2
+//	2 |	2	1	(5)	4	3
+//	3 |	3	2	1	(5)	4
+//	4 |	4	3	2	1	(5)
+func (s *Snapshot) calcDifficulty(number uint64, signer common.Address) uint64 {
 	signers, offset := s.signers(), 0
 	for offset < len(signers) && signers[offset] != signer {
 		offset++
 	}
-	return (number % uint64(len(signers))) == uint64(offset)
+	if offset == len(signers) {
+		// Unauthorized address
+		return 0
+	}
+	if x := offset - int(number%uint64(len(signers))); x >= 0 {
+		// In-turn signer, or a succeeding signer
+		return uint64(len(signers) - x)
+	} else {
+		// Preceding signer
+		return uint64(-x)
+	}
 }
