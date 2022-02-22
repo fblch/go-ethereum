@@ -16,6 +16,7 @@
 
 // TODOJAKUB add support for new permission model testing (voter/signer)
 // TODOJAKUB add support for new voting model testing (multiple votes)
+// TODOJAKUB add support for new difficulty model testing (1-n scale difficulties)
 
 package clique
 
@@ -517,44 +518,6 @@ func TestClique(t *testing.T) {
 		for j := 0; j < len(result); j++ {
 			if !bytes.Equal(result[j][:], signers[j][:]) {
 				t.Errorf("test %d, signer %d: signer mismatch: have %x, want %x", i, j, result[j], signers[j])
-			}
-		}
-	}
-}
-
-func TestCalcDifficulty(t *testing.T) {
-	// Generate five addresses authorized for signing
-	signers := make([]common.Address, 5)
-	for i := 0; i < 2*len(signers); i += 2 {
-		signers[i/2] = common.BigToAddress(big.NewInt(int64(i)))
-	}
-
-	// Generate a snapshot with authorized signer addresses
-	snap := newSnapshot(nil, nil, 0, common.BigToHash(big.NewInt(0)), make([]common.Address, 0), signers)
-
-	// Generate a mix of ten authorized and unauthorized addresses
-	addresses := make([]common.Address, 10)
-	for i := 0; i < len(addresses); i++ {
-		addresses[i] = common.BigToAddress(big.NewInt(int64(i)))
-	}
-
-	// Generate a matrix of correct diffuculties
-	diffs := [5][10]uint64{
-		{5, 0, 4, 0, 3, 0, 2, 0, 1, 0},
-		{1, 0, 5, 0, 4, 0, 3, 0, 2, 0},
-		{2, 0, 1, 0, 5, 0, 4, 0, 3, 0},
-		{3, 0, 2, 0, 1, 0, 5, 0, 4, 0},
-		{4, 0, 3, 0, 2, 0, 1, 0, 5, 0},
-	}
-
-	// Test
-	for block := 0; block < 1000000; block++ {
-		for i := 0; i < len(addresses); i++ {
-			have := snap.calcDifficulty(uint64(block), addresses[i])
-			want := diffs[block%len(signers)][i]
-			if have != want {
-				t.Errorf("have %d, want %d", have, want)
-				return
 			}
 		}
 	}
