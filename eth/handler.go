@@ -223,6 +223,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 			log.Warn("Unsynced yet, discarded propagated block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
 			return 0, nil
 		}
+		// MEMO by Jakub Pajek: network init (various)
 		// If snap sync is running, deny importing weird blocks. This is a problematic
 		// clause when starting up a new network, because snap-syncing miners might not
 		// accept each others' blocks until a restart. Unfortunately we haven't figured

@@ -79,7 +79,7 @@ var (
 
 	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW
 
-	diffInvalid = big.NewInt(0) // Block difficulty for unauthorized signers
+	diffInvalid = big.NewInt(0) // Block difficulty must be at greater than zero
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -463,7 +463,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 						voters = append(voters, signers[i])
 					}
 				}
-				snap = newSnapshot(c.config, c.signatures, number, hash, voters, signers)
+				snap = newGenesisSnapshot(c.config, c.signatures, number, hash, voters, signers)
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -534,21 +534,17 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 	if err != nil {
 		return err
 	}
-	if _, ok := snap.Signers[signer]; !ok {
+	if lastBlockSigned, ok := snap.Signers[signer]; !ok {
 		return errUnauthorizedSigner
-	}
-	for seen, recent := range snap.Recents {
-		if recent == signer {
-			// Signer is among recents, only fail if the current block doesn't shift it out
-			if limit := uint64(len(snap.Signers)/2 + 1); seen > number-limit {
-				return errRecentlySigned
-			}
+	} else if lastBlockSigned > 0 {
+		// Check against recent signers
+		if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
+			return errRecentlySigned
 		}
 	}
 	// Ensure that the difficulty corresponds to the turn-ness of the signer
 	if !c.fakeDiff {
-		difficulty := new(big.Int).SetUint64(snap.calcDifficulty(header.Number.Uint64(), signer))
-		if header.Difficulty.Cmp(difficulty) != 0 {
+		if header.Difficulty.Cmp(calcDifficulty(snap.Signers, signer)) != 0 {
 			return errWrongDifficulty
 		}
 	}
@@ -599,7 +595,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 	// Set the correct difficulty
 	// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-	header.Difficulty = calcDifficulty(snap, c.signer)
+	header.Difficulty = calcDifficulty(snap.Signers, c.signer)
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -756,16 +752,13 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	if err != nil {
 		return err
 	}
-	if _, authorized := snap.Signers[signer]; !authorized {
+	if lastBlockSigned, ok := snap.Signers[signer]; !ok {
 		return errUnauthorizedSigner
-	}
-	// If we're amongst the recent signers, wait for the next block
-	for seen, recent := range snap.Recents {
-		if recent == signer {
-			// Signer is among recents, only wait if the current block doesn't shift it out
-			if limit := uint64(len(snap.Signers)/2 + 1); number < limit || seen > number-limit {
-				return errors.New("signed recently, must wait for others")
-			}
+	} else if lastBlockSigned > 0 {
+		// Check against recent signers
+		if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
+			// If we're amongst the recent signers, wait for the next block
+			return errors.New("signed recently, must wait for others")
 		}
 	}
 	// Sweet, the protocol permits us to sign the block, wait for our time
@@ -810,11 +803,34 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		return nil
 	}
 	// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-	return calcDifficulty(snap, c.signer)
+	return calcDifficulty(snap.Signers, c.signer)
 }
 
-func calcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
-	return new(big.Int).SetUint64(snap.calcDifficulty(snap.Number+1, signer))
+// calcDifficulty returns the difficulty for signer, given all signers and their most recently
+// signed block numbers, with 0 meaning 'has not signed yet'. With n signers, it will always
+// return values from 1 to n, inclusive.
+//
+// Difficulty is defined as 1 plus the number of lower priority signers, with more recent
+// signers having lower priority. If multiple signers have not yet signed (0), then addresses
+// which lexicographically sort later have lower priority.
+func calcDifficulty(signers map[common.Address]uint64, signer common.Address) *big.Int {
+	difficulty := uint64(1)
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if lastBlockSigned := signers[signer]; lastBlockSigned > 0 {
+		for _, n := range signers {
+			if n > lastBlockSigned {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr, n := range signers {
+			if n > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

@@ -51,13 +51,12 @@ type Snapshot struct {
 	config   *params.CliqueConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache        // Cache of recent block signatures to speed up ecrecover
 
-	Number  uint64                      `json:"number"`  // Block number where the snapshot was created
-	Hash    common.Hash                 `json:"hash"`    // Block hash where the snapshot was created
-	Voters  map[common.Address]struct{} `json:"voters"`  // Set of authorized voters at this moment
-	Signers map[common.Address]struct{} `json:"signers"` // Set of authorized signers at this moment
-	Recents map[uint64]common.Address   `json:"recents"` // Set of recent signers for spam protections
-	Votes   []*Vote                     `json:"votes"`   // List of votes cast in chronological order
-	Tally   map[common.Address]Tally    `json:"tally"`   // Current vote tally to avoid recalculating
+	Number  uint64                    `json:"number"`  // Block number where the snapshot was created
+	Hash    common.Hash               `json:"hash"`    // Block hash where the snapshot was created
+	Voters  map[common.Address]uint64 `json:"voters"`  // Set of authorized voters at this moment and their most recently signed block
+	Signers map[common.Address]uint64 `json:"signers"` // Set of authorized signers at this moment and their most recently signed block
+	Votes   []*Vote                   `json:"votes"`   // List of votes cast in chronological order
+	Tally   map[common.Address]Tally  `json:"tally"`   // Current vote tally to avoid recalculating
 }
 
 // addressesAscending implements the sort interface to allow sorting a list of addresses
@@ -68,24 +67,23 @@ func (s addressesAscending) Less(i, j int) bool { return bytes.Compare(s[i][:], 
 func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // newSnapshot creates a new snapshot with the specified startup parameters. This
-// method does not initialize the set of recent signers, so only ever use if for
-// the genesis block.
-func newSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
+// method does not initialize the signers most recently signed blocks, so only ever
+// use it for the genesis block.
+func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
 	snap := &Snapshot{
 		config:   config,
 		sigcache: sigcache,
 		Number:   number,
 		Hash:     hash,
-		Voters:   make(map[common.Address]struct{}),
-		Signers:  make(map[common.Address]struct{}),
-		Recents:  make(map[uint64]common.Address),
+		Voters:   make(map[common.Address]uint64),
+		Signers:  make(map[common.Address]uint64),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for _, voter := range voters {
-		snap.Voters[voter] = struct{}{}
+		snap.Voters[voter] = 0
 	}
 	for _, signer := range signers {
-		snap.Signers[signer] = struct{}{}
+		snap.Signers[signer] = 0
 	}
 	return snap
 }
@@ -122,20 +120,16 @@ func (s *Snapshot) copy() *Snapshot {
 		sigcache: s.sigcache,
 		Number:   s.Number,
 		Hash:     s.Hash,
-		Voters:   make(map[common.Address]struct{}),
-		Signers:  make(map[common.Address]struct{}),
-		Recents:  make(map[uint64]common.Address),
+		Voters:   make(map[common.Address]uint64),
+		Signers:  make(map[common.Address]uint64),
 		Votes:    make([]*Vote, len(s.Votes)),
 		Tally:    make(map[common.Address]Tally),
 	}
-	for voter := range s.Voters {
-		cpy.Voters[voter] = struct{}{}
+	for voter, signed := range s.Voters {
+		cpy.Voters[voter] = signed
 	}
-	for signer := range s.Signers {
-		cpy.Signers[signer] = struct{}{}
-	}
-	for block, signer := range s.Recents {
-		cpy.Recents[block] = signer
+	for signer, signed := range s.Signers {
+		cpy.Signers[signer] = signed
 	}
 	for address, tally := range s.Tally {
 		cpy.Tally[address] = tally
@@ -232,24 +226,23 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
-		// Delete the oldest signer from the recent list to allow it signing again
-		if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
-			delete(snap.Recents, number-limit)
-		}
 		// Resolve the authorization key and check against signers
 		signer, err := ecrecover(header, s.sigcache)
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := snap.Signers[signer]; !ok {
+		if lastBlockSigned, ok := snap.Signers[signer]; !ok {
 			return nil, errUnauthorizedSigner
-		}
-		for _, recent := range snap.Recents {
-			if recent == signer {
+		} else if lastBlockSigned > 0 {
+			// Check against recent signers
+			if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
 				return nil, errRecentlySigned
 			}
 		}
-		snap.Recents[number] = signer
+		if _, ok := snap.Voters[signer]; ok {
+			snap.Voters[signer] = number
+		}
+		snap.Signers[signer] = number
 
 		// If a vote is cast...
 		extraBytes := len(header.Extra) - extraVanity - extraSeal
@@ -259,7 +252,6 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				return nil, errUnauthorizedVoter
 			}
 
-			// TODOJAKUB what if vote/vote, vote/drop, drop/vote, etc
 			// For every vote...
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
@@ -301,18 +293,14 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				// If the vote passed, update the list of voters/signers
 				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
 					if tally.Proposal == proposalVoterVote {
-						snap.Voters[address] = struct{}{}
-						snap.Signers[address] = struct{}{}
+						snap.Voters[address] = 0
+						snap.Signers[address] = 0
 					} else if tally.Proposal == proposalSignerVote {
-						snap.Signers[address] = struct{}{}
+						snap.Signers[address] = 0
 					} else {
 						delete(snap.Voters, address)
 						delete(snap.Signers, address)
 
-						// Signer list shrunk, delete any leftover recent caches
-						if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
-							delete(snap.Recents, number-limit)
-						}
 						// Discard any previous votes the deauthorized voter cast
 						for i := 0; i < len(snap.Votes); i++ {
 							if snap.Votes[i].Voter == address {
@@ -372,40 +360,8 @@ func (s *Snapshot) signers() []common.Address {
 	return sigs
 }
 
-// calcDifficulty returns a diffuculty for a signer at a given block height.
-//
-// Returned difficulty values are between 0 and SIGNER_COUNT inclusive.
-// * The in-turn signer for a given block (marked in pharenthesis below) gets
-//   the highest difficulty equal to SIGNER_COUNT.
-// * Unauthorized addresses get difficulty 0.
-// * The closer a succeeding signer is to the in-turn signer for a given block,
-//   the higher the difficulty.
-// * The closer a preceding signer is to the in-turn signer for a given block,
-//   the lower the difficulty.
-//
-// Assuming five signers, denoted as s0...s4, the difficulty matrix is as follows:
-//
-// 		s0	s1	s2	s3	s4
-// ---+-------------------
-//	0 |	(5)	4	3	2	1
-//	1 |	1	(5)	4	3	2
-//	2 |	2	1	(5)	4	3
-//	3 |	3	2	1	(5)	4
-//	4 |	4	3	2	1	(5)
-func (s *Snapshot) calcDifficulty(number uint64, signer common.Address) uint64 {
-	signers, offset := s.signers(), 0
-	for offset < len(signers) && signers[offset] != signer {
-		offset++
-	}
-	if offset == len(signers) {
-		// Unauthorized address
-		return 0
-	}
-	if x := offset - int(number%uint64(len(signers))); x >= 0 {
-		// In-turn signer, or a succeeding signer
-		return uint64(len(signers) - x)
-	} else {
-		// Preceding signer
-		return uint64(-x)
-	}
+// nextSignableBlockNumber returns the number of the next block legal for signature
+// by the signer of lastSignedBlockNumber, based on the current number of signers.
+func (s *Snapshot) nextSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
+	return lastSignedBlockNumber + uint64(len(s.Signers))/2 + 1
 }
