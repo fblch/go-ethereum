@@ -166,6 +166,103 @@ func (api *API) Proposals() map[common.Address]prop {
 	return proposals
 }
 
+// GetValidProposals returns a subset of current proposals that are valid at the specified block.
+func (api *API) GetValidProposals(number *rpc.BlockNumber) (map[common.Address]prop, error) {
+	api.clique.lock.RLock()
+	defer api.clique.lock.RUnlock()
+
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	proposals := make(map[common.Address]prop)
+	for address, proposal := range api.clique.proposals {
+		if !snap.validVote(address, proposal.Proposal) {
+			continue
+		}
+		switch proposal.Proposal {
+		case proposalVoterVote:
+			proposals[address] = prop{
+				Proposal: "voter",
+				Block:    proposal.Block,
+			}
+		case proposalSignerVote:
+			proposals[address] = prop{
+				Proposal: "signer",
+				Block:    proposal.Block,
+			}
+		case proposalDropVote:
+			proposals[address] = prop{
+				Proposal: "drop",
+				Block:    proposal.Block,
+			}
+		default:
+			proposals[address] = prop{
+				Proposal: "<invalid>",
+				Block:    proposal.Block,
+			}
+		}
+	}
+	return proposals, nil
+}
+
+// GetValidProposalsAtHash returns a subset of current proposals that are valid at the specified block.
+func (api *API) GetValidProposalsAtHash(hash common.Hash) (map[common.Address]prop, error) {
+	api.clique.lock.RLock()
+	defer api.clique.lock.RUnlock()
+
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	proposals := make(map[common.Address]prop)
+	for address, proposal := range api.clique.proposals {
+		if !snap.validVote(address, proposal.Proposal) {
+			continue
+		}
+		switch proposal.Proposal {
+		case proposalVoterVote:
+			proposals[address] = prop{
+				Proposal: "voter",
+				Block:    proposal.Block,
+			}
+		case proposalSignerVote:
+			proposals[address] = prop{
+				Proposal: "signer",
+				Block:    proposal.Block,
+			}
+		case proposalDropVote:
+			proposals[address] = prop{
+				Proposal: "drop",
+				Block:    proposal.Block,
+			}
+		default:
+			proposals[address] = prop{
+				Proposal: "<invalid>",
+				Block:    proposal.Block,
+			}
+		}
+	}
+	return proposals, nil
+}
+
 // Propose injects a new authorization proposal that the signer will attempt to
 // push through.
 func (api *API) Propose(address common.Address, proposal string) error {
