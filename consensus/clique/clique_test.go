@@ -17,7 +17,9 @@
 package clique
 
 import (
+	"bytes"
 	"math/big"
+	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -145,5 +147,146 @@ func TestSealHash(t *testing.T) {
 	want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")
 	if have != want {
 		t.Errorf("have %x, want %x", have, want)
+	}
+}
+
+func TestCalcDifficulty(t *testing.T) {
+	addrs := []common.Address{
+		common.HexToAddress("0abcdefghijklmnopqrs"),
+		common.HexToAddress("1abcdefghijklmnopqrs"),
+		common.HexToAddress("2abcdefghijklmnopqrs"),
+		common.HexToAddress("3abcdefghijklmnopqrs"),
+		common.HexToAddress("4abcdefghijklmnopqrs"),
+		common.HexToAddress("5abcdefghijklmnopqrs"),
+	}
+	for _, test := range []testCalcDifficulty{
+		// Genesis.
+		{
+			name: "3/genesis",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 0,
+				addrs[1]: 0,
+				addrs[2]: 0,
+			},
+		},
+		{
+			name: "6/genesis",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 0,
+				addrs[1]: 0,
+				addrs[2]: 0,
+				addrs[3]: 0,
+				addrs[4]: 0,
+				addrs[5]: 0,
+			},
+		},
+		// All signed.
+		{
+			name: "3/all-signed/in-turn",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 1,
+				addrs[1]: 2,
+				addrs[2]: 3,
+			},
+		},
+		{
+			name: "3/all-signed/out-of-turn",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 1,
+				addrs[1]: 4,
+				addrs[2]: 3,
+			},
+		},
+		{
+			name: "6/all-signed/in-turn",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 1,
+				addrs[1]: 2,
+				addrs[2]: 3,
+				addrs[3]: 4,
+				addrs[4]: 5,
+				addrs[5]: 6,
+			},
+		},
+		{
+			name: "6/all-signed/out-of-turn",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 9,
+				addrs[1]: 2,
+				addrs[2]: 7,
+				addrs[3]: 8,
+				addrs[4]: 5,
+				addrs[5]: 6,
+			},
+		},
+		// One new.
+		{
+			name: "3/one-new",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 0,
+				addrs[1]: 4,
+				addrs[2]: 3,
+			},
+		},
+		{
+			name: "6/one-new",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 1,
+				addrs[1]: 2,
+				addrs[2]: 3,
+				addrs[3]: 4,
+				addrs[4]: 5,
+				addrs[5]: 0,
+			},
+		},
+		// Multiple new.
+		{
+			name: "3/multiple-new",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 0,
+				addrs[1]: 0,
+				addrs[2]: 3,
+			},
+		},
+		{
+			name: "6/multiple-new",
+			lastSigned: map[common.Address]uint64{
+				addrs[0]: 0,
+				addrs[1]: 0,
+				addrs[2]: 3,
+				addrs[3]: 0,
+				addrs[4]: 0,
+				addrs[5]: 0,
+			},
+		},
+	} {
+		t.Run(test.name, test.run)
+	}
+}
+
+type testCalcDifficulty struct {
+	name       string
+	lastSigned map[common.Address]uint64
+}
+
+func (test *testCalcDifficulty) run(t *testing.T) {
+	var signers []common.Address
+	for addr := range test.lastSigned {
+		signers = append(signers, addr)
+	}
+	sort.Slice(signers, func(i, j int) bool {
+		iAddr, jAddr := signers[i], signers[j]
+		iN, jN := test.lastSigned[iAddr], test.lastSigned[jAddr]
+		if iN != jN {
+			return iN < jN
+		}
+		return bytes.Compare(iAddr[:], jAddr[:]) < 0
+	})
+	for i, signer := range signers {
+		exp := len(signers) - i
+		got := calcDifficulty(test.lastSigned, signer)
+		if got.Cmp(new(big.Int).SetUint64(uint64(exp))) != 0 {
+			t.Errorf("expected difficulty %d but got %d", exp, got.Uint64())
+		}
 	}
 }
