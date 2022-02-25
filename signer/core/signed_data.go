@@ -148,7 +148,9 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 			return nil, useEthereumV, err
 		}
 		// Add space in the extradata to put the signature
-		newExtra := make([]byte, len(header.Extra)+65)
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//newExtra := make([]byte, len(header.Extra)+65)
+		newExtra := make([]byte, len(header.Extra)+clique.ExtraSeal)
 		copy(newExtra, header.Extra)
 		header.Extra = newExtra
 
