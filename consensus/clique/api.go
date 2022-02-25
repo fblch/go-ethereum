@@ -357,7 +357,7 @@ func (api *API) Status() (*status, error) {
 		if h == nil {
 			return nil, fmt.Errorf("missing block %d", n)
 		}
-		// MODIFIED by Jakub Pajek (1-n scale difficulties)
+		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//if h.Difficulty.Cmp(diffInTurn) == 0 {
 		if h.Difficulty.Cmp(big.NewInt(int64(len(snap.Signers)))) == 0 {
 			optimals++
