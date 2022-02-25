@@ -125,12 +125,14 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 
 	switch e := engine.(type) {
 	case *clique.Clique:
-		// MODIFIED by Jakub Pajek (clique permissions)
+		// MODIFIED by Jakub Pajek BEG (clique permissions)
 		//gspec.ExtraData = make([]byte, 32+common.AddressLength+crypto.SignatureLength)
-		gspec.ExtraData = make([]byte, 32+common.AddressLength+1+crypto.SignatureLength)
-		copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
+		//copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
+		gspec.ExtraData = make([]byte, clique.ExtraVanity+common.AddressLength+1+clique.ExtraSeal)
+		copy(gspec.ExtraData[clique.ExtraVanity:clique.ExtraVanity+common.AddressLength], testBankAddress.Bytes())
+		// MODIFIED by Jakub Pajek END (clique permissions)
 		// ADDED by Jakub Pajek (clique permissions)
-		gspec.ExtraData[32+common.AddressLength] = clique.ExtraVoterMarker
+		gspec.ExtraData[clique.ExtraVanity+common.AddressLength] = clique.ExtraVoterMarker
 		e.Authorize(testBankAddress, func(account accounts.Account, s string, data []byte) ([]byte, error) {
 			return crypto.Sign(crypto.Keccak256(data), testBankKey)
 		})
