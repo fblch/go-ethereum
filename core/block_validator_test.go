@@ -106,16 +106,18 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			Config: &config,
 			// MODIFIED by Jakub Pajek (clique permissions)
 			//ExtraData: make([]byte, 32+common.AddressLength+crypto.SignatureLength),
-			ExtraData: make([]byte, 32+common.AddressLength+1+crypto.SignatureLength),
+			ExtraData: make([]byte, clique.ExtraVanity+common.AddressLength+1+clique.ExtraSeal),
 			Alloc: map[common.Address]GenesisAccount{
 				addr: {Balance: big.NewInt(1)},
 			},
 			BaseFee:    big.NewInt(params.InitialBaseFee),
 			Difficulty: new(big.Int),
 		}
-		copy(gspec.ExtraData[32:], addr[:])
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//copy(gspec.ExtraData[32:], addr[:])
+		copy(gspec.ExtraData[clique.ExtraVanity:], addr[:])
 		// ADDED by Jakub Pajek (clique permissions)
-		gspec.ExtraData[32+common.AddressLength] = clique.ExtraVoterMarker
+		gspec.ExtraData[clique.ExtraVanity+common.AddressLength] = clique.ExtraVoterMarker
 		// ADDED by Jakub Pajek BEG (clique static block rewards)
 		// Inject signer's address into the consensus engine so that FinalizeAndAssemble
 		// called from GenerateChain below can correctly assign static block rewards.
@@ -131,8 +133,10 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			if i > 0 {
 				header.ParentHash = blocks[i-1].Hash()
 			}
-			header.Extra = make([]byte, 32+crypto.SignatureLength)
-			// MODIFIED by Jakub Pajek (1-n scale difficulties)
+			// MODIFIED by Jakub Pajek (clique permissions)
+			//header.Extra = make([]byte, 32+crypto.SignatureLength)
+			header.Extra = make([]byte, clique.ExtraVanity+clique.ExtraSeal)
+			// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 			//header.Difficulty = big.NewInt(2)
 			header.Difficulty = big.NewInt(1) // single in-turn signer
 
