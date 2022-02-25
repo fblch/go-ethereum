@@ -521,8 +521,8 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 		Config: &config,
 		// MODIFIED by Jakub Pajek (clique permissions)
 		//ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
-		// Avoid import cycles in clique_test.go
-		//ExtraData: append(append(append(make([]byte, 32), faucet[:]...), clique.ExtraVoterMarker), make([]byte, crypto.SignatureLength)...),
+		// Importing clique package creates import cycles...
+		//ExtraData: append(append(append(make([]byte, clique.ExtraVanity), faucet[:]...), clique.ExtraVoterMarker), make([]byte, clique.ExtraSeal)...),
 		ExtraData:  append(append(append(make([]byte, 32), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
 		GasLimit:   gasLimit,
 		BaseFee:    big.NewInt(params.InitialBaseFee),

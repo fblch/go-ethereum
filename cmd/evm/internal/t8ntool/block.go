@@ -203,25 +203,48 @@ func (i *bbInput) sealClique(block *types.Block) (*types.Block, error) {
 		return nil, NewError(ErrorConfig, fmt.Errorf("sealing with clique will overwrite provided extra data"))
 	}
 	header := block.Header()
-	if i.Clique.Voted != nil {
-		if i.Header.Coinbase != nil {
-			return nil, NewError(ErrorConfig, fmt.Errorf("sealing with clique and voting will overwrite provided coinbase"))
+	// MODIFIED by Jakub Pajek (clique multiple votes)
+	// Clique voting no longer uses Coinbase field
+	/*
+		if i.Clique.Voted != nil {
+			if i.Header.Coinbase != nil {
+				return nil, NewError(ErrorConfig, fmt.Errorf("sealing with clique and voting will overwrite provided coinbase"))
+			}
+			header.Coinbase = *i.Clique.Voted
 		}
-		header.Coinbase = *i.Clique.Voted
-	}
-	if i.Clique.Authorize != nil {
-		if i.Header.Nonce != nil {
-			return nil, NewError(ErrorConfig, fmt.Errorf("sealing with clique and voting will overwrite provided nonce"))
+	*/
+	// MODIFIED by Jakub Pajek (clique multiple votes)
+	// Clique voting no longer uses Nonce field
+	/*
+		if i.Clique.Authorize != nil {
+			if i.Header.Nonce != nil {
+				return nil, NewError(ErrorConfig, fmt.Errorf("sealing with clique and voting will overwrite provided nonce"))
+			}
+			if *i.Clique.Authorize {
+				header.Nonce = [8]byte{}
+			} else {
+				header.Nonce = [8]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+			}
 		}
-		if *i.Clique.Authorize {
-			header.Nonce = [8]byte{}
-		} else {
-			header.Nonce = [8]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-		}
-	}
+	*/
 	// Extra is fixed 32 byte vanity and 65 byte signature
-	header.Extra = make([]byte, 32+65)
-	copy(header.Extra[0:32], i.Clique.Vanity.Bytes()[:])
+	// MODIFIED by Jakub Pajek BEG (clique permissions, clique multiple votes)
+	//header.Extra = make([]byte, 32+65)
+	//copy(header.Extra[0:32], i.Clique.Vanity.Bytes()[:])
+	header.Extra = make([]byte, clique.ExtraVanity)
+	copy(header.Extra[0:clique.ExtraVanity], i.Clique.Vanity.Bytes()[:])
+	if i.Clique.Voted != nil && i.Clique.Authorize != nil {
+		header.Extra = append(header.Extra, (*i.Clique.Voted)[:]...)
+		// MEMO by Jakub Pajek (clique multiple votes)
+		// Support authorizing for signer only, not for voter
+		if *i.Clique.Authorize {
+			header.Extra = append(header.Extra, clique.ExtraSignerVote)
+		} else {
+			header.Extra = append(header.Extra, clique.ExtraDropVote)
+		}
+	}
+	header.Extra = append(header.Extra, make([]byte, clique.ExtraSeal)...)
+	// MODIFIED by Jakub Pajek END (clique permissions, clique multiple votes)
 
 	// Sign the seal hash and fill in the rest of the extra data
 	h := clique.SealHash(header)
@@ -229,7 +252,9 @@ func (i *bbInput) sealClique(block *types.Block) (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	copy(header.Extra[32:], sighash)
+	// MODIFIED by Jakub Pajek (clique permissions, clique multiple votes)
+	//copy(header.Extra[32:], sighash)
+	copy(header.Extra[len(header.Extra)-clique.ExtraSeal:], sighash)
 	block = block.WithSeal(header)
 	return block, nil
 }
