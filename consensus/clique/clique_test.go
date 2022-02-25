@@ -50,15 +50,15 @@ func TestReimportMirroredState(t *testing.T) {
 	genspec := &core.Genesis{
 		// MODIFIED by Jakub Pajek (clique permissions)
 		//ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
-		ExtraData: make([]byte, extraVanity+common.AddressLength+1+extraSeal),
+		ExtraData: make([]byte, ExtraVanity+common.AddressLength+1+ExtraSeal),
 		Alloc: map[common.Address]core.GenesisAccount{
 			addr: {Balance: big.NewInt(10000000000000000)},
 		},
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
-	copy(genspec.ExtraData[extraVanity:], addr[:])
+	copy(genspec.ExtraData[ExtraVanity:], addr[:])
 	// ADDED by Jakub Pajek (clique permissions)
-	genspec.ExtraData[32+common.AddressLength] = ExtraVoterMarker
+	genspec.ExtraData[ExtraVanity+common.AddressLength] = ExtraVoterMarker
 	// ADDED by Jakub Pajek BEG (clique static block rewards)
 	// Inject signer's address into the consensus engine so that FinalizeAndAssemble
 	// called from GenerateChain below can correctly assign static block rewards.
@@ -77,7 +77,7 @@ func TestReimportMirroredState(t *testing.T) {
 	blocks, _ := core.GenerateChain(params.AllCliqueProtocolChanges, genesis, engine, db, 3, func(i int, block *core.BlockGen) {
 		// The chain maker doesn't have access to a chain, so the difficulty will be
 		// lets unset (nil). Set it here to the correct value.
-		// MODIFIED by Jakub Pajek (1-n scale difficulties)
+		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//block.SetDifficulty(diffInTurn)
 		block.SetDifficulty(big.NewInt(1)) // single in-turn signer
 
@@ -96,13 +96,13 @@ func TestReimportMirroredState(t *testing.T) {
 		if i > 0 {
 			header.ParentHash = blocks[i-1].Hash()
 		}
-		header.Extra = make([]byte, extraVanity+extraSeal)
-		// MODIFIED by Jakub Pajek (1-n scale difficulties)
+		header.Extra = make([]byte, ExtraVanity+ExtraSeal)
+		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//header.Difficulty = diffInTurn
 		header.Difficulty = big.NewInt(1) // single in-turn signer
 
 		sig, _ := crypto.Sign(SealHash(header).Bytes(), key)
-		copy(header.Extra[len(header.Extra)-extraSeal:], sig)
+		copy(header.Extra[len(header.Extra)-ExtraSeal:], sig)
 		blocks[i] = block.WithSeal(header)
 	}
 	// Insert the first two blocks and make sure the chain is valid
@@ -141,7 +141,7 @@ func TestSealHash(t *testing.T) {
 	have := SealHash(&types.Header{
 		Difficulty: new(big.Int),
 		Number:     new(big.Int),
-		Extra:      make([]byte, 32+65),
+		Extra:      make([]byte, ExtraVanity+ExtraSeal),
 		BaseFee:    new(big.Int),
 	})
 	want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")

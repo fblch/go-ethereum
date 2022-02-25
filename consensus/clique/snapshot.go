@@ -245,7 +245,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		snap.Signers[signer] = number
 
 		// If a vote is cast...
-		extraBytes := len(header.Extra) - extraVanity - extraSeal
+		extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
 		if number%s.config.Epoch != 0 && extraBytes > 0 {
 			// ...check the signer against voters
 			if _, ok := snap.Voters[signer]; !ok {
@@ -255,7 +255,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			// For every vote...
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
-				index := extraVanity + voteIdx*(common.AddressLength+1)
+				index := ExtraVanity + voteIdx*(common.AddressLength+1)
 				var address common.Address
 				copy(address[:], header.Extra[index:])
 
