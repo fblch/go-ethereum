@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// TODOJAKUB add support for new permission model testing (voter/signer)
-// TODOJAKUB add support for new voting model testing (multiple votes)
-// TODOJAKUB add support for new difficulty model testing (1-n scale difficulties)
+// TODOJAKUB add support for new permission model testing (clique permissions)
+// TODOJAKUB add support for new voting model testing (clique multiple votes)
+// TODOJAKUB add support for new difficulty model testing (clique 1-n scale difficulties)
 
 package clique
 
@@ -58,7 +58,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	}
 	sort.Sort(addressesAscending(auths))
 	for i, auth := range auths {
-		copy(header.Extra[extraVanity+i*common.AddressLength:], auth.Bytes())
+		copy(header.Extra[ExtraVanity+i*common.AddressLength:], auth.Bytes())
 	}
 }
 
@@ -86,7 +86,7 @@ func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 	}
 	// Sign the header and embed the signature in extra data
 	sig, _ := crypto.Sign(SealHash(header).Bytes(), ap.accounts[signer])
-	copy(header.Extra[len(header.Extra)-extraSeal:], sig)
+	copy(header.Extra[len(header.Extra)-ExtraSeal:], sig)
 }
 
 // testerVote represents a single block signed by a parcitular account, where
@@ -401,13 +401,13 @@ func TestClique(t *testing.T) {
 		genesis := &core.Genesis{
 			// MODIFIED by Jakub Pajek (clique permissions)
 			//ExtraData: make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
-			ExtraData: make([]byte, extraVanity+(common.AddressLength+1)*len(signers)+extraSeal),
+			ExtraData: make([]byte, ExtraVanity+(common.AddressLength+1)*len(signers)+ExtraSeal),
 			BaseFee:   big.NewInt(params.InitialBaseFee),
 		}
 		// MODIFIED by Jakub Pajek BEG (clique permissions)
 		for j, signer := range signers {
 			//copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
-			index := extraVanity + j*(common.AddressLength+1)
+			index := ExtraVanity + j*(common.AddressLength+1)
 			copy(genesis.ExtraData[index:], signer[:])
 			genesis.ExtraData[index+common.AddressLength] = ExtraVoterMarker
 		}
@@ -444,9 +444,9 @@ func TestClique(t *testing.T) {
 			if j > 0 {
 				header.ParentHash = blocks[j-1].Hash()
 			}
-			header.Extra = make([]byte, extraVanity+extraSeal)
+			header.Extra = make([]byte, ExtraVanity+ExtraSeal)
 			if auths := tt.votes[j].checkpoint; auths != nil {
-				header.Extra = make([]byte, extraVanity+len(auths)*common.AddressLength+extraSeal)
+				header.Extra = make([]byte, ExtraVanity+len(auths)*common.AddressLength+ExtraSeal)
 				accounts.checkpoint(header, auths)
 			}
 			// TODOJAKUB just changed diffInTurn to big.NewInt(1) without checking the logic

@@ -176,10 +176,10 @@ func makeGenesis(faucets []*ecdsa.PrivateKey, sealers []*ecdsa.PrivateKey) *core
 	}
 	// MODIFIED by Jakub Pajek BEG (clique permissions)
 	//genesis.ExtraData = make([]byte, 32+len(signers)*common.AddressLength+65)
-	genesis.ExtraData = make([]byte, 32+len(signers)*(common.AddressLength+1)+65)
+	genesis.ExtraData = make([]byte, clique.ExtraVanity+len(signers)*(common.AddressLength+1)+clique.ExtraSeal)
 	for i, signer := range signers {
 		//copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
-		index := 32 + i*(common.AddressLength+1)
+		index := clique.ExtraVanity + i*(common.AddressLength+1)
 		copy(genesis.ExtraData[index:], signer[:])
 		genesis.ExtraData[index+common.AddressLength] = clique.ExtraVoterMarker
 	}

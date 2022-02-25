@@ -148,9 +148,13 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 			return nil, useEthereumV, err
 		}
 		// The incoming clique header is already truncated, sent to us with a extradata already shortened
-		if len(header.Extra) < 65 {
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//if len(header.Extra) < 65 {
+		if len(header.Extra) < clique.ExtraSeal {
 			// Need to add it back, to get a suitable length for hashing
-			newExtra := make([]byte, len(header.Extra)+65)
+			// MODIFIED by Jakub Pajek (clique permissions)
+			//newExtra := make([]byte, len(header.Extra)+65)
+			newExtra := make([]byte, len(header.Extra)+clique.ExtraSeal)
 			copy(newExtra, header.Extra)
 			header.Extra = newExtra
 		}
