@@ -93,7 +93,7 @@ web3._extend({
 		new web3._extend.Method({
 			name: 'status',
 			call: 'clique_status',
-			params: 0
+			params: 1
 		}),
 		new web3._extend.Method({
 			name: 'getSigner',

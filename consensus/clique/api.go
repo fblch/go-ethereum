@@ -328,12 +328,12 @@ type status struct {
 // - the number of active signers,
 // - the number of signers,
 // - the percentage of in-turn blocks
-func (api *API) Status() (*status, error) {
+func (api *API) Status(numBlocks uint64) (*status, error) {
 	var (
-		numBlocks = uint64(64)
-		header    = api.chain.CurrentHeader()
-		diff      = uint64(0)
-		optimals  = 0
+		//numBlocks = uint64(64)
+		header   = api.chain.CurrentHeader()
+		diff     = uint64(0)
+		optimals = 0
 	)
 	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
