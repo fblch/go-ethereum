@@ -416,6 +416,7 @@ func (h *serverHandler) broadcastLoop() {
 			header := ev.Block.Header()
 			hash, number := header.Hash(), header.Number.Uint64()
 			td := h.blockchain.GetTd(hash, number)
+			// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 			if td == nil || td.Cmp(lastTd) <= 0 {
 				continue
 			}
