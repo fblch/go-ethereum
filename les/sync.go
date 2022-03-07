@@ -96,6 +96,7 @@ func (h *clientHandler) synchronise(peer *serverPeer) {
 	// Make sure the peer's TD is higher than our own.
 	latest := h.backend.blockchain.CurrentHeader()
 	currentTd := rawdb.ReadTd(h.backend.chainDb, latest.Hash(), latest.Number.Uint64())
+	// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 	if currentTd != nil && peer.Td().Cmp(currentTd) < 0 {
 		return
 	}
@@ -196,6 +197,7 @@ func (h *clientHandler) synchronise(peer *serverPeer) {
 		h.syncStart(h.backend.blockchain.CurrentHeader())
 	}
 	// Fetch the remaining block headers based on the current chain header.
+	// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 	if err := h.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync); err != nil {
 		log.Debug("Synchronise failed", "reason", err)
 		return
