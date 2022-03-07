@@ -147,8 +147,9 @@ func (p *Peer) Head() (hash common.Hash, td *big.Int) {
 	return hash, new(big.Int).Set(p.td)
 }
 
-// SetHead updates the head hash and total difficulty of the peer.
-func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
+// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+//func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
+func (p *Peer) SetHead(hash common.Hash, td *big.Int, dummy bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
