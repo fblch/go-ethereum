@@ -87,7 +87,9 @@ func testSnapSyncDisabling(t *testing.T, ethVer uint, snapVer uint) {
 	time.Sleep(250 * time.Millisecond)
 
 	// Check that snap sync was disabled
-	op := peerToSyncOp(downloader.SnapSync, empty.handler.peers.peerWithHighestTD())
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//op := peerToSyncOp(downloader.SnapSync, empty.handler.peers.peerWithHighestTD())
+	op := peerToSyncOp(downloader.SnapSync, empty.handler.peers.peerWithHighestTD(false))
 	if err := empty.handler.doSync(op); err != nil {
 		t.Fatal("sync failed:", err)
 	}
