@@ -311,6 +311,7 @@ func (f *lightFetcher) mainloop() {
 			}
 			// Announced tds should be strictly monotonic, drop the peer if
 			// the announce is out-of-order.
+			// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 			if peer.latest != nil && data.Td.Cmp(peer.latest.Td) <= 0 {
 				f.peerset.unregister(peerid.String())
 				log.Debug("Non-monotonic td", "peer", peerid, "current", data.Td, "previous", peer.latest.Td)
@@ -319,6 +320,7 @@ func (f *lightFetcher) mainloop() {
 			peer.latest = data
 
 			// Filter out any stale announce, the local chain is ahead of announce
+			// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 			if localTd != nil && data.Td.Cmp(localTd) <= 0 {
 				continue
 			}

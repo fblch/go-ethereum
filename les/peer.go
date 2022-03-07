@@ -985,6 +985,7 @@ func (p *clientPeer) sendLastAnnounce() {
 	if p.lastAnnounce.Td == nil {
 		return
 	}
+	// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 	if p.headInfo.Td == nil || p.lastAnnounce.Td.Cmp(p.headInfo.Td) > 0 {
 		if !p.queueSend(func() { p.sendAnnounce(p.lastAnnounce) }) {
 			p.Log().Debug("Dropped announcement because queue is full", "number", p.lastAnnounce.Number, "hash", p.lastAnnounce.Hash)
@@ -1239,7 +1240,9 @@ func (ps *serverPeerSet) len() int {
 // bestPeer retrieves the known peer with the currently highest total difficulty.
 // If the peerset is "client peer set", then nothing meaningful will return. The
 // reason is client peer never send back their latest status to server.
-func (ps *serverPeerSet) bestPeer() *serverPeer {
+// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+//func (ps *serverPeerSet) bestPeer() *serverPeer {
+func (ps *serverPeerSet) bestPeer(dummy bool) *serverPeer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
