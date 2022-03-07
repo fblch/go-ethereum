@@ -533,7 +533,9 @@ func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruni
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
 func (s *Ethereum) Merger() *consensus.Merger          { return s.merger }
 func (s *Ethereum) SyncMode() downloader.SyncMode {
-	mode, _ := s.handler.chainSync.modeAndLocalHead()
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//mode, _ := s.handler.chainSync.modeAndLocalHead()
+	mode, _, _ := s.handler.chainSync.modeAndLocalHead()
 	return mode
 }
 
