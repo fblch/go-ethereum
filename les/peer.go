@@ -985,6 +985,7 @@ func (p *clientPeer) sendLastAnnounce() {
 	if p.lastAnnounce.Td == nil {
 		return
 	}
+	// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 	if p.headInfo.Td == nil || p.lastAnnounce.Td.Cmp(p.headInfo.Td) > 0 {
 		if !p.queueSend(func() { p.sendAnnounce(p.lastAnnounce) }) {
 			p.Log().Debug("Dropped announcement because queue is full", "number", p.lastAnnounce.Number, "hash", p.lastAnnounce.Hash)
