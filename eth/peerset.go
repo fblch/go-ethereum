@@ -231,7 +231,9 @@ func (ps *peerSet) snapLen() int {
 
 // peerWithHighestTD retrieves the known peer with the currently highest total
 // difficulty.
-func (ps *peerSet) peerWithHighestTD() *eth.Peer {
+// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+//func (ps *peerSet) peerWithHighestTD() *eth.Peer {
+func (ps *peerSet) peerWithHighestTD(dummy bool) *eth.Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 

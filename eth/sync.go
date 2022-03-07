@@ -160,14 +160,20 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 		return nil
 	}
 	// We have enough peers, check TD
-	peer := cs.handler.peers.peerWithHighestTD()
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//peer := cs.handler.peers.peerWithHighestTD()
+	peer := cs.handler.peers.peerWithHighestTD(false)
 	if peer == nil {
 		return nil
 	}
-	mode, ourTD := cs.modeAndLocalHead()
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//mode, ourTD := cs.modeAndLocalHead()
+	mode, ourHead, ourTD := cs.modeAndLocalHead()
 
 	op := peerToSyncOp(mode, peer)
-	if op.td.Cmp(ourTD) <= 0 {
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//if op.td.Cmp(ourTD) <= 0 {
+	if cmp := op.td.Cmp(ourTD); cmp < 0 || (cmp == 0 && op.head.Big().Cmp(ourHead.Big()) == 0) {
 		return nil // We're in sync.
 	}
 	return op
@@ -178,26 +184,40 @@ func peerToSyncOp(mode downloader.SyncMode, p *eth.Peer) *chainSyncOp {
 	return &chainSyncOp{mode: mode, peer: p, td: peerTD, head: peerHead}
 }
 
-func (cs *chainSyncer) modeAndLocalHead() (downloader.SyncMode, *big.Int) {
+// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+//func (cs *chainSyncer) modeAndLocalHead() (downloader.SyncMode, *big.Int) {
+func (cs *chainSyncer) modeAndLocalHead() (downloader.SyncMode, common.Hash, *big.Int) {
 	// If we're in snap sync mode, return that directly
 	if atomic.LoadUint32(&cs.handler.snapSync) == 1 {
 		block := cs.handler.chain.CurrentFastBlock()
-		td := cs.handler.chain.GetTd(block.Hash(), block.NumberU64())
-		return downloader.SnapSync, td
+		// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+		//td := cs.handler.chain.GetTd(block.Hash(), block.NumberU64())
+		//return downloader.SnapSync, td
+		blockHash := block.Hash()
+		td := cs.handler.chain.GetTd(blockHash, block.NumberU64())
+		return downloader.SnapSync, blockHash, td
 	}
 	// We are probably in full sync, but we might have rewound to before the
 	// snap sync pivot, check if we should reenable
 	if pivot := rawdb.ReadLastPivotNumber(cs.handler.database); pivot != nil {
 		if head := cs.handler.chain.CurrentBlock(); head.NumberU64() < *pivot {
 			block := cs.handler.chain.CurrentFastBlock()
-			td := cs.handler.chain.GetTd(block.Hash(), block.NumberU64())
-			return downloader.SnapSync, td
+			// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+			//td := cs.handler.chain.GetTd(block.Hash(), block.NumberU64())
+			//return downloader.SnapSync, td
+			blockHash := block.Hash()
+			td := cs.handler.chain.GetTd(blockHash, block.NumberU64())
+			return downloader.SnapSync, blockHash, td
 		}
 	}
 	// Nope, we're really full syncing
 	head := cs.handler.chain.CurrentBlock()
-	td := cs.handler.chain.GetTd(head.Hash(), head.NumberU64())
-	return downloader.FullSync, td
+	// MODIFIED by Jakub Pajek (sync peers with same td but different hashes)
+	//td := cs.handler.chain.GetTd(head.Hash(), head.NumberU64())
+	//return downloader.FullSync, td
+	headHash := head.Hash()
+	td := cs.handler.chain.GetTd(headHash, head.NumberU64())
+	return downloader.FullSync, headHash, td
 }
 
 // startSync launches doSync in a new goroutine.

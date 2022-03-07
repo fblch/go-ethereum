@@ -1225,6 +1225,7 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
 				// R: Nothing to give
 				if mode != LightSync {
 					head := d.blockchain.CurrentBlock()
+					// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 					if !gotHeaders && td.Cmp(d.blockchain.GetTd(head.Hash(), head.NumberU64())) > 0 {
 						return errStallingPeer
 					}
@@ -1238,6 +1239,7 @@ func (d *Downloader) processHeaders(origin uint64, td *big.Int) error {
 				// peer gave us something useful, we're already happy/progressed (above check).
 				if mode == SnapSync || mode == LightSync {
 					head := d.lightchain.CurrentHeader()
+					// TODO (?) by Jakub Pajek (sync peers with same td but different hashes)
 					if td.Cmp(d.lightchain.GetTd(head.Hash(), head.Number.Uint64())) > 0 {
 						return errStallingPeer
 					}
