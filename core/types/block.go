@@ -137,13 +137,12 @@ func (h *Header) SanityCheck() error {
 	//if eLen := len(h.Extra); eLen > 100*1024 {
 	//	return fmt.Errorf("too large block extradata: size %d", eLen)
 	//}
-	// MEMO by Jakub Pajek: effective votes/sealers limit (clique permissions, clique multiple votes)
+	// MEMO by Jakub Pajek: sealers limit (clique permissions, clique multiple votes)
 	// If set to a value greater than 0, eMaxFields will effectively limit:
 	//  * the number of votes that can be included in extra-data of non-checkpoint blocks,
 	//  * the number of sealers that can be included in extra-data of checkpoint blocks.
-	// MEMO by Jakub Pajek: set the limit at 10000 for now. Increase as network grows.
-	// Although, the behavoiur of the network with that many sealers is undetermined at this point,
-	// and by the time the network exceeds 10000 sealers we should have transitioned to PoS anyways.
+	// MEMO by Jakub Pajek: sealers limit
+	// Set the limit at 10000 for now. Increase as network grows.
 	if eMaxFields := 10000; eMaxFields > 0 {
 		// Importing clique package creates import cycles...
 		//eMaxLen := clique.ExtraVanity + maxAddressNum*(common.AddressLength+1) + clique.ExtraSeal

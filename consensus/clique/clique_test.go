@@ -163,100 +163,100 @@ func TestCalcDifficulty(t *testing.T) {
 		// Genesis.
 		{
 			name: "3/genesis",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 0,
-				addrs[1]: 0,
-				addrs[2]: 0,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 0},
+				addrs[1]: {LastSignedBlock: 0},
+				addrs[2]: {LastSignedBlock: 0},
 			},
 		},
 		{
 			name: "6/genesis",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 0,
-				addrs[1]: 0,
-				addrs[2]: 0,
-				addrs[3]: 0,
-				addrs[4]: 0,
-				addrs[5]: 0,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 0},
+				addrs[1]: {LastSignedBlock: 0},
+				addrs[2]: {LastSignedBlock: 0},
+				addrs[3]: {LastSignedBlock: 0},
+				addrs[4]: {LastSignedBlock: 0},
+				addrs[5]: {LastSignedBlock: 0},
 			},
 		},
 		// All signed.
 		{
 			name: "3/all-signed/in-turn",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 1,
-				addrs[1]: 2,
-				addrs[2]: 3,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 1},
+				addrs[1]: {LastSignedBlock: 2},
+				addrs[2]: {LastSignedBlock: 3},
 			},
 		},
 		{
 			name: "3/all-signed/out-of-turn",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 1,
-				addrs[1]: 4,
-				addrs[2]: 3,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 1},
+				addrs[1]: {LastSignedBlock: 4},
+				addrs[2]: {LastSignedBlock: 3},
 			},
 		},
 		{
 			name: "6/all-signed/in-turn",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 1,
-				addrs[1]: 2,
-				addrs[2]: 3,
-				addrs[3]: 4,
-				addrs[4]: 5,
-				addrs[5]: 6,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 1},
+				addrs[1]: {LastSignedBlock: 2},
+				addrs[2]: {LastSignedBlock: 3},
+				addrs[3]: {LastSignedBlock: 4},
+				addrs[4]: {LastSignedBlock: 5},
+				addrs[5]: {LastSignedBlock: 6},
 			},
 		},
 		{
 			name: "6/all-signed/out-of-turn",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 9,
-				addrs[1]: 2,
-				addrs[2]: 7,
-				addrs[3]: 8,
-				addrs[4]: 5,
-				addrs[5]: 6,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 9},
+				addrs[1]: {LastSignedBlock: 2},
+				addrs[2]: {LastSignedBlock: 7},
+				addrs[3]: {LastSignedBlock: 8},
+				addrs[4]: {LastSignedBlock: 5},
+				addrs[5]: {LastSignedBlock: 6},
 			},
 		},
 		// One new.
 		{
 			name: "3/one-new",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 0,
-				addrs[1]: 4,
-				addrs[2]: 3,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 0},
+				addrs[1]: {LastSignedBlock: 4},
+				addrs[2]: {LastSignedBlock: 3},
 			},
 		},
 		{
 			name: "6/one-new",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 1,
-				addrs[1]: 2,
-				addrs[2]: 3,
-				addrs[3]: 4,
-				addrs[4]: 5,
-				addrs[5]: 0,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 1},
+				addrs[1]: {LastSignedBlock: 2},
+				addrs[2]: {LastSignedBlock: 3},
+				addrs[3]: {LastSignedBlock: 4},
+				addrs[4]: {LastSignedBlock: 5},
+				addrs[5]: {LastSignedBlock: 0},
 			},
 		},
 		// Multiple new.
 		{
 			name: "3/multiple-new",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 0,
-				addrs[1]: 0,
-				addrs[2]: 3,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 0},
+				addrs[1]: {LastSignedBlock: 0},
+				addrs[2]: {LastSignedBlock: 3},
 			},
 		},
 		{
 			name: "6/multiple-new",
-			lastSigned: map[common.Address]uint64{
-				addrs[0]: 0,
-				addrs[1]: 0,
-				addrs[2]: 3,
-				addrs[3]: 0,
-				addrs[4]: 0,
-				addrs[5]: 0,
+			lastSigned: map[common.Address]Signer{
+				addrs[0]: {LastSignedBlock: 0},
+				addrs[1]: {LastSignedBlock: 0},
+				addrs[2]: {LastSignedBlock: 3},
+				addrs[3]: {LastSignedBlock: 0},
+				addrs[4]: {LastSignedBlock: 0},
+				addrs[5]: {LastSignedBlock: 0},
 			},
 		},
 	} {
@@ -266,7 +266,7 @@ func TestCalcDifficulty(t *testing.T) {
 
 type testCalcDifficulty struct {
 	name       string
-	lastSigned map[common.Address]uint64
+	lastSigned map[common.Address]Signer
 }
 
 func (test *testCalcDifficulty) run(t *testing.T) {
@@ -276,7 +276,7 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 	}
 	sort.Slice(signers, func(i, j int) bool {
 		iAddr, jAddr := signers[i], signers[j]
-		iN, jN := test.lastSigned[iAddr], test.lastSigned[jAddr]
+		iN, jN := test.lastSigned[iAddr].LastSignedBlock, test.lastSigned[jAddr].LastSignedBlock
 		if iN != jN {
 			return iN < jN
 		}
