@@ -60,7 +60,17 @@ var (
 	ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
 	ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
 
+	// MEMO by Jakub Pajek: sealers limit
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+
+	// MEMO by Jakub Pajek: sealers limit
+	// offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
+	// https://www.desmos.com/calculator/octei0izoc
+	minOfflineTime = uint64(86400 * 31) // Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
+	// MEMO by Jakub Pajek: sealers limit
+	// strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
+	// https://www.desmos.com/calculator/mbgwbxnpdm
+	minStrikeCount = uint64(17) // Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
 
 	ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	ExtraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
@@ -534,11 +544,11 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 	if err != nil {
 		return err
 	}
-	if lastBlockSigned, ok := snap.Signers[signer]; !ok {
+	if signed, ok := snap.Signers[signer]; !ok {
 		return errUnauthorizedSigner
-	} else if lastBlockSigned > 0 {
+	} else if signed.LastSignedBlock > 0 {
 		// Check against recent signers
-		if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
+		if next := snap.nextSignableBlockNumber(signed.LastSignedBlock); next > number {
 			return errRecentlySigned
 		}
 	}
@@ -625,7 +635,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 			// On that occasion, also purge already passed and old proposals
 			addresses, purged := make([]common.Address, 0, len(c.proposals)), 0
 			for address, proposal := range c.proposals {
-				if snap.validVote(address, proposal.Proposal) {
+				// Vote should be valid, and cast after the signer was dropped for inactivity,
+				// in order not to automatically vote on re-adding those dropped signers
+				if snap.validVote(address, proposal.Proposal) && snap.Dropped[address] < proposal.Block {
 					addresses = append(addresses, address)
 				} else if number > proposal.Block && number-proposal.Block > params.FullImmutabilityThreshold {
 					delete(c.proposals, address)
@@ -752,11 +764,11 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	if err != nil {
 		return err
 	}
-	if lastBlockSigned, ok := snap.Signers[signer]; !ok {
+	if signed, ok := snap.Signers[signer]; !ok {
 		return errUnauthorizedSigner
-	} else if lastBlockSigned > 0 {
+	} else if signed.LastSignedBlock > 0 {
 		// Check against recent signers
-		if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
+		if next := snap.nextSignableBlockNumber(signed.LastSignedBlock); next > number {
 			// If we're amongst the recent signers, wait for the next block
 			return errors.New("signed recently, must wait for others")
 		}
@@ -815,19 +827,19 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 // Difficulty is defined as 1 plus the number of lower priority signers, with more recent
 // signers having lower priority. If multiple signers have not yet signed (0), then addresses
 // which lexicographically sort later have lower priority.
-func calcDifficulty(signers map[common.Address]uint64, signer common.Address) *big.Int {
+func calcDifficulty(signers map[common.Address]Signer, signer common.Address) *big.Int {
 	difficulty := uint64(1)
 	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
-	if lastBlockSigned := signers[signer]; lastBlockSigned > 0 {
-		for _, n := range signers {
-			if n > lastBlockSigned {
+	if lastSignedBlock := signers[signer].LastSignedBlock; lastSignedBlock > 0 {
+		for _, signed := range signers {
+			if signed.LastSignedBlock > lastSignedBlock {
 				difficulty++
 			}
 		}
 	} else {
 		// Haven't signed yet. If there are others, fall back to address sort.
-		for addr, n := range signers {
-			if n > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+		for addr, signed := range signers {
+			if signed.LastSignedBlock > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
 				difficulty++
 			}
 		}

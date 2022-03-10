@@ -46,6 +46,14 @@ type Tally struct {
 	Votes    int    `json:"votes"`    // Number of votes until now wanting to pass the proposal
 }
 
+// Signer is the state of a single authorized signer (and voter) with all the data required
+// for calculating block difficulty, penalties, etc.
+type Signer struct {
+	LastSignedBlock uint64 `json:"lastSignedBlock"` // Last signed block number by the signer
+	SignedCount     uint64 `json:"signedCount"`     // Number of blocks signed by the signer since last checked
+	StrikeCount     uint64 `json:"strikeCount"`     // Number of strikes the signer has received so far (can increase and decrease)
+}
+
 // Snapshot is the state of the authorization voting at a given point in time.
 type Snapshot struct {
 	config   *params.CliqueConfig // Consensus engine parameters to fine tune behavior
@@ -54,7 +62,8 @@ type Snapshot struct {
 	Number  uint64                    `json:"number"`  // Block number where the snapshot was created
 	Hash    common.Hash               `json:"hash"`    // Block hash where the snapshot was created
 	Voters  map[common.Address]uint64 `json:"voters"`  // Set of authorized voters at this moment and their most recently signed block
-	Signers map[common.Address]uint64 `json:"signers"` // Set of authorized signers at this moment and their most recently signed block
+	Signers map[common.Address]Signer `json:"signers"` // Set of authorized signers at this moment and their state
+	Dropped map[common.Address]uint64 `json:"dropped"` // Set of authorized signers dropped due to inactivity and their drop block number
 	Votes   []*Vote                   `json:"votes"`   // List of votes cast in chronological order
 	Tally   map[common.Address]Tally  `json:"tally"`   // Current vote tally to avoid recalculating
 }
@@ -76,14 +85,15 @@ func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, num
 		Number:   number,
 		Hash:     hash,
 		Voters:   make(map[common.Address]uint64),
-		Signers:  make(map[common.Address]uint64),
+		Signers:  make(map[common.Address]Signer),
+		Dropped:  make(map[common.Address]uint64),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for _, voter := range voters {
 		snap.Voters[voter] = 0
 	}
 	for _, signer := range signers {
-		snap.Signers[signer] = 0
+		snap.Signers[signer] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
 	}
 	return snap
 }
@@ -121,7 +131,8 @@ func (s *Snapshot) copy() *Snapshot {
 		Number:   s.Number,
 		Hash:     s.Hash,
 		Voters:   make(map[common.Address]uint64),
-		Signers:  make(map[common.Address]uint64),
+		Signers:  make(map[common.Address]Signer),
+		Dropped:  make(map[common.Address]uint64),
 		Votes:    make([]*Vote, len(s.Votes)),
 		Tally:    make(map[common.Address]Tally),
 	}
@@ -130,6 +141,9 @@ func (s *Snapshot) copy() *Snapshot {
 	}
 	for signer, signed := range s.Signers {
 		cpy.Signers[signer] = signed
+	}
+	for signer, dropped := range s.Dropped {
+		cpy.Dropped[signer] = dropped
 	}
 	for address, tally := range s.Tally {
 		cpy.Tally[address] = tally
@@ -231,18 +245,60 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if err != nil {
 			return nil, err
 		}
-		if lastBlockSigned, ok := snap.Signers[signer]; !ok {
+		if signed, ok := snap.Signers[signer]; !ok {
 			return nil, errUnauthorizedSigner
-		} else if lastBlockSigned > 0 {
-			// Check against recent signers
-			if next := snap.nextSignableBlockNumber(lastBlockSigned); next > number {
-				return nil, errRecentlySigned
+		} else {
+			if signed.LastSignedBlock > 0 {
+				// Check against recent signers
+				if next := snap.nextSignableBlockNumber(signed.LastSignedBlock); next > number {
+					return nil, errRecentlySigned
+				}
+			}
+			if _, ok := snap.Voters[signer]; ok {
+				snap.Voters[signer] = number
+			}
+			signed.LastSignedBlock = number
+			signed.SignedCount++
+			snap.Signers[signer] = signed
+		}
+
+		// Select the next signer in turn based on the current block number, and check it's activity
+		signerCount := uint64(len(snap.Signers))
+		address := snap.signers()[number%signerCount]
+		if signed, _ := snap.Signers[address]; signed.SignedCount > 0 {
+			// The signer signed at least one new block since the last check.
+			// Decrease the strike count, zero out the signed block count, save the state.
+			if signed.StrikeCount > signed.SignedCount {
+				signed.StrikeCount -= signed.SignedCount
+			} else {
+				signed.StrikeCount = 0
+			}
+			signed.SignedCount = 0
+			snap.Signers[address] = signed
+		} else {
+			// The signer did not sign any new blocks since the last check.
+			// Increase the strike count and save the state.
+			signed.StrikeCount++
+			snap.Signers[address] = signed
+			// If the strike count exceeded threshold, drop the signer from authorized signers.
+			// This does not apply to voters. Voters can only be removed thru explicit voting.
+			if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold(signerCount) {
+				// Delete the signer from authorized signers
+				delete(snap.Signers, address)
+				// Add the signer to dropped signers
+				snap.Dropped[address] = number
+				// Discard any previous votes the deauthorized voter cast (not needed for non-voters)
+				// ...
+				// Discard any previous votes around the just changed account
+				for i := 0; i < len(snap.Votes); i++ {
+					if snap.Votes[i].Address == address {
+						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+						i--
+					}
+				}
+				delete(snap.Tally, address)
 			}
 		}
-		if _, ok := snap.Voters[signer]; ok {
-			snap.Voters[signer] = number
-		}
-		snap.Signers[signer] = number
 
 		// If a vote is cast...
 		extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
@@ -294,12 +350,19 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
-						snap.Signers[address] = 0
+						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
+						// Delete the signer from dropped signers
+						delete(snap.Dropped, address)
 					} else if tally.Proposal == proposalSignerVote {
-						snap.Signers[address] = 0
+						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
+						// Delete the signer from dropped signers
+						delete(snap.Dropped, address)
 					} else {
 						delete(snap.Voters, address)
 						delete(snap.Signers, address)
+						// Delete the signer from dropped signers
+						// (the case when signer was voted out at the same block it was dropped?)
+						delete(snap.Dropped, address)
 
 						// Discard any previous votes the deauthorized voter cast
 						for i := 0; i < len(snap.Votes); i++ {
@@ -364,4 +427,21 @@ func (s *Snapshot) signers() []common.Address {
 // by the signer of lastSignedBlockNumber, based on the current number of signers.
 func (s *Snapshot) nextSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
 	return lastSignedBlockNumber + uint64(len(s.Signers))/2 + 1
+}
+
+// calcStrikeThreshold returns the strike threshold above which inactive signers are excluded
+// from the authorized signers. The value of this threshold depends on the current signer count.
+//
+// The lower the signer count, the higher the threshold value, in order to assure that we do not
+// drop the offline signer too soon. The signer must be offline for at least minStrikeThreshold
+// seconds before it can be dropped.
+// The higher the signer count, the lower the threshold value, however the threshold value will
+// not drop below minStrikeThreshold in order to assure that enough samples are gathered before
+// we decide to drop the signer.
+func (s *Snapshot) calcStrikeThreshold(signerCount uint64) uint64 {
+	strikeThreshold := minOfflineTime / s.config.Period / signerCount
+	if strikeThreshold < minStrikeCount {
+		return minStrikeCount
+	}
+	return strikeThreshold
 }
