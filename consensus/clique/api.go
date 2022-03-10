@@ -189,7 +189,9 @@ func (api *API) GetValidProposals(number *rpc.BlockNumber) (map[common.Address]p
 
 	proposals := make(map[common.Address]prop)
 	for address, proposal := range api.clique.proposals {
-		if !snap.validVote(address, proposal.Proposal) {
+		// Vote should be valid, and cast after the signer was dropped for inactivity,
+		// in order not to automatically vote on re-adding those dropped signers
+		if !snap.validVote(address, proposal.Proposal) || snap.Dropped[address] >= proposal.Block {
 			continue
 		}
 		switch proposal.Proposal {
