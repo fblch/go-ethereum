@@ -19,6 +19,7 @@ package clique
 import (
 	"bytes"
 	"encoding/json"
+	"math/big"
 	"sort"
 	"time"
 
@@ -59,13 +60,14 @@ type Snapshot struct {
 	config   *params.CliqueConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache        // Cache of recent block signatures to speed up ecrecover
 
-	Number  uint64                    `json:"number"`  // Block number where the snapshot was created
-	Hash    common.Hash               `json:"hash"`    // Block hash where the snapshot was created
-	Voters  map[common.Address]uint64 `json:"voters"`  // Set of authorized voters at this moment and their most recently signed block
-	Signers map[common.Address]Signer `json:"signers"` // Set of authorized signers at this moment and their state
-	Dropped map[common.Address]uint64 `json:"dropped"` // Set of authorized signers dropped due to inactivity and their drop block number
-	Votes   []*Vote                   `json:"votes"`   // List of votes cast in chronological order
-	Tally   map[common.Address]Tally  `json:"tally"`   // Current vote tally to avoid recalculating
+	Number    uint64                    `json:"number"`    // Block number where the snapshot was created
+	Hash      common.Hash               `json:"hash"`      // Block hash where the snapshot was created
+	VoterRing bool                      `json:"voterRing"` // Flag to indicate the ring in which blocks are signed (the sealer ring or the voter ring)
+	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their most recently signed block
+	Signers   map[common.Address]Signer `json:"signers"`   // Set of authorized signers at this moment and their state
+	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their drop block number
+	Votes     []*Vote                   `json:"votes"`     // List of votes cast in chronological order
+	Tally     map[common.Address]Tally  `json:"tally"`     // Current vote tally to avoid recalculating
 }
 
 // addressesAscending implements the sort interface to allow sorting a list of addresses
@@ -80,14 +82,15 @@ func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // use it for the genesis block.
 func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
 	snap := &Snapshot{
-		config:   config,
-		sigcache: sigcache,
-		Number:   number,
-		Hash:     hash,
-		Voters:   make(map[common.Address]uint64),
-		Signers:  make(map[common.Address]Signer),
-		Dropped:  make(map[common.Address]uint64),
-		Tally:    make(map[common.Address]Tally),
+		config:    config,
+		sigcache:  sigcache,
+		Number:    number,
+		Hash:      hash,
+		VoterRing: false,
+		Voters:    make(map[common.Address]uint64),
+		Signers:   make(map[common.Address]Signer),
+		Dropped:   make(map[common.Address]uint64),
+		Tally:     make(map[common.Address]Tally),
 	}
 	for _, voter := range voters {
 		snap.Voters[voter] = 0
@@ -126,15 +129,16 @@ func (s *Snapshot) store(db ethdb.Database) error {
 // copy creates a deep copy of the snapshot, though not the individual votes.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
-		config:   s.config,
-		sigcache: s.sigcache,
-		Number:   s.Number,
-		Hash:     s.Hash,
-		Voters:   make(map[common.Address]uint64),
-		Signers:  make(map[common.Address]Signer),
-		Dropped:  make(map[common.Address]uint64),
-		Votes:    make([]*Vote, len(s.Votes)),
-		Tally:    make(map[common.Address]Tally),
+		config:    s.config,
+		sigcache:  s.sigcache,
+		Number:    s.Number,
+		Hash:      s.Hash,
+		VoterRing: s.VoterRing,
+		Voters:    make(map[common.Address]uint64),
+		Signers:   make(map[common.Address]Signer),
+		Dropped:   make(map[common.Address]uint64),
+		Votes:     make([]*Vote, len(s.Votes)),
+		Tally:     make(map[common.Address]Tally),
 	}
 	for voter, signed := range s.Voters {
 		cpy.Voters[voter] = signed
@@ -248,55 +252,123 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if signed, ok := snap.Signers[signer]; !ok {
 			return nil, errUnauthorizedSigner
 		} else {
+			var (
+				_, okVoter = snap.Voters[signer]
+				nextNumber uint64
+				voterRing  bool
+			)
+			// Check in which ring we are currently signing blocks in
+			if !snap.VoterRing {
+				// We are currently signing blocks in the sealer ring.
+				// Check the diffuculty to determine if we want to stay
+				// in the sealer ring or switch to the voter ring.
+				if header.Difficulty.Cmp(snap.maxSealerRingDifficulty()) <= 0 {
+					// We want to stay in the sealer ring
+					nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
+					voterRing = false
+				} else if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
+					// We want to switch to the voter ring
+					// Check the signer against voters (only voters can switch to the voter ring)
+					if !okVoter {
+						return nil, errUnauthorizedVoter
+					}
+					nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
+					voterRing = true
+				} else if header.Difficulty.Cmp(snap.maxRingBreakerDifficulty()) <= 0 {
+					// We want to preemptively prevent switching to the voter ring
+					// Check the signer against voters (only non-voters can prevent the voter ring)
+					if okVoter {
+						return nil, errUnauthorizedVoter
+					}
+					nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
+					voterRing = false
+				} else {
+					// Difficulties above maxRingBreakerDifficulty are not allowed
+					return nil, errWrongDifficultySealerRing
+				}
+			} else {
+				// We are currently signing blocks in the voter ring.
+				// Check the difficulty to determine if we want to stay
+				// in the voter ring or return to the sealer ring.
+				if header.Difficulty.Cmp(snap.maxSealerRingDifficulty()) <= 0 {
+					// Difficulties from the sealer ring range are not allowed in the voter ring
+					return nil, errWrongDifficultyVoterRing
+				} else if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
+					// We want to stay in the voter ring
+					// Check the signer against voters (only voters can sign blocks in the voter ring)
+					if !okVoter {
+						return nil, errUnauthorizedVoter
+					}
+					nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
+					voterRing = true
+				} else if header.Difficulty.Cmp(snap.maxRingBreakerDifficulty()) <= 0 {
+					// We want to return to the sealer ring
+					// Check the signer against voters (only non-voters can disband the voter ring)
+					if okVoter {
+						return nil, errUnauthorizedVoter
+					}
+					nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
+					voterRing = false
+				} else {
+					// Difficulties above maxRingBreakerDifficulty are not allowed
+					return nil, errWrongDifficultyVoterRing
+				}
+			}
 			if signed.LastSignedBlock > 0 {
 				// Check against recent signers
-				if next := snap.nextSignableBlockNumber(signed.LastSignedBlock); next > number {
+				if nextNumber > number {
 					return nil, errRecentlySigned
 				}
 			}
-			if _, ok := snap.Voters[signer]; ok {
+			// Update last signed block numbers
+			if okVoter {
 				snap.Voters[signer] = number
 			}
 			signed.LastSignedBlock = number
 			signed.SignedCount++
 			snap.Signers[signer] = signed
+			// Update the ring state
+			snap.VoterRing = voterRing
 		}
 
-		// Select the next signer in turn based on the current block number, and check it's activity
-		signerCount := uint64(len(snap.Signers))
-		address := snap.signers()[number%signerCount]
-		if signed, _ := snap.Signers[address]; signed.SignedCount > 0 {
-			// The signer signed at least one new block since the last check.
-			// Decrease the strike count, zero out the signed block count, save the state.
-			if signed.StrikeCount > signed.SignedCount {
-				signed.StrikeCount -= signed.SignedCount
-			} else {
-				signed.StrikeCount = 0
-			}
-			signed.SignedCount = 0
-			snap.Signers[address] = signed
-		} else {
-			// The signer did not sign any new blocks since the last check.
-			// Increase the strike count and save the state.
-			signed.StrikeCount++
-			snap.Signers[address] = signed
-			// If the strike count exceeded threshold, drop the signer from authorized signers.
-			// This does not apply to voters. Voters can only be removed thru explicit voting.
-			if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold(signerCount) {
-				// Delete the signer from authorized signers
-				delete(snap.Signers, address)
-				// Add the signer to dropped signers
-				snap.Dropped[address] = number
-				// Discard any previous votes the deauthorized voter cast (not needed for non-voters)
-				// ...
-				// Discard any previous votes around the just changed account
-				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Address == address {
-						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-						i--
-					}
+		// If in the sealer ring, apply offline penalties (drop inactive signers)
+		if !snap.VoterRing {
+			// Select the next signer in turn based on the current block number, and check it's activity
+			signerCount := uint64(len(snap.Signers))
+			address := snap.signers()[number%signerCount]
+			if signed, _ := snap.Signers[address]; signed.SignedCount > 0 {
+				// The signer signed at least one new block since the last check.
+				// Decrease the strike count, zero out the signed block count, save the state.
+				if signed.StrikeCount > signed.SignedCount {
+					signed.StrikeCount -= signed.SignedCount
+				} else {
+					signed.StrikeCount = 0
 				}
-				delete(snap.Tally, address)
+				signed.SignedCount = 0
+				snap.Signers[address] = signed
+			} else {
+				// The signer did not sign any new blocks since the last check.
+				// Increase the strike count and save the state.
+				signed.StrikeCount++
+				snap.Signers[address] = signed
+				// If the strike count exceeded threshold, drop the signer from authorized signers.
+				// This does not apply to voters. Voters can only be removed thru explicit voting.
+				if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold(signerCount) {
+					// Delete the signer from authorized signers
+					delete(snap.Signers, address)
+					// Add the signer to dropped signers
+					snap.Dropped[address] = number
+					// Discard any previous votes the deauthorized voter cast
+					// (...not needed for non-voters)
+					// Discard any previous votes around the just changed account
+					for i := 0; i < len(snap.Votes); i++ {
+						if snap.Votes[i].Address == address {
+							snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+							i--
+						}
+					}
+					delete(snap.Tally, address)
+				}
 			}
 		}
 
@@ -423,10 +495,124 @@ func (s *Snapshot) signers() []common.Address {
 	return sigs
 }
 
-// nextSignableBlockNumber returns the number of the next block legal for signature
-// by the signer of lastSignedBlockNumber, based on the current number of signers.
-func (s *Snapshot) nextSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
+// maxSealerRingDifficulty returns maximum possible difficulty for a signer during the sealer ring.
+func (s *Snapshot) maxSealerRingDifficulty() *big.Int {
+	return new(big.Int).SetUint64(uint64(len(s.Signers)))
+}
+
+// maxVoterRingDifficulty returns maximum possible difficulty for a voter during the voter ring.
+func (s *Snapshot) maxVoterRingDifficulty() *big.Int {
+	return new(big.Int).SetUint64(uint64(len(s.Signers)) + uint64(len(s.Voters)))
+}
+
+// maxRingBreakerDifficulty returns maximum possible difficulty for a signer preventing/disbanding the voter ring.
+func (s *Snapshot) maxRingBreakerDifficulty() *big.Int {
+	return new(big.Int).SetUint64(uint64(2*len(s.Signers)) + uint64(len(s.Voters)))
+}
+
+// calcSealerRingDifficulty returns the difficulty for a signer during the sealer ring, given all
+// the signers and their most recently signed block numbers, with 0 meaning 'has not signed yet'.
+// With N signers, it will always return values from 1 to N inclusive for an authorized signer,
+// 0 otherwise.
+//
+// Sealer ring difficulty is defined as 1 plus the number of lower priority sealers, with more
+// recent sealers having lower priority. If multiple sealers have not yet signed (0), then addresses
+// which lexicographically sort later have lower priority.
+func (s *Snapshot) calcSealerRingDifficulty(signer common.Address) *big.Int {
+	difficulty := uint64(1)
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if signerSigned, ok := s.Signers[signer]; !ok {
+		return big.NewInt(0)
+	} else if signerSigned.LastSignedBlock > 0 {
+		for _, signed := range s.Signers {
+			if signed.LastSignedBlock > signerSigned.LastSignedBlock {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr, signed := range s.Signers {
+			if signed.LastSignedBlock > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
+}
+
+// calcVoterRingDifficulty returns the difficulty for a voter during the voter ring, given the sealer count,
+// all the voters and their most recently signed block numbers, with 0 meaning 'has not signed yet'.
+// With N sealers and M voters, it will always return values from N+1 to N+M inclusive for an authorized
+// voter, 0 otherwise. Thus, block difficulties in the voter ring for authorized voters are always higher
+// than block difficulties in the sealer ring. This is to prioritize the voter ring over the sealer ring.
+//
+// Voter ring difficulty for voters is defined as a maximum sealer ring difficulty N plus 1 plus the number
+// of lower priority voters, with more recent voters having lower priority. If multiple voters have not yet
+// signed (0), then addresses which lexicographically sort later have lower priority.
+func (s *Snapshot) calcVoterRingDifficulty(voter common.Address) *big.Int {
+	difficulty := uint64(len(s.Signers)) + 1
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if lastSignedBlock, ok := s.Voters[voter]; !ok {
+		return big.NewInt(0)
+	} else if lastSignedBlock > 0 {
+		for _, signed := range s.Voters {
+			if signed > lastSignedBlock {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr, signed := range s.Voters {
+			if signed > 0 || bytes.Compare(addr[:], voter[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
+}
+
+// calcRingBreakerDifficulty returns the difficulty for a signer preventing/disbanding the voter ring, given
+// the voter count, all the sealers and their most recently signed block numbers, with 0 meaning 'has not signed yet'.
+// With N sealers and M voters, it will always return values from N+M+1 to N+M+N inclusive for an authorized
+// signer, 0 otherwise. Thus, block difficulties in the voter ring for authorized signers are always higher
+// than block difficulties for voters in the voter ring. This is to prioritize preventing/disbanding the voter
+// ring by signers.
+//
+// Voter ring difficulty for signers is defined as a maximum voter ring difficulty N+M plus 1 plus the number
+// of lower priority sealers, with more recent sealers having lower priority. If multiple sealers have not yet
+// signed (0), then addresses which lexicographically sort later have lower priority.
+func (s *Snapshot) calcRingBreakerDifficulty(signer common.Address) *big.Int {
+	difficulty := uint64(len(s.Signers)+len(s.Voters)) + 1
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if signerSigned, ok := s.Signers[signer]; !ok {
+		return big.NewInt(0)
+	} else if signerSigned.LastSignedBlock > 0 {
+		for _, signed := range s.Signers {
+			if signed.LastSignedBlock > signerSigned.LastSignedBlock {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr, signed := range s.Signers {
+			if signed.LastSignedBlock > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
+}
+
+// nextSealerRingSignableBlockNumber returns the number of the next block legal for signature
+// in the sealer ring by the signer of lastSignedBlockNumber, based on the current number of sealers.
+func (s *Snapshot) nextSealerRingSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
 	return lastSignedBlockNumber + uint64(len(s.Signers))/2 + 1
+}
+
+// nextVoterRingSignableBlockNumber returns the number of the next block legal for signature
+// in the voter ring by the signer of lastSignedBlockNumber, based on the current number of voters.
+func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
+	return lastSignedBlockNumber + uint64(len(s.Voters))/2 + 1
 }
 
 // calcStrikeThreshold returns the strike threshold above which inactive signers are excluded
