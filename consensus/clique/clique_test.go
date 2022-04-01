@@ -282,9 +282,13 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 		}
 		return bytes.Compare(iAddr[:], jAddr[:]) < 0
 	})
+	snap := newGenesisSnapshot(nil, nil, 0, common.Hash{}, make([]common.Address, 0), signers)
+	for _, signer := range signers {
+		snap.Signers[signer] = test.lastSigned[signer]
+	}
 	for i, signer := range signers {
 		exp := len(signers) - i
-		got := calcDifficulty(test.lastSigned, signer)
+		got := snap.calcSealerRingDifficulty(signer)
 		if got.Cmp(new(big.Int).SetUint64(uint64(exp))) != 0 {
 			t.Errorf("expected difficulty %d but got %d", exp, got.Uint64())
 		}
