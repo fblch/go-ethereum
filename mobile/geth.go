@@ -53,8 +53,8 @@ import (
 
 // ADDED by Jakub Pajek BEG
 const (
-	// Sync mode defaults to light sync (not full sync!)
-	SyncModeDefault int64 = int64(downloader.FullSync)
+	// Synchronise the entire blockchain history from full blocks
+	SyncModeFull = int64(downloader.FullSync)
 
 	// Download the chain and the state via compact snapshots
 	SyncModeSnap = int64(downloader.SnapSync)
@@ -221,9 +221,6 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	// ADDED by Jakub Pajek BEG
 	if config.UserIdent == "" {
 		config.UserIdent = defaultNodeConfig.UserIdent
-	}
-	if config.SyncMode == SyncModeDefault {
-		config.SyncMode = defaultNodeConfig.SyncMode
 	}
 	if config.ListenAddr == "" {
 		config.ListenAddr = defaultNodeConfig.ListenAddr
