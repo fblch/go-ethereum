@@ -19,10 +19,13 @@
 package geth
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // EthereumClient provides access to the Ethereum APIs.
@@ -136,6 +139,56 @@ func (ec *EthereumClient) SubscribeNewHead(ctx *Context, handler NewHeadHandler,
 			select {
 			case header := <-ch:
 				handler.OnNewHead(&Header{header})
+
+			case err := <-rawSub.Err():
+				if err != nil {
+					handler.OnError(err.Error())
+				}
+				return
+			}
+		}
+	}()
+	return &Subscription{rawSub}, nil
+}
+
+// ADDED by Jakub Pajek (subscribe syncing)
+// SyncHandler is a client-side subscription callback to invoke on events and
+// subscription failure.
+type SyncHandler interface {
+	OnSyncStatus(syncing bool, progress *SyncProgress)
+	OnError(failure string)
+}
+
+// ADDED by Jakub Pajek (subscribe syncing)
+// SubscribeSyncing subscribes to notifications about the current sync status and progress
+// on the given channel.
+func (ec *EthereumClient) SubscribeSyncing(ctx *Context, handler SyncHandler, buffer int) (sub *Subscription, _ error) {
+	// Subscribe to the event internally
+	ch := make(chan interface{}, buffer)
+	rawSub, err := ec.client.SubscribeSyncing(ctx.context, ch)
+	if err != nil {
+		return nil, err
+	}
+	// Start up a dispatcher to feed into the callback
+	go func() {
+		for {
+			select {
+			case event := <-ch:
+				if syncing, ok := event.(bool); ok {
+					handler.OnSyncStatus(syncing, nil)
+				} else if status, ok := event.(map[string]interface{}); ok {
+					jsonStatus, err := json.Marshal(status)
+					if err != nil {
+						log.Warn("Failed to parse syncing notification from channer", "err", err)
+						break
+					}
+					rawStatus := downloader.SyncingResult{}
+					if err := json.Unmarshal(jsonStatus, &rawStatus); err != nil {
+						log.Warn("Failed to parse syncing notification from channer", "err", err)
+						break
+					}
+					handler.OnSyncStatus(rawStatus.Syncing, &SyncProgress{rawStatus.Status})
+				}
 
 			case err := <-rawSub.Err():
 				if err != nil {
