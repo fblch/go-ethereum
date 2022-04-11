@@ -529,6 +529,11 @@ func (n *Node) GetNodeInfo() *NodeInfo {
 	return &NodeInfo{n.node.Server().NodeInfo()}
 }
 
+// GetPeersCount returns the number of connected peers.
+func (n *Node) GetPeersCount() int {
+	return n.node.Server().PeerCount()
+}
+
 // GetPeersInfo returns an array of metadata objects describing connected peers.
 func (n *Node) GetPeersInfo() *PeerInfos {
 	return &PeerInfos{n.node.Server().PeersInfo()}
