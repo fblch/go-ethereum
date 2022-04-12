@@ -281,7 +281,9 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		isLocalBlock: isLocalBlock,
 		localUncles:  make(map[common.Hash]*types.Block),
 		remoteUncles: make(map[common.Hash]*types.Block),
-		unconfirmed:  newUnconfirmedBlocks(eth.BlockChain(), sealingLogAtDepth),
+		// MODIFIED by Jakub Pajek (subscribe canonical/lost blocks)
+		//unconfirmed:  newUnconfirmedBlocks(eth.BlockChain(), sealingLogAtDepth),
+		unconfirmed: newUnconfirmedBlocks(eth.BlockChain(), sealingLogAtDepth, eth.BlockChain().CanoFeed(), eth.BlockChain().LostFeed()),
 		// COMMENTED by Jakub Pajek BEG (revert require explicit etherbase address)
 		//coinbase:           config.Etherbase,
 		//extra:              config.ExtraData,
