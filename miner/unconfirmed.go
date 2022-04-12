@@ -21,7 +21,9 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -51,13 +53,23 @@ type unconfirmedBlocks struct {
 	depth  uint           // Depth after which to discard previous blocks
 	blocks *ring.Ring     // Block infos to allow canonical chain cross checks
 	lock   sync.Mutex     // Protects the fields from concurrent access
+	// ADDED by Jakub Pajek BEG (subscribe canonical/lost blocks)
+	canoFeed *event.Feed // Event feed about locally mined blocks reaching canonical chain
+	lostFeed *event.Feed // Event feed baout locally mined blocks not reaching canonical chain
+	// ADDED by Jakub Pajek END (subscribe canonical/lost blocks)
 }
 
+// MODIFIED by Jakub Pajek (subscribe canonical/lost blocks)
 // newUnconfirmedBlocks returns new data structure to track currently unconfirmed blocks.
-func newUnconfirmedBlocks(chain chainRetriever, depth uint) *unconfirmedBlocks {
+//func newUnconfirmedBlocks(chain chainRetriever, depth uint) *unconfirmedBlocks {
+func newUnconfirmedBlocks(chain chainRetriever, depth uint, canoFeed *event.Feed, lostFeed *event.Feed) *unconfirmedBlocks {
 	return &unconfirmedBlocks{
 		chain: chain,
 		depth: depth,
+		// ADDED by Jakub Pajek BEG (subscribe canonical/lost blocks)
+		canoFeed: canoFeed,
+		lostFeed: lostFeed,
+		// ADDED by Jakub Pajek END (subscribe canonical/lost blocks)
 	}
 }
 
@@ -105,6 +117,10 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 			log.Warn("Failed to retrieve header of mined block", "number", next.index, "hash", next.hash)
 		case header.Hash() == next.hash:
 			log.Info("🔗 block reached canonical chain", "number", next.index, "hash", next.hash)
+			// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+			if set.canoFeed != nil {
+				set.canoFeed.Send(core.CanonicalBlockEvent{Hash: next.hash})
+			}
 		default:
 			// Block is not canonical, check whether we have an uncle or a lost block
 			included := false
@@ -120,8 +136,16 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 			}
 			if included {
 				log.Info("⑂ block became an uncle", "number", next.index, "hash", next.hash)
+				// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+				if set.canoFeed != nil {
+					set.canoFeed.Send(core.CanonicalBlockEvent{Hash: next.hash})
+				}
 			} else {
 				log.Info("😱 block lost", "number", next.index, "hash", next.hash)
+				// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+				if set.lostFeed != nil {
+					set.lostFeed.Send(core.CanonicalBlockEvent{Hash: next.hash})
+				}
 			}
 		}
 		// Drop the block out of the ring

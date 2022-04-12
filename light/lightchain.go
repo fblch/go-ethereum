@@ -57,6 +57,8 @@ type LightChain struct {
 	chainFeed     event.Feed
 	chainSideFeed event.Feed
 	chainHeadFeed event.Feed
+	canoBlockFeed event.Feed // ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+	lostBlockFeed event.Feed // ADDED by Jakub Pajek (subscribe canonical/lost blocks)
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
 	forker        *core.ForkChoice
@@ -588,6 +590,18 @@ func (lc *LightChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) eve
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
 func (lc *LightChain) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
 	return lc.scope.Track(lc.chainSideFeed.Subscribe(ch))
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeCanonicalBlockEvent registers a subscription of CanonicalBlockEvent.
+func (lc *LightChain) SubscribeCanonicalBlockEvent(ch chan<- core.CanonicalBlockEvent) event.Subscription {
+	return lc.scope.Track(lc.canoBlockFeed.Subscribe(ch))
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeLostBlockEvent registers a subscription of LostBlockEvent.
+func (lc *LightChain) SubscribeLostBlockEvent(ch chan<- core.LostBlockEvent) event.Subscription {
+	return lc.scope.Track(lc.lostBlockFeed.Subscribe(ch))
 }
 
 // SubscribeLogsEvent implements the interface of filters.Backend
