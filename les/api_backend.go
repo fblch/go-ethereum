@@ -243,6 +243,16 @@ func (b *LesApiBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) e
 	return b.eth.blockchain.SubscribeChainSideEvent(ch)
 }
 
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+func (b *LesApiBackend) SubscribeCanonicalBlockEvent(ch chan<- core.CanonicalBlockEvent) event.Subscription {
+	return b.eth.blockchain.SubscribeCanonicalBlockEvent(ch)
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+func (b *LesApiBackend) SubscribeLostBlockEvent(ch chan<- core.LostBlockEvent) event.Subscription {
+	return b.eth.blockchain.SubscribeLostBlockEvent(ch)
+}
+
 func (b *LesApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.eth.blockchain.SubscribeLogsEvent(ch)
 }

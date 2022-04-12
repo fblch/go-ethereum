@@ -41,3 +41,11 @@ type ChainSideEvent struct {
 }
 
 type ChainHeadEvent struct{ Block *types.Block }
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// CanonicalBlockEvent is posted when a locally mined block reached canonical chain.
+type CanonicalBlockEvent struct{ Hash common.Hash }
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// LostBlockEvent is posted when a locally mined block did not reached canonical chain.
+type LostBlockEvent struct{ Hash common.Hash }

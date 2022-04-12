@@ -182,6 +182,8 @@ type BlockChain struct {
 	chainHeadFeed event.Feed
 	logsFeed      event.Feed
 	blockProcFeed event.Feed
+	canoBlockFeed event.Feed // ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+	lostBlockFeed event.Feed // ADDED by Jakub Pajek (subscribe canonical/lost blocks)
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
 
@@ -414,6 +416,16 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		}()
 	}
 	return bc, nil
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+func (bc *BlockChain) CanoFeed() *event.Feed {
+	return &bc.canoBlockFeed
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+func (bc *BlockChain) LostFeed() *event.Feed {
+	return &bc.lostBlockFeed
 }
 
 // empty returns an indicator whether the blockchain is empty.
