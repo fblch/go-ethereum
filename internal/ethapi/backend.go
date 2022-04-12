@@ -72,6 +72,10 @@ type Backend interface {
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
+	// ADDED by Jakub Pajek BEG (subscribe canonical/lost blocks)
+	SubscribeCanonicalBlockEvent(ch chan<- core.CanonicalBlockEvent) event.Subscription
+	SubscribeLostBlockEvent(ch chan<- core.LostBlockEvent) event.Subscription
+	// ADDED by Jakub Pajek END (subscribe canonical/lost blocks)
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
