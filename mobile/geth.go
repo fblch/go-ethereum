@@ -28,6 +28,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -661,4 +662,94 @@ func setAccountManagerBackends(stack *node.Node) error {
 	*/
 
 	return nil
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// CanonicalBlockHandler is a server-side (not client-side) subscription callback
+// to invoke on events and subscription failure.
+type CanonicalBlockHandler interface {
+	OnCanonicalBlock(hash *Hash)
+	OnError(failure string)
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeCannonicalBlock subscribes to notifications about locally mined blocks
+// reaching canonical chain on the given channel.
+func (n *Node) SubscribeCannonicalBlock(handler CanonicalBlockHandler, buffer int) (sub *Subscription, _ error) {
+	// Check if n is a configured as a full node
+	if n.eth == nil {
+		return nil, errors.New("Light clients do not support mining")
+	}
+	// Subscribe to the event internally
+	// (Use EthAPIBackend for simlicity of implementation. Client-side subscriptions would use RPC requests)
+	ch := make(chan core.CanonicalBlockEvent, buffer)
+	rawSub := n.eth.APIBackend.SubscribeCanonicalBlockEvent(ch)
+	// Safe cast event.Subscription to ethereum.Subscription
+	// (The same interface is defined twice in different packages, so cast should be possible)
+	rawEthSub, ok := rawSub.(ethereum.Subscription)
+	if !ok {
+		rawSub.Unsubscribe()
+		return nil, errors.New("Failed to safe cast between subscription interfaces")
+	}
+	// Start up a dispatcher to feed into the callback
+	go func() {
+		for {
+			select {
+			case ev := <-ch:
+				handler.OnCanonicalBlock(&Hash{ev.Hash})
+
+			case err := <-rawSub.Err():
+				if err != nil {
+					handler.OnError(err.Error())
+				}
+				return
+			}
+		}
+	}()
+	return &Subscription{rawEthSub}, nil
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// LostBlockHandler is a server-side (not client-side) subscription callback
+// to invoke on events and subscription failure.
+type LostBlockHandler interface {
+	OnLostBlock(hash *Hash)
+	OnError(failure string)
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeLostBlock subscribes to notifications about locally mined blocks
+// not reaching canonical chain on the given channel.
+func (n *Node) SubscribeLostBlock(handler LostBlockHandler, buffer int) (sub *Subscription, _ error) {
+	// Check if n is a configured as a full node
+	if n.eth == nil {
+		return nil, errors.New("Light clients do not support mining")
+	}
+	// Subscribe to the event internally
+	// (Use EthAPIBackend for simlicity of implementation. Client-side subscriptions would use RPC requests)
+	ch := make(chan core.LostBlockEvent, buffer)
+	rawSub := n.eth.APIBackend.SubscribeLostBlockEvent(ch)
+	// Safe cast event.Subscription to ethereum.Subscription
+	// (The same interface is defined twice in different packages, so cast should be possible)
+	rawEthSub, ok := rawSub.(ethereum.Subscription)
+	if !ok {
+		rawSub.Unsubscribe()
+		return nil, errors.New("Failed to safe cast between subscription interfaces")
+	}
+	// Start up a dispatcher to feed into the callback
+	go func() {
+		for {
+			select {
+			case ev := <-ch:
+				handler.OnLostBlock(&Hash{ev.Hash})
+
+			case err := <-rawSub.Err():
+				if err != nil {
+					handler.OnError(err.Error())
+				}
+				return
+			}
+		}
+	}()
+	return &Subscription{rawEthSub}, nil
 }

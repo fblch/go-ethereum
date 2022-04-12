@@ -391,3 +391,15 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
 }
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeCanonicalBlockEvent registers a subscription of CanonicalBlockEvent.
+func (bc *BlockChain) SubscribeCanonicalBlockEvent(ch chan<- CanonicalBlockEvent) event.Subscription {
+	return bc.scope.Track(bc.canoBlockFeed.Subscribe(ch))
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeLostBlockEvent registers a subscription of LostBlockEvent.
+func (bc *BlockChain) SubscribeLostBlockEvent(ch chan<- LostBlockEvent) event.Subscription {
+	return bc.scope.Track(bc.lostBlockFeed.Subscribe(ch))
+}
