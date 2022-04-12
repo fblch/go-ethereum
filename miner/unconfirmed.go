@@ -144,7 +144,7 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 				log.Info("😱 block lost", "number", next.index, "hash", next.hash)
 				// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
 				if set.lostFeed != nil {
-					set.lostFeed.Send(core.CanonicalBlockEvent{Hash: next.hash})
+					set.lostFeed.Send(core.LostBlockEvent{Hash: next.hash})
 				}
 			}
 		}
