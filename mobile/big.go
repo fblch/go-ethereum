@@ -82,6 +82,15 @@ func (bi *BigInt) Sign() int {
 	return bi.bigint.Sign()
 }
 
+// SetString sets the big int to x.
+//
+// The string prefix determines the actual conversion base. A prefix of "0x" or
+// "0X" selects base 16; the "0" prefix selects base 8, and a "0b" or "0B" prefix
+// selects base 2. Otherwise the selected base is 10.
+func (bi *BigInt) SetString(x string, base int) {
+	bi.bigint.SetString(x, base)
+}
+
 // ADDED by Jakub Pajek
 // Add returns the sum bi+bi2 as new big int
 func (bi *BigInt) Add(bi2 *BigInt) *BigInt {
@@ -95,24 +104,25 @@ func (bi *BigInt) Sub(bi2 *BigInt) *BigInt {
 }
 
 // ADDED by Jakub Pajek
-// Sub returns the product bi*bi2 as new big int
+// Mul returns the product bi*bi2 as new big int
 func (bi *BigInt) Mul(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Mul(bi.bigint, bi2.bigint)}
 }
 
 // ADDED by Jakub Pajek
-// Sub returns the quotient bi/bi2 as new big int (panics on division by 0)
+// Div returns the quotient bi/bi2 as new big int (panics on division by 0)
 func (bi *BigInt) Div(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Div(bi.bigint, bi2.bigint)}
 }
 
-// SetString sets the big int to x.
-//
-// The string prefix determines the actual conversion base. A prefix of "0x" or
-// "0X" selects base 16; the "0" prefix selects base 8, and a "0b" or "0B" prefix
-// selects base 2. Otherwise the selected base is 10.
-func (bi *BigInt) SetString(x string, base int) {
-	bi.bigint.SetString(x, base)
+// ADDED by Jakub Pajek
+// DivMod returns the quotient bi/bi2 and modulus bi%bi2 as two new big ints (panics on division by 0)
+func (bi *BigInt) DivMod(bi2 *BigInt) *BigInts {
+	bigInts := NewBigInts(2)
+	q, m := new(big.Int).DivMod(bi.bigint, bi2.bigint, new(big.Int))
+	bigInts.Set(0, &BigInt{q})
+	bigInts.Set(1, &BigInt{m})
+	return bigInts
 }
 
 // BigInts represents a slice of big ints.
