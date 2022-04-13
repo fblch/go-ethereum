@@ -82,6 +82,30 @@ func (bi *BigInt) Sign() int {
 	return bi.bigint.Sign()
 }
 
+// ADDED by Jakub Pajek
+// Add returns the sum bi+bi2 as new big int
+func (bi *BigInt) Add(bi2 *BigInt) *BigInt {
+	return &BigInt{new(big.Int).Add(bi.bigint, bi2.bigint)}
+}
+
+// ADDED by Jakub Pajek
+// Sub returns the difference bi-bi2 as new big int
+func (bi *BigInt) Sub(bi2 *BigInt) *BigInt {
+	return &BigInt{new(big.Int).Sub(bi.bigint, bi2.bigint)}
+}
+
+// ADDED by Jakub Pajek
+// Sub returns the product bi*bi2 as new big int
+func (bi *BigInt) Mul(bi2 *BigInt) *BigInt {
+	return &BigInt{new(big.Int).Mul(bi.bigint, bi2.bigint)}
+}
+
+// ADDED by Jakub Pajek
+// Sub returns the quotient bi/bi2 as new big int (panics on division by 0)
+func (bi *BigInt) Div(bi2 *BigInt) *BigInt {
+	return &BigInt{new(big.Int).Div(bi.bigint, bi2.bigint)}
+}
+
 // SetString sets the big int to x.
 //
 // The string prefix determines the actual conversion base. A prefix of "0x" or
