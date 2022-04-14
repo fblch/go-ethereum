@@ -91,32 +91,32 @@ func (bi *BigInt) SetString(x string, base int) {
 	bi.bigint.SetString(x, base)
 }
 
-// ADDED by Jakub Pajek
-// Add returns the sum bi+bi2 as new big int
+// ADDED by Jakub Pajek (big int)
+// Add returns the sum bi+bi2 as new big int.
 func (bi *BigInt) Add(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Add(bi.bigint, bi2.bigint)}
 }
 
-// ADDED by Jakub Pajek
-// Sub returns the difference bi-bi2 as new big int
+// ADDED by Jakub Pajek (big int)
+// Sub returns the difference bi-bi2 as new big int.
 func (bi *BigInt) Sub(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Sub(bi.bigint, bi2.bigint)}
 }
 
-// ADDED by Jakub Pajek
-// Mul returns the product bi*bi2 as new big int
+// ADDED by Jakub Pajek (big int)
+// Mul returns the product bi*bi2 as new big int.
 func (bi *BigInt) Mul(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Mul(bi.bigint, bi2.bigint)}
 }
 
-// ADDED by Jakub Pajek
-// Div returns the quotient bi/bi2 as new big int (panics on division by 0)
+// ADDED by Jakub Pajek (big int)
+// Div returns the quotient bi/bi2 as new big int (panics on division by 0).
 func (bi *BigInt) Div(bi2 *BigInt) *BigInt {
 	return &BigInt{new(big.Int).Div(bi.bigint, bi2.bigint)}
 }
 
-// ADDED by Jakub Pajek
-// DivMod returns the quotient bi/bi2 and modulus bi%bi2 as two new big ints (panics on division by 0)
+// ADDED by Jakub Pajek (big int)
+// DivMod returns the quotient bi/bi2 and modulus bi%bi2 as two new big ints (panics on division by 0).
 func (bi *BigInt) DivMod(bi2 *BigInt) *BigInts {
 	bigInts := NewBigInts(2)
 	q, m := new(big.Int).DivMod(bi.bigint, bi2.bigint, new(big.Int))
@@ -160,4 +160,112 @@ func (bi *BigInts) Set(index int, bigint *BigInt) error {
 // GetString returns the value of x as a formatted string in some number base.
 func (bi *BigInt) GetString(base int) string {
 	return bi.bigint.Text(base)
+}
+
+// ADDED by Jakub Pajek (big float)
+// A BigFloat represents a multi-precision floating point number.
+type BigFloat struct {
+	bigfloat *big.Float
+}
+
+// ADDED by Jakub Pajek (big float)
+// NewBigFloat allocates and returns a new BigFloat set to x (panics if x is a NaN).
+func NewBigFloat(x float64) *BigFloat {
+	return &BigFloat{big.NewFloat(x)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// NewBigFloatFromString allocates and returns a new BigFloat set to x, or nil on parsing failure.
+func NewBigFloatFromString(x string) *BigFloat {
+	if b, success := new(big.Float).SetString(x); success {
+		return &BigFloat{b}
+	}
+	return nil
+}
+
+// ADDED by Jakub Pajek (big float)
+// NewBigFloatFromInt allocates and returns a new BigFloat set to the (possibly rounded) value of x.
+func NewBigFloatFromInt(x *BigInt) *BigFloat {
+	return &BigFloat{new(big.Float).SetInt(x.bigint)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// String returns the value of x as a formatted string like x.Text('g', 10).
+func (bi *BigFloat) String() string {
+	return bi.bigfloat.String()
+}
+
+// ADDED by Jakub Pajek (big float)
+// Text returns the value of x as a formatted string according to the given format and precision.
+func (bi *BigFloat) Text(format byte, prec int) string {
+	return bi.bigfloat.Text(format, prec)
+}
+
+// ADDED by Jakub Pajek (big float)
+// GetFloat64 returns the float64 value nearest to x. Rounding error is ignored.
+func (bi *BigFloat) GetFloat64() float64 {
+	b, _ := bi.bigfloat.Float64()
+	return b
+}
+
+// ADDED by Jakub Pajek (big float)
+// SetFloat64 sets the big float to the (possibly rounded) value of x (panics if x is a NaN).
+func (bi *BigFloat) SetFloat64(x float64) {
+	bi.bigfloat.SetFloat64(x)
+}
+
+// ADDED by Jakub Pajek (big float)
+// GetInt returns the big int value nearest to x. Rounding error is ignored.
+func (bi *BigFloat) GetInt() *BigInt {
+	b, _ := bi.bigfloat.Int(nil)
+	return &BigInt{b}
+}
+
+// ADDED by Jakub Pajek (big float)
+// SetInt sets the big float to the (possibly rounded) value of x.
+func (bi *BigFloat) SetInt(x *BigInt) {
+	bi.bigfloat.SetInt(x.bigint)
+}
+
+// ADDED by Jakub Pajek (big float)
+// Sign returns:
+//
+//	-1 if x <  0
+//	 0 if x == 0
+//	+1 if x >  0
+//
+func (bi *BigFloat) Sign() int {
+	return bi.bigfloat.Sign()
+}
+
+// ADDED by Jakub Pajek (big float)
+// SetString sets the big float to x and returns boolean indicating success.
+// On failure the value of big float becomes undefined.
+func (bi *BigFloat) SetString(x string) bool {
+	_, success := bi.bigfloat.SetString(x)
+	return success
+}
+
+// ADDED by Jakub Pajek (big float)
+// Add returns the rounded sum bi+bi2 as new big float  (panics if both operands are infinities with opposite signs).
+func (bi *BigFloat) Add(bi2 *BigFloat) *BigFloat {
+	return &BigFloat{new(big.Float).Add(bi.bigfloat, bi2.bigfloat)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// Sub returns the rounded difference bi-bi2 as new big float (panics if both operands are infinities with equal signs).
+func (bi *BigFloat) Sub(bi2 *BigFloat) *BigFloat {
+	return &BigFloat{new(big.Float).Sub(bi.bigfloat, bi2.bigfloat)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// Mul returns the rounded product bi*bi2 as new big float (panics if one operand is zero and the other operand an infinity).
+func (bi *BigFloat) Mul(bi2 *BigFloat) *BigFloat {
+	return &BigFloat{new(big.Float).Mul(bi.bigfloat, bi2.bigfloat)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// Quo returns the rounded quotient bi/bi2 as new big float (panics if both operands are zero or infinities).
+func (bi *BigFloat) Quo(bi2 *BigFloat) *BigFloat {
+	return &BigFloat{new(big.Float).Quo(bi.bigfloat, bi2.bigfloat)}
 }
