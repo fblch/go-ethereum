@@ -867,13 +867,13 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	}
 	// MODIFIED by Jakub Pajek (clique empty blocks)
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
-	//if c.config.Period == 0 && len(block.Transactions()) == 0 {
-	// MODIFIED by Jakub Pajek (clique empty blocks, clique voter ring)
-	// For any-period chains, refuse to seal empty blocks, unless disbanding the voter ring
-	//if len(block.Transactions()) == 0 && !(snap.VoterRing && header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) > 0) {
-	// MODIFIED by Jakub Pajek (clique empty blocks, clique voter ring)
-	// For any-period chains, refuse to seal empty blocks (no reward but would spin sealing)
-	if len(block.Transactions()) == 0 {
+	if c.config.Period == 0 && len(block.Transactions()) == 0 {
+		// MODIFIED by Jakub Pajek (clique empty blocks, clique voter ring)
+		// For any-period chains, refuse to seal empty blocks, unless disbanding the voter ring
+		//if len(block.Transactions()) == 0 && !(snap.VoterRing && header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) > 0) {
+		// MODIFIED by Jakub Pajek (clique empty blocks, clique voter ring)
+		// For any-period chains, refuse to seal empty blocks (no reward but would spin sealing)
+		//if len(block.Transactions()) == 0 {
 		return errors.New("sealing paused while waiting for transactions")
 	}
 	// Don't hold the signer fields for the entire sealing procedure
