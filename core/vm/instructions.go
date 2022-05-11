@@ -527,6 +527,8 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	}
 	loc := scope.Stack.pop()
 	val := scope.Stack.pop()
+	// MEMO by Jakub Pajek: preloaded contracts
+	//log.Error("SetState, addr=" + scope.Contract.Address().String() + ", loc=" + common.Hash(loc.Bytes32()).String() + ", val=" + common.Hash(val.Bytes32()).String())
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(),
 		loc.Bytes32(), val.Bytes32())
 	return nil, nil

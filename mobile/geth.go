@@ -147,7 +147,7 @@ type NodeConfig struct {
 	MinerGasPrice *BigInt
 
 	// ADDED by Jakub Pajek
-	// MinerGasPrice sets block extra data set by the miner (default = client version).
+	// MinerExtraData sets block extra data set by the miner (default = client version).
 	// Maximum size is 32 bytes.
 	MinerExtraData string
 }
