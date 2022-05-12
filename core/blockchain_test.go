@@ -3701,10 +3701,15 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 3: Ensure that miner received only the tx's tip.
 	actual := state.GetBalance(block.Coinbase())
-	expected := new(big.Int).Add(
-		new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
-		ethash.ConstantinopleBlockReward,
-	)
+	// MODIFIED by Jakub Pajek BEG (no tx fee rewards)
+	/*
+		expected := new(big.Int).Add(
+			new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
+			ethash.ConstantinopleBlockReward,
+		)
+	*/
+	expected := ethash.ConstantinopleBlockReward
+	// MODIFIED by Jakub Pajek END (no tx fee rewards)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -3741,10 +3746,15 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 6+5: Ensure that miner received only the tx's effective tip.
 	actual = state.GetBalance(block.Coinbase())
-	expected = new(big.Int).Add(
-		new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
-		ethash.ConstantinopleBlockReward,
-	)
+	// MODIFIED by Jakub Pajek BEG (no tx fee rewards)
+	/*
+		expected = new(big.Int).Add(
+			new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
+			ethash.ConstantinopleBlockReward,
+		)
+	*/
+	expected = ethash.ConstantinopleBlockReward
+	// MODIFIED by Jakub Pajek END (no tx fee rewards)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
