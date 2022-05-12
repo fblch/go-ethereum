@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -340,21 +339,26 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// After EIP-3529: refunds are capped to gasUsed / 5
 		st.refundGas(params.RefundQuotientEIP3529)
 	}
-	effectiveTip := st.gasPrice
-	if rules.IsLondon {
-		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
-	}
+	// MODIFIED by Jakub Pajek (no tx fee rewards)
+	// Unlike adding static block reward to clique, this modification runs regardless of consensus protocol in use
+	// and effectively breaks this client's compatibility with Ethereum's PoW networks.
+	/*
+		effectiveTip := st.gasPrice
+		if rules.IsLondon {
+			effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
+		}
 
-	// MEMO by Jakub Pajek: mining reward (tx fee)
-	if st.evm.Config.NoBaseFee && st.gasFeeCap.Sign() == 0 && st.gasTipCap.Sign() == 0 {
-		// Skip fee payment when NoBaseFee is set and the fee fields
-		// are 0. This avoids a negative effectiveTip being applied to
-		// the coinbase when simulating calls.
-	} else {
-		fee := new(big.Int).SetUint64(st.gasUsed())
-		fee.Mul(fee, effectiveTip)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee)
-	}
+		// MEMO by Jakub Pajek: mining reward (tx fee)
+		if st.evm.Config.NoBaseFee && st.gasFeeCap.Sign() == 0 && st.gasTipCap.Sign() == 0 {
+			// Skip fee payment when NoBaseFee is set and the fee fields
+			// are 0. This avoids a negative effectiveTip being applied to
+			// the coinbase when simulating calls.
+		} else {
+			fee := new(big.Int).SetUint64(st.gasUsed())
+			fee.Mul(fee, effectiveTip)
+			st.state.AddBalance(st.evm.Context.Coinbase, fee)
+		}
+	*/
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
