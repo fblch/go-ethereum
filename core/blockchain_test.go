@@ -3714,7 +3714,9 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 4: Ensure the tx sender paid for the gasUsed * (tip + block baseFee).
 	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
-	expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
+	// MODIFIED by Jakub Pajek (tx fee refund)
+	//expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
+	expected = new(big.Int).SetUint64(0)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -3740,7 +3742,8 @@ func TestEIP1559Transition(t *testing.T) {
 
 	block = chain.GetBlockByNumber(2)
 	state, _ = chain.State()
-	effectiveTip := block.Transactions()[0].GasTipCap().Uint64() - block.BaseFee().Uint64()
+	// COMMENTED by Jakub Pajek (tx fee refund)
+	//effectiveTip := block.Transactions()[0].GasTipCap().Uint64() - block.BaseFee().Uint64()
 
 	// 6+5: Ensure that miner received only the tx's effective tip.
 	actual = state.GetBalance(block.Coinbase())
@@ -3759,7 +3762,9 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 4: Ensure the tx sender paid for the gasUsed * (effectiveTip + block baseFee).
 	actual = new(big.Int).Sub(funds, state.GetBalance(addr2))
-	expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
+	// MODIFIED by Jakub Pajek (tx fee refund)
+	//expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
+	expected = new(big.Int).SetUint64(0)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}

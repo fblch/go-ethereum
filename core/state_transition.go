@@ -334,10 +334,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
-		st.refundGas(params.RefundQuotient)
+		// MODIFIED by Jakub Pajek (tx fee refund)
+		//st.refundGas(params.RefundQuotient)
+		st.refundGas(params.RefundQuotient, false)
 	} else {
 		// After EIP-3529: refunds are capped to gasUsed / 5
-		st.refundGas(params.RefundQuotientEIP3529)
+		// MODIFIED by Jakub Pajek (tx fee refund)
+		//st.refundGas(params.RefundQuotientEIP3529)
+		st.refundGas(params.RefundQuotientEIP3529, false)
 	}
 	// MODIFIED by Jakub Pajek (no tx fee rewards)
 	// Unlike adding static block reward to clique, this modification runs regardless of consensus protocol in use
@@ -367,7 +371,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}, nil
 }
 
-func (st *StateTransition) refundGas(refundQuotient uint64) {
+// MODIFIED by Jakub Pajek (tx fee refund)
+//func (st *StateTransition) refundGas(refundQuotient uint64) {
+func (st *StateTransition) refundGas(refundQuotient uint64, dummy bool) {
 	// Apply refund counter, capped to a refund quotient
 	refund := st.gasUsed() / refundQuotient
 	if refund > st.state.GetRefund() {
@@ -375,9 +381,18 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 	}
 	st.gas += refund
 
-	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
-	st.state.AddBalance(st.msg.From(), remaining)
+	// MODIFIED by Jakub Pajek BEG (tx fee refund)
+	// Unlike adding static block reward to clique, this modification runs regardless of consensus protocol in use
+	// and effectively breaks this client's compatibility with Ethereum's PoW networks.
+	/*
+		// Return ETH for remaining gas, exchanged at the original rate.
+		remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
+		st.state.AddBalance(st.msg.From(), remaining)
+	*/
+	// Return ETH for initial gas, exchanged at the original rate.
+	initial := new(big.Int).Mul(new(big.Int).SetUint64(st.initialGas), st.gasPrice)
+	st.state.AddBalance(st.msg.From(), initial)
+	// MODIFIED by Jakub Pajek END (tx fee refund)
 
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.
