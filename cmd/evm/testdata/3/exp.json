@@ -5,12 +5,12 @@
       "balance": "0xde0b6b3a76586a0"
     },
     "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b": {
-      "balance": "0xde0b6b3a7622741",
+      "balance": "0xde0b6b3a7627960",
       "nonce": "0x1"
     }
   },
   "result": {
-    "stateRoot": "0xb7c73c5ec700772e803e6662e81b01c7a957967a0eb07d0db1fbd6079b6deca4",
+    "stateRoot": "0x72459cad7902287e5b4c1ee480511d45b3cc1706c5ecf47460cae60cdd56132e",
     "txRoot": "0x75e61774a2ff58cbe32653420256c7f44bc715715a423b0b746d5c622979af6b",
     "receiptsRoot": "0xd0d26df80374a327c025d405ebadc752b1bbd089d864801ae78ab704bcad8086",
     "logsHash": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
