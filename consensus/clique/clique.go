@@ -77,7 +77,9 @@ var (
 	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
 	// strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
 	// https://www.desmos.com/calculator/mbgwbxnpdm
-	minStrikeCount = uint64(17)
+	//minStrikeCount = uint64(17)
+	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 10min block periods)
+	minStrikeCount = uint64(5)
 
 	ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	ExtraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
