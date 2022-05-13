@@ -66,7 +66,9 @@ var (
 
 	// Minimal time (in units of the clique period) that needs to pass between consecutive blocks in order for
 	// the voters to be allowed to switch the network to the voter ring. 60s for a 15s period network.
-	minStallPeriod = uint64(4)
+	//minStallPeriod = uint64(4)
+	// Adjusted to 20min for a 10min period network.
+	minStallPeriod = uint64(2)
 
 	// MEMO by Jakub Pajek: sealers limit
 	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
