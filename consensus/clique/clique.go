@@ -68,7 +68,9 @@ var (
 	// the voters to be allowed to switch the network to the voter ring. 60s for a 15s period network.
 	//minStallPeriod = uint64(4)
 	// Adjusted to 20min for a 10min period network.
-	minStallPeriod = uint64(2)
+	//minStallPeriod = uint64(2)
+	// Adjusted to 4min for a 1min period network.
+	minStallPeriod = uint64(4)
 
 	// MEMO by Jakub Pajek: sealers limit
 	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
@@ -81,7 +83,9 @@ var (
 	// https://www.desmos.com/calculator/mbgwbxnpdm
 	//minStrikeCount = uint64(17)
 	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 10min block periods)
-	minStrikeCount = uint64(5)
+	//minStrikeCount = uint64(5)
+	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 1min block periods)
+	minStrikeCount = uint64(9)
 
 	ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	ExtraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
