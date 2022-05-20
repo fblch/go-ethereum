@@ -177,6 +177,7 @@ func (h *clientHandler) synchronise(peer *serverPeer) {
 		}
 		log.Debug("Checkpoint syncing start", "peer", peer.id, "checkpoint", checkpoint.SectionIndex)
 
+		// MEMO by Jakub Pajek (clique special case)
 		// Fetch the start point block header.
 		//
 		// For the ethash consensus engine, the start header is the block header

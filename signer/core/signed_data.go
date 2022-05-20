@@ -166,6 +166,7 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 				Value: fmt.Sprintf("clique header %d [%#x]", header.Number, header.Hash()),
 			},
 		}
+		// MEMO by Jakub Pajek (clique special case)
 		// Clique uses V on the form 0 or 1
 		useEthereumV = false
 		req = &SignDataRequest{ContentType: mediaType, Rawdata: cliqueRlp, Messages: messages, Hash: sighash}
