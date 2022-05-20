@@ -387,6 +387,7 @@ func (s *Ethereum) isLocalBlock(header *types.Header) bool {
 // during the chain reorg depending on whether the author of block
 // is a local account.
 func (s *Ethereum) shouldPreserve(header *types.Header) bool {
+	// MEMO by Jakub Pajek (clique special case)
 	// The reason we need to disable the self-reorg preserving for clique
 	// is it can be probable to introduce a deadlock.
 	//
