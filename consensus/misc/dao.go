@@ -46,6 +46,13 @@ var (
 //   - if the node is pro-fork, require blocks in the specific range to have the
 //     unique extra-data set.
 func VerifyDAOHeaderExtraData(config *params.ChainConfig, header *types.Header) error {
+	// ADDED by Jakub Pajek BEG (zero size extra)
+	// Short circuit validation when using zero size extra
+	// DAO fork logic (which requires extra data) does not apply to TheChain
+	if params.MaximumExtraDataSize == 0 {
+		return nil
+	}
+	// ADDED by Jakub Pajek END (zero size extra)
 	// Short circuit validation if the node doesn't care about the DAO fork
 	if config.DAOForkBlock == nil {
 		return nil
