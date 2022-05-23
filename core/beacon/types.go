@@ -145,6 +145,8 @@ func ExecutableDataToBlock(params ExecutableDataV1) (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	// MEMO by Jakub Pajek (zero size extra)
+	// How does the below check affect zero size extra data in TChain?
 	if len(params.ExtraData) > 32 {
 		return nil, fmt.Errorf("invalid extradata length: %v", len(params.ExtraData))
 	}

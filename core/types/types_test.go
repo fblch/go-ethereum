@@ -56,7 +56,9 @@ func benchRLP(b *testing.B, encode bool) {
 				GasLimit:   8_000_000,
 				GasUsed:    8_000_000,
 				Time:       555,
-				Extra:      make([]byte, 32),
+				// MODIFIED by Jakub Pajek (zero size extra)
+				//Extra:      make([]byte, 32),
+				Extra: []byte{},
 			},
 		},
 		{
@@ -67,8 +69,10 @@ func benchRLP(b *testing.B, encode bool) {
 				GasLimit:   8_000_000,
 				GasUsed:    8_000_000,
 				Time:       555,
-				Extra:      make([]byte, 32),
-				BaseFee:    big.NewInt(10000000000),
+				// MODIFIED by Jakub Pajek (zero size extra)
+				//Extra:      make([]byte, 32),
+				Extra:   []byte{},
+				BaseFee: big.NewInt(10000000000),
 			},
 		},
 		{
