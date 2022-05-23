@@ -511,7 +511,9 @@ func testCheckpointChallenge(t *testing.T, syncmode downloader.SyncMode, checkpo
 	var response *types.Header
 	if checkpoint {
 		number := (uint64(rand.Intn(500))+1)*params.CHTFrequency - 1
-		response = &types.Header{Number: big.NewInt(int64(number)), Extra: []byte("valid")}
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//response = &types.Header{Number: big.NewInt(int64(number)), Extra: []byte("valid")}
+		response = &types.Header{Number: big.NewInt(int64(number)), Extra: []byte{}, Nonce: types.EncodeNonce(666)}
 
 		handler.handler.checkpointNumber = number
 		handler.handler.checkpointHash = response.Hash()

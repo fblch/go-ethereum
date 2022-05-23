@@ -147,7 +147,9 @@ func (h *Header) SanityCheck() error {
 	if eMaxFields := 10000; eMaxFields > 0 {
 		// Importing clique package creates import cycles...
 		//eMaxLen := clique.ExtraVanity + maxAddressNum*(common.AddressLength+1) + clique.ExtraSeal
-		eMaxLen := 32 + eMaxFields*(common.AddressLength+1) + crypto.SignatureLength
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//eMaxLen := 32 + eMaxFields*(common.AddressLength+1) + crypto.SignatureLength
+		eMaxLen := 0 + eMaxFields*(common.AddressLength+1) + crypto.SignatureLength
 		if eLen := len(h.Extra); eLen > eMaxLen {
 			return fmt.Errorf("too large block extradata: size %d", eLen)
 		}

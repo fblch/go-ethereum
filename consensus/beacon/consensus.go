@@ -217,6 +217,8 @@ func (beacon *Beacon) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 // (b) we don't verify if a block is in the future anymore
 // (c) the extradata is limited to 32 bytes
 func (beacon *Beacon) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header) error {
+	// MEMO by Jakub Pajek (zero size extra)
+	// How does the below check affect zero size extra data in TChain?
 	// Ensure that the header's extra-data section is of a reasonable size
 	if len(header.Extra) > 32 {
 		return fmt.Errorf("extra-data longer than 32 bytes (%d)", len(header.Extra))
