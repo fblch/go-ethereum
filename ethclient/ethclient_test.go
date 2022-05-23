@@ -188,9 +188,11 @@ var (
 )
 
 var genesis = &core.Genesis{
-	Config:    params.AllEthashProtocolChanges,
-	Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}},
-	ExtraData: []byte("test genesis"),
+	Config: params.AllEthashProtocolChanges,
+	Alloc:  core.GenesisAlloc{testAddr: {Balance: testBalance}},
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//ExtraData: []byte("test genesis"),
+	ExtraData: []byte{},
 	Timestamp: 9000,
 	BaseFee:   big.NewInt(params.InitialBaseFee),
 }
@@ -241,7 +243,9 @@ func generateTestChain() []*types.Block {
 	db := rawdb.NewMemoryDatabase()
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
-		g.SetExtra([]byte("test"))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//g.SetExtra([]byte("test"))
+		g.SetExtra([]byte{})
 		if i == 1 {
 			// Test transactions are included in block #2.
 			g.AddTx(testTx1)

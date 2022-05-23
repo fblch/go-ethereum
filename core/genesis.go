@@ -445,8 +445,9 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 // DefaultGenesisBlock returns the Ethereum main net genesis block.
 func DefaultGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.MainnetChainConfig,
-		Nonce:      66,
+		Config: params.MainnetChainConfig,
+		Nonce:  66,
+		// MEMO by Jakub Pajek (zero size extra)
 		ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
 		GasLimit:   5000,
 		Difficulty: big.NewInt(17179869184),
@@ -457,8 +458,9 @@ func DefaultGenesisBlock() *Genesis {
 // DefaultRopstenGenesisBlock returns the Ropsten network genesis block.
 func DefaultRopstenGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.RopstenChainConfig,
-		Nonce:      66,
+		Config: params.RopstenChainConfig,
+		Nonce:  66,
+		// MEMO by Jakub Pajek (zero size extra)
 		ExtraData:  hexutil.MustDecode("0x3535353535353535353535353535353535353535353535353535353535353535"),
 		GasLimit:   16777216,
 		Difficulty: big.NewInt(1048576),
@@ -469,8 +471,9 @@ func DefaultRopstenGenesisBlock() *Genesis {
 // DefaultRinkebyGenesisBlock returns the Rinkeby network genesis block.
 func DefaultRinkebyGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.RinkebyChainConfig,
-		Timestamp:  1492009146,
+		Config:    params.RinkebyChainConfig,
+		Timestamp: 1492009146,
+		// MEMO by Jakub Pajek (zero size extra)
 		ExtraData:  hexutil.MustDecode("0x52657370656374206d7920617574686f7269746168207e452e436172746d616e42eb768f2244c8811c63729a21a3569731535f067ffc57839b00206d1ad20c69a1981b489f772031b279182d99e65703f0076e4812653aab85fca0f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   4700000,
 		Difficulty: big.NewInt(1),
@@ -481,8 +484,9 @@ func DefaultRinkebyGenesisBlock() *Genesis {
 // DefaultGoerliGenesisBlock returns the Görli network genesis block.
 func DefaultGoerliGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.GoerliChainConfig,
-		Timestamp:  1548854791,
+		Config:    params.GoerliChainConfig,
+		Timestamp: 1548854791,
+		// MEMO by Jakub Pajek (zero size extra)
 		ExtraData:  hexutil.MustDecode("0x22466c6578692069732061207468696e6722202d204166726900000000000000e0a2bd4258d2768837baa26a28fe71dc079f84c70000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   10485760,
 		Difficulty: big.NewInt(1),
@@ -493,8 +497,9 @@ func DefaultGoerliGenesisBlock() *Genesis {
 // DefaultSepoliaGenesisBlock returns the Sepolia network genesis block.
 func DefaultSepoliaGenesisBlock() *Genesis {
 	return &Genesis{
-		Config:     params.SepoliaChainConfig,
-		Nonce:      0,
+		Config: params.SepoliaChainConfig,
+		Nonce:  0,
+		// MEMO by Jakub Pajek (zero size extra)
 		ExtraData:  []byte("Sepolia, Athens, Attica, Greece!"),
 		GasLimit:   0x1c9c380,
 		Difficulty: big.NewInt(0x20000),
@@ -529,7 +534,9 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 		//ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
 		// Importing clique package creates import cycles...
 		//ExtraData: append(append(append(make([]byte, clique.ExtraVanity), faucet[:]...), clique.ExtraVoterMarker), make([]byte, clique.ExtraSeal)...),
-		ExtraData:  append(append(append(make([]byte, 32), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ExtraData:  append(append(append(make([]byte, 32), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
+		ExtraData:  append(append(append(make([]byte, 0), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
 		GasLimit:   gasLimit,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(1),

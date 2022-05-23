@@ -1,7 +1,7 @@
 {
   "genesis": {
     "difficulty": "117067574",
-    "extraData": "0xd783010502846765746887676f312e372e33856c696e7578",
+    "extraData": "",
     "gasLimit": "4712380",
     "hash": "0xe05db05eeb3f288041ecb10a787df121c0ed69499355716e17c307de313a4486",
     "miner": "0x0c062b329265c965deef1eede55183b3acb8f611",

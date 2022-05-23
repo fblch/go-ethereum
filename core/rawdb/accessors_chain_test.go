@@ -39,7 +39,9 @@ func TestHeaderStorage(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	// Create a test header to move around the database and make sure it's really new
-	header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header")}
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header")}
+	header := &types.Header{Number: big.NewInt(42), Extra: []byte{}}
 	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry != nil {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}
@@ -72,7 +74,9 @@ func TestBodyStorage(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	// Create a test body to move around the database and make sure it's really new
-	body := &types.Body{Uncles: []*types.Header{{Extra: []byte("test header")}}}
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//body := &types.Body{Uncles: []*types.Header{{Extra: []byte("test header")}}}
+	body := &types.Body{Uncles: []*types.Header{{Extra: []byte{}}}}
 
 	hasher := sha3.NewLegacyKeccak256()
 	rlp.Encode(hasher, body)
@@ -111,7 +115,9 @@ func TestBlockStorage(t *testing.T) {
 
 	// Create a test block to move around the database and make sure it's really new
 	block := types.NewBlockWithHeader(&types.Header{
-		Extra:       []byte("test block"),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:       []byte("test block"),
+		Extra:       []byte{},
 		UncleHash:   types.EmptyUncleHash,
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -159,7 +165,9 @@ func TestBlockStorage(t *testing.T) {
 func TestPartialBlockStorage(t *testing.T) {
 	db := NewMemoryDatabase()
 	block := types.NewBlockWithHeader(&types.Header{
-		Extra:       []byte("test block"),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:       []byte("test block"),
+		Extra:       []byte{},
 		UncleHash:   types.EmptyUncleHash,
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -195,8 +203,10 @@ func TestBadBlockStorage(t *testing.T) {
 
 	// Create a test block to move around the database and make sure it's really new
 	block := types.NewBlockWithHeader(&types.Header{
-		Number:      big.NewInt(1),
-		Extra:       []byte("bad block"),
+		Number: big.NewInt(1),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:       []byte("bad block"),
+		Extra:       []byte{},
 		UncleHash:   types.EmptyUncleHash,
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -213,8 +223,10 @@ func TestBadBlockStorage(t *testing.T) {
 	}
 	// Write one more bad block
 	blockTwo := types.NewBlockWithHeader(&types.Header{
-		Number:      big.NewInt(2),
-		Extra:       []byte("bad block two"),
+		Number: big.NewInt(2),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:       []byte("bad block two"),
+		Extra:       []byte{},
 		UncleHash:   types.EmptyUncleHash,
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -232,8 +244,10 @@ func TestBadBlockStorage(t *testing.T) {
 	// in reverse order. The extra blocks should be truncated.
 	for _, n := range rand.Perm(100) {
 		block := types.NewBlockWithHeader(&types.Header{
-			Number:      big.NewInt(int64(n)),
-			Extra:       []byte("bad block"),
+			Number: big.NewInt(int64(n)),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:       []byte("bad block"),
+			Extra:       []byte{},
 			UncleHash:   types.EmptyUncleHash,
 			TxHash:      types.EmptyRootHash,
 			ReceiptHash: types.EmptyRootHash,
@@ -308,9 +322,14 @@ func TestCanonicalMappingStorage(t *testing.T) {
 func TestHeadStorage(t *testing.T) {
 	db := NewMemoryDatabase()
 
-	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block header")})
-	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block full")})
-	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block fast")})
+	// MODIFIED by Jakub Pajek BEG (zero size extra)
+	//blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block header")})
+	//blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block full")})
+	//blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block fast")})
+	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
+	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
+	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
+	// MODIFIED by Jakub Pajek END (zero size extra)
 
 	// Check that no head entries are in a pristine database
 	if entry := ReadHeadHeaderHash(db); entry != (common.Hash{}) {
@@ -443,8 +462,10 @@ func TestAncientStorage(t *testing.T) {
 	defer db.Close()
 	// Create a test block
 	block := types.NewBlockWithHeader(&types.Header{
-		Number:      big.NewInt(0),
-		Extra:       []byte("test block"),
+		Number: big.NewInt(0),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:       []byte("test block"),
+		Extra:       []byte{},
 		UncleHash:   types.EmptyUncleHash,
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -638,7 +659,9 @@ func makeTestBlocks(nblock int, txsPerBlock int) []*types.Block {
 	for i := 0; i < nblock; i++ {
 		header := &types.Header{
 			Number: big.NewInt(int64(i)),
-			Extra:  []byte("test block"),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:  []byte("test block"),
+			Extra: []byte{},
 		}
 		blocks[i] = types.NewBlockWithHeader(header).WithBody(txs, nil)
 		blocks[i].Hash() // pre-cache the block hash
@@ -890,8 +913,10 @@ func TestHeadersRLPStorage(t *testing.T) {
 	var pHash common.Hash
 	for i := 0; i < 100; i++ {
 		block := types.NewBlockWithHeader(&types.Header{
-			Number:      big.NewInt(int64(i)),
-			Extra:       []byte("test block"),
+			Number: big.NewInt(int64(i)),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:       []byte("test block"),
+			Extra:       []byte{},
 			UncleHash:   types.EmptyUncleHash,
 			TxHash:      types.EmptyRootHash,
 			ReceiptHash: types.EmptyRootHash,
