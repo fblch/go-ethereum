@@ -558,7 +558,9 @@ func testGetSealingWork(t *testing.T, chainConfig *params.ChainConfig, engine co
 	w, b := newTestWorker(t, chainConfig, engine, rawdb.NewMemoryDatabase(), 0)
 	defer w.close()
 
-	w.setExtra([]byte{0x01, 0x02})
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//w.setExtra([]byte{0x01, 0x02})
+	w.setExtra([]byte{})
 	w.postSideBlock(core.ChainSideEvent{Block: b.uncleBlock})
 
 	w.skipSealHook = func(task *task) bool {

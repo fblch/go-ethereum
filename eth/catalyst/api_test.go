@@ -50,9 +50,11 @@ func generatePreMergeChain(n int) (*core.Genesis, []*types.Block) {
 	db := rawdb.NewMemoryDatabase()
 	config := params.AllEthashProtocolChanges
 	genesis := &core.Genesis{
-		Config:     config,
-		Alloc:      core.GenesisAlloc{testAddr: {Balance: testBalance}},
-		ExtraData:  []byte("test genesis"),
+		Config: config,
+		Alloc:  core.GenesisAlloc{testAddr: {Balance: testBalance}},
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ExtraData:  []byte("test genesis"),
+		ExtraData:  []byte{},
 		Timestamp:  9000,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(0),
@@ -60,7 +62,9 @@ func generatePreMergeChain(n int) (*core.Genesis, []*types.Block) {
 	testNonce := uint64(0)
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
-		g.SetExtra([]byte("test"))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//g.SetExtra([]byte("test"))
+		g.SetExtra([]byte{})
 		tx, _ := types.SignTx(types.NewTransaction(testNonce, common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(config), testKey)
 		g.AddTx(tx)
 		testNonce++
