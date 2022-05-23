@@ -407,14 +407,20 @@ func testGetNodeData(t *testing.T, protocol uint) {
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
-			block.SetExtra([]byte("yeehaw"))
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//block.SetExtra([]byte("yeehaw"))
+			block.SetExtra([]byte{})
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 			b2 := block.PrevBlock(1).Header()
-			b2.Extra = []byte("foo")
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//b2.Extra = []byte("foo")
+			b2.Extra = []byte{}
 			block.AddUncle(b2)
 			b3 := block.PrevBlock(2).Header()
-			b3.Extra = []byte("foo")
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//b3.Extra = []byte("foo")
+			b3.Extra = []byte{}
 			block.AddUncle(b3)
 		}
 	}
@@ -516,14 +522,20 @@ func testGetBlockReceipts(t *testing.T, protocol uint) {
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
-			block.SetExtra([]byte("yeehaw"))
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//block.SetExtra([]byte("yeehaw"))
+			block.SetExtra([]byte{})
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 			b2 := block.PrevBlock(1).Header()
-			b2.Extra = []byte("foo")
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//b2.Extra = []byte("foo")
+			b2.Extra = []byte{}
 			block.AddUncle(b2)
 			b3 := block.PrevBlock(2).Header()
-			b3.Extra = []byte("foo")
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//b3.Extra = []byte("foo")
+			b3.Extra = []byte{}
 			block.AddUncle(b3)
 		}
 	}

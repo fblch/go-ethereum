@@ -482,8 +482,10 @@ var (
 		Value: "0",
 	}
 	MinerExtraDataFlag = cli.StringFlag{
-		Name:  "miner.extradata",
-		Usage: "Block extra data set by the miner (default = client version)",
+		Name: "miner.extradata",
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Usage: "Block extra data set by the miner (default = client version)",
+		Usage: "Not supported in TheChain! Block extra data set by the miner (default = client version)",
 	}
 	MinerRecommitIntervalFlag = cli.DurationFlag{
 		Name:  "miner.recommit",
@@ -1491,7 +1493,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	cfg.NotifyFull = ctx.GlobalBool(MinerNotifyFullFlag.Name)
 	if ctx.GlobalIsSet(MinerExtraDataFlag.Name) {
-		cfg.ExtraData = []byte(ctx.GlobalString(MinerExtraDataFlag.Name))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//cfg.ExtraData = []byte(ctx.GlobalString(MinerExtraDataFlag.Name))
+		log.Warn("Block extra data is not supported in TheChain! Ignoring...")
 	}
 	if ctx.GlobalIsSet(MinerGasLimitFlag.Name) {
 		cfg.GasCeil = ctx.GlobalUint64(MinerGasLimitFlag.Name)

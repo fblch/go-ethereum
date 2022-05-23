@@ -149,7 +149,8 @@ type NodeConfig struct {
 	// ADDED by Jakub Pajek
 	// MinerExtraData sets block extra data set by the miner (default = client version).
 	// Maximum size is 32 bytes.
-	MinerExtraData string
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//MinerExtraData string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -170,7 +171,8 @@ var defaultNodeConfig = &NodeConfig{
 	UseLightweightKDF: false,
 	MinerGasLimit:     int64(ethconfig.Defaults.Miner.GasCeil),
 	MinerGasPrice:     NewBigInt(ethconfig.Defaults.Miner.GasPrice.Int64()),
-	MinerExtraData:    "",
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//MinerExtraData:    "",
 	// ADDED by Jakub Pajek END
 }
 
@@ -337,7 +339,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// ADDED by Jakub Pajek BEG
 		ethConf.Miner.GasCeil = uint64(config.MinerGasLimit)
 		ethConf.Miner.GasPrice = new(big.Int).SetBytes(config.MinerGasPrice.GetBytes())
-		ethConf.Miner.ExtraData = []byte(config.MinerExtraData)
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ethConf.Miner.ExtraData = []byte(config.MinerExtraData)
 		// ADDED by Jakub Pajek END
 		// MODIFIED by Jakub Pajek BEG
 		/*

@@ -210,9 +210,11 @@ func (p *skeletonTestPeer) RequestReceipts([]common.Hash, chan *eth.Response) (*
 func TestSkeletonSyncInit(t *testing.T) {
 	// Create a few key headers
 	var (
-		genesis  = &types.Header{Number: big.NewInt(0)}
-		block49  = &types.Header{Number: big.NewInt(49)}
-		block49B = &types.Header{Number: big.NewInt(49), Extra: []byte("B")}
+		genesis = &types.Header{Number: big.NewInt(0)}
+		block49 = &types.Header{Number: big.NewInt(49)}
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//block49B = &types.Header{Number: big.NewInt(49), Extra: []byte("B")}
+		block49B = &types.Header{Number: big.NewInt(49), Extra: []byte{}, Nonce: types.EncodeNonce(666)}
 		block50  = &types.Header{Number: big.NewInt(50), ParentHash: block49.Hash()}
 	)
 	tests := []struct {
@@ -400,9 +402,11 @@ func TestSkeletonSyncInit(t *testing.T) {
 func TestSkeletonSyncExtend(t *testing.T) {
 	// Create a few key headers
 	var (
-		genesis  = &types.Header{Number: big.NewInt(0)}
-		block49  = &types.Header{Number: big.NewInt(49)}
-		block49B = &types.Header{Number: big.NewInt(49), Extra: []byte("B")}
+		genesis = &types.Header{Number: big.NewInt(0)}
+		block49 = &types.Header{Number: big.NewInt(49)}
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//block49B = &types.Header{Number: big.NewInt(49), Extra: []byte("B")}
+		block49B = &types.Header{Number: big.NewInt(49), Extra: []byte{}, Nonce: types.EncodeNonce(666)}
 		block50  = &types.Header{Number: big.NewInt(50), ParentHash: block49.Hash()}
 		block51  = &types.Header{Number: big.NewInt(51), ParentHash: block50.Hash()}
 	)

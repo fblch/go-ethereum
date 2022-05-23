@@ -144,7 +144,9 @@ func TestSealHash(t *testing.T) {
 		Extra:      make([]byte, ExtraVanity+ExtraSeal),
 		BaseFee:    new(big.Int),
 	})
-	want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")
+	want := common.HexToHash("0x31775027428c8e2ea15ba3512c7dc42bc356fe2cba2a82b537b3633f7e1907ab")
 	if have != want {
 		t.Errorf("have %x, want %x", have, want)
 	}
