@@ -110,7 +110,9 @@ func (it *lookup) startQueries() bool {
 		// for the table to fill in this case, but there is no good mechanism for that
 		// yet.
 		if len(closest.entries) == 0 {
-			it.slowdown()
+			// MODIFIED by Jakub Pajek (reduce disc traffic)
+			//it.slowdown()
+			it.slowdown(1 * time.Second)
 		}
 		it.queries = 1
 		it.replyCh <- closest.entries
@@ -130,8 +132,12 @@ func (it *lookup) startQueries() bool {
 	return it.queries > 0
 }
 
-func (it *lookup) slowdown() {
-	sleep := time.NewTimer(1 * time.Second)
+// MODIFIED by Jakub Pajek (reduce disc traffic)
+//func (it *lookup) slowdown() {
+func (it *lookup) slowdown(d time.Duration) {
+	// MODIFIED by Jakub Pajek (reduce disc traffic)
+	//sleep := time.NewTimer(1 * time.Second)
+	sleep := time.NewTimer(d)
 	defer sleep.Stop()
 	select {
 	case <-sleep.C:
@@ -140,6 +146,8 @@ func (it *lookup) slowdown() {
 }
 
 func (it *lookup) query(n *node, reply chan<- []*node) {
+	// ADDED by Jakub Pajek (reduce disc traffic)
+	it.slowdown(1 * time.Second)
 	fails := it.tab.db.FindFails(n.ID(), n.IP())
 	r, err := it.queryfunc(n)
 	if errors.Is(err, errClosed) {
