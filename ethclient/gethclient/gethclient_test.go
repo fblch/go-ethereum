@@ -79,14 +79,18 @@ func newTestBackend(t *testing.T) (*node.Node, []*types.Block) {
 
 func generateTestChain() (*core.Genesis, []*types.Block) {
 	genesis := &core.Genesis{
-		Config:    params.AllEthashProtocolChanges,
-		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}}},
-		ExtraData: []byte("test genesis"),
+		Config: params.AllEthashProtocolChanges,
+		Alloc:  core.GenesisAlloc{testAddr: {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}}},
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ExtraData: []byte("test genesis"),
+		ExtraData: []byte{},
 		Timestamp: 9000,
 	}
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
-		g.SetExtra([]byte("test"))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//g.SetExtra([]byte("test"))
+		g.SetExtra([]byte{})
 	}
 	_, blocks, _ := core.GenerateChainWithGenesis(genesis, ethash.NewFaker(), 1, generate)
 	blocks = append([]*types.Block{genesis.ToBlock()}, blocks...)

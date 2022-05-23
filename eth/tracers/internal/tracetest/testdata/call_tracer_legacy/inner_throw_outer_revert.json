@@ -44,7 +44,7 @@
       "homesteadBlock": 0
     },
     "difficulty": "3956606365",
-    "extraData": "0x566961425443",
+    "extraData": "",
     "gasLimit": "5418523",
     "hash": "0x6f37eb930a25da673ea1bb80fd9e32ddac19cdf7cd4bb2eac62cc13598624077",
     "miner": "0xd049bfd667cb46aa3ef5df0da3e57db3be39e511",
