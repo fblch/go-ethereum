@@ -231,17 +231,23 @@ func testChainGen(i int, block *core.BlockGen) {
 	case 2:
 		// Block 3 is empty but was mined by account #2.
 		block.SetCoinbase(acc2Addr)
-		block.SetExtra([]byte("yeehaw"))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//block.SetExtra([]byte("yeehaw"))
+		block.SetExtra([]byte{})
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, block.BaseFee(), data), signer, testBankKey)
 		block.AddTx(tx)
 	case 3:
 		// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 		b2 := block.PrevBlock(1).Header()
-		b2.Extra = []byte("foo")
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//b2.Extra = []byte("foo")
+		b2.Extra = []byte{}
 		block.AddUncle(b2)
 		b3 := block.PrevBlock(2).Header()
-		b3.Extra = []byte("foo")
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//b3.Extra = []byte("foo")
+		b3.Extra = []byte{}
 		block.AddUncle(b3)
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, block.BaseFee(), data), signer, testBankKey)

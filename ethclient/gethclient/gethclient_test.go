@@ -81,14 +81,18 @@ func generateTestChain() (*core.Genesis, []*types.Block) {
 	db := rawdb.NewMemoryDatabase()
 	config := params.AllEthashProtocolChanges
 	genesis := &core.Genesis{
-		Config:    config,
-		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}}},
-		ExtraData: []byte("test genesis"),
+		Config: config,
+		Alloc:  core.GenesisAlloc{testAddr: {Balance: testBalance, Storage: map[common.Hash]common.Hash{testSlot: testValue}}},
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ExtraData: []byte("test genesis"),
+		ExtraData: []byte{},
 		Timestamp: 9000,
 	}
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
-		g.SetExtra([]byte("test"))
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//g.SetExtra([]byte("test"))
+		g.SetExtra([]byte{})
 	}
 	gblock := genesis.MustCommit(db)
 	engine := ethash.NewFaker()
