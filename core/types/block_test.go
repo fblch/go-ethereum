@@ -256,7 +256,9 @@ func makeBenchBlock() *Block {
 		GasLimit:   12345678,
 		GasUsed:    1476322,
 		Time:       9876543,
-		Extra:      []byte("coolest block on chain"),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:      []byte("coolest block on chain"),
+		Extra: []byte{},
 	}
 	for i := range txs {
 		amount := math.BigPow(2, int64(i))
@@ -277,7 +279,9 @@ func makeBenchBlock() *Block {
 			GasLimit:   12345678,
 			GasUsed:    1476322,
 			Time:       9876543,
-			Extra:      []byte("benchmark uncle"),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:      []byte("benchmark uncle"),
+			Extra: []byte{},
 		}
 	}
 	return NewBlock(header, txs, uncles, receipts, newHasher())
@@ -304,8 +308,12 @@ func TestRlpDecodeParentHash(t *testing.T) {
 		ParentHash: want,
 		Difficulty: mainnetTd,
 		Number:     new(big.Int).SetUint64(math.MaxUint64),
-		Extra:      make([]byte, 65+32),
-		BaseFee:    new(big.Int).SetUint64(math.MaxUint64),
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//Extra:      make([]byte, 65+32),
+		// Importing clique package creates import cycles...
+		//Extra:   make([]byte, clique.ExtraSeal),
+		Extra:   make([]byte, crypto.SignatureLength),
+		BaseFee: new(big.Int).SetUint64(math.MaxUint64),
 	}); err != nil {
 		t.Fatal(err)
 	} else {
@@ -319,7 +327,8 @@ func TestRlpDecodeParentHash(t *testing.T) {
 		// which is the first to blow the fast-path.
 		h := &Header{
 			ParentHash: want,
-			Extra:      make([]byte, 65041),
+			// MEMO by Jakub Pajek (zero size extra)
+			Extra: make([]byte, 65041),
 		}
 		if rlpData, err := rlp.EncodeToBytes(h); err != nil {
 			t.Fatal(err)
