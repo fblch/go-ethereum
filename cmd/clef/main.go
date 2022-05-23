@@ -822,8 +822,10 @@ func testExternalUI(api *core.SignerAPI) {
 			GasLimit:    1338,
 			GasUsed:     1338,
 			Time:        1338,
-			Extra:       []byte("Extra data Extra data Extra data  Extra data  Extra data  Extra data  Extra data Extra data"),
-			MixDigest:   common.HexToHash("0x0000H45H"),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:       []byte("Extra data Extra data Extra data  Extra data  Extra data  Extra data  Extra data Extra data"),
+			Extra:     []byte{},
+			MixDigest: common.HexToHash("0x0000H45H"),
 		}
 		cliqueRlp, err := rlp.EncodeToBytes(cliqueHeader)
 		if err != nil {
