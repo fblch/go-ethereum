@@ -87,7 +87,9 @@ var (
 	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 1min block periods)
 	minStrikeCount = uint64(9)
 
-	ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
+	ExtraVanity = 0                      // Fixed number of extra-data prefix bytes reserved for signer vanity
 	ExtraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
 
 	ExtraVoterMarker  byte = 0xff // Magic value in epoch transition block's extra-data to mark address as a voter

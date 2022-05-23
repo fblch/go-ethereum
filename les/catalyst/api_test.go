@@ -47,9 +47,11 @@ var (
 func generatePreMergeChain(pre, post int) (*core.Genesis, []*types.Header, []*types.Block, []*types.Header, []*types.Block) {
 	config := *params.AllEthashProtocolChanges
 	genesis := &core.Genesis{
-		Config:    &config,
-		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}},
-		ExtraData: []byte("test genesis"),
+		Config: &config,
+		Alloc:  core.GenesisAlloc{testAddr: {Balance: testBalance}},
+		// MODIFIED by Jakub Pajek (zero size extra)
+		//ExtraData: []byte("test genesis"),
+		ExtraData: []byte{},
 		Timestamp: 9000,
 		BaseFee:   big.NewInt(params.InitialBaseFee),
 	}
