@@ -281,6 +281,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	// ADDED by Jakub Pajek BEG
 	// Node doesn't by default populate account manager backends
 	if err := setAccountManagerBackends(rawStack); err != nil {
+		rawStack.Close()
 		return nil, fmt.Errorf("Failed to set account manager backends: %v", err)
 	}
 	// ADDED by Jakub Pajek END
@@ -292,6 +293,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// Parse the user supplied genesis spec if not mainnet
 		genesis = new(core.Genesis)
 		if err := json.Unmarshal([]byte(config.EthereumGenesis), genesis); err != nil {
+			// ADDED by Jakub Pajek
+			rawStack.Close()
 			return nil, fmt.Errorf("invalid genesis spec: %v", err)
 		}
 		// If we have the Ropsten testnet, hard code the chain configs too
@@ -358,23 +361,29 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if ethConf.SyncMode == downloader.LightSync {
 			lesBackend, err := les.New(rawStack, &ethConf)
 			if err != nil {
+				// ADDED by Jakub Pajek
+				rawStack.Close()
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
 			// If netstats reporting is requested, do it
 			if config.EthereumNetStats != "" {
 				if err := ethstats.New(rawStack, lesBackend.ApiBackend, lesBackend.Engine(), config.EthereumNetStats); err != nil {
+					// ADDED by Jakub Pajek
+					rawStack.Close()
 					return nil, fmt.Errorf("netstats init: %v", err)
 				}
 			}
 		} else {
 			backend, err := eth.New(rawStack, &ethConf)
 			if err != nil {
+				rawStack.Close()
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
 			ethBackend = backend
 			// If netstats reporting is requested, do it
 			if config.EthereumNetStats != "" {
 				if err := ethstats.New(rawStack, backend.APIBackend, backend.Engine(), config.EthereumNetStats); err != nil {
+					rawStack.Close()
 					return nil, fmt.Errorf("netstats init: %v", err)
 				}
 			}
