@@ -283,6 +283,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	// ADDED by Jakub Pajek BEG
 	// Node doesn't by default populate account manager backends
 	if err := setAccountManagerBackends(rawStack); err != nil {
+		rawStack.Close()
 		return nil, fmt.Errorf("Failed to set account manager backends: %v", err)
 	}
 	// ADDED by Jakub Pajek END
