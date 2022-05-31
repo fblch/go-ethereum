@@ -412,7 +412,9 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-	if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
+	// MODIFIED by Jakub Pajek (zero size extra)
+	//if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
+	if config.Clique != nil && len(block.Extra()) < crypto.SignatureLength {
 		return nil, errors.New("can't start clique chain without signers")
 	}
 	// All the checks has passed, flush the states derived from the genesis
