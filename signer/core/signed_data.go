@@ -213,8 +213,12 @@ func SignTextValidator(validatorData apitypes.ValidatorData) (hexutil.Bytes, str
 // in clique.go panics if this is the case, thus it's been reimplemented here to avoid the panic
 // and simply return an error instead
 func cliqueHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) {
-	if len(header.Extra) < 65 {
-		err = fmt.Errorf("clique header extradata too short, %d < 65", len(header.Extra))
+	// MODIFIED by Jakub Pajek (clique permissions)
+	//if len(header.Extra) < 65 {
+	if len(header.Extra) < clique.ExtraSeal {
+		// MODIFIED by Jakub Pajek (clique permissions)
+		//err = fmt.Errorf("clique header extradata too short, %d < 65", len(header.Extra))
+		err = fmt.Errorf("clique header extradata too short, %d < %d", len(header.Extra), clique.ExtraSeal)
 		return
 	}
 	rlp = clique.CliqueRLP(header)
