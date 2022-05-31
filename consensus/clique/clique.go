@@ -260,6 +260,7 @@ func loadProposals(db ethdb.Database) (map[common.Address]Proposal, error) {
 }
 
 // storeProposals inserts existing proposals into the database.
+// (assumes that the lock mutex is locked!)
 func (c *Clique) storeProposals() error {
 	blob, err := json.Marshal(c.proposals)
 	if err != nil {
@@ -444,10 +445,10 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	// If the block is a checkpoint block, verify the permissions list
 	if number%c.config.Epoch == 0 {
 		permissions := make([]byte, len(snap.Signers)*(common.AddressLength+1))
-		for i, signer := range snap.signers() {
+		for i, authorizedSigner := range snap.signers() {
 			index := i * (common.AddressLength + 1)
-			copy(permissions[index:], signer[:])
-			if _, ok := snap.Voters[signer]; ok {
+			copy(permissions[index:], authorizedSigner[:])
+			if _, ok := snap.Voters[authorizedSigner]; ok {
 				permissions[index+common.AddressLength] = ExtraVoterMarker
 			} else {
 				permissions[index+common.AddressLength] = ExtraSignerMarker
@@ -703,8 +704,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	}
 
 	// Check if we are an authorized voter, for future use...
-	// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-	_, okVoter := snap.Voters[c.signer]
+	c.lock.RLock()
+	signer := c.signer
+	c.lock.RUnlock()
+	_, okVoter := snap.Voters[signer]
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < ExtraVanity {
@@ -715,9 +718,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	// If the block is a checkpoint, include permissions list.
 	// Otherwise, if the signer is a voter, cast all valid votes.
 	if number%c.config.Epoch == 0 {
-		for _, signer := range snap.signers() {
-			header.Extra = append(header.Extra, signer[:]...)
-			if _, ok := snap.Voters[signer]; ok {
+		for _, authorizedSigner := range snap.signers() {
+			header.Extra = append(header.Extra, authorizedSigner[:]...)
+			if _, ok := snap.Voters[authorizedSigner]; ok {
 				header.Extra = append(header.Extra, ExtraVoterMarker)
 			} else {
 				header.Extra = append(header.Extra, ExtraSignerMarker)
@@ -787,17 +790,14 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		if header.Time >= parent.Time+(minStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
-				// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-				header.Difficulty = snap.calcVoterRingDifficulty(c.signer)
+				header.Difficulty = snap.calcVoterRingDifficulty(signer)
 			} else {
 				// Set the correct difficulty for preventing switching to the voter ring
-				// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-				header.Difficulty = snap.calcRingBreakerDifficulty(c.signer)
+				header.Difficulty = snap.calcRingBreakerDifficulty(signer)
 			}
 		} else {
 			// Set the correct difficulty for the sealer ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			header.Difficulty = snap.calcSealerRingDifficulty(c.signer)
+			header.Difficulty = snap.calcSealerRingDifficulty(signer)
 		}
 	} else {
 		// We are currently signing blocks in the voter ring.
@@ -805,12 +805,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// the voter ring. Continue in the voter ring otherwise.
 		if !okVoter {
 			// Set the correct difficulty for disbanding the voter ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			header.Difficulty = snap.calcRingBreakerDifficulty(c.signer)
+			header.Difficulty = snap.calcRingBreakerDifficulty(signer)
 		} else {
 			// Set the correct difficulty for the voter ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			header.Difficulty = snap.calcVoterRingDifficulty(c.signer)
+			header.Difficulty = snap.calcVoterRingDifficulty(signer)
 		}
 	}
 	return nil
@@ -846,8 +844,9 @@ func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *
 	// Finalize block
 	//c.Finalize(chain, header, state, txs, uncles, nil)
 	{
-		// TODOJAKUB c.signer should be protected by c.lock.RLock()?
+		c.lock.RLock()
 		signer := c.signer
+		c.lock.RUnlock()
 		if signer == (common.Address{}) {
 			return nil, errors.New("signer not set")
 		}
@@ -1001,8 +1000,10 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		return nil
 	}
 	// Check if we are an authorized voter, for future use...
-	// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-	_, okVoter := snap.Voters[c.signer]
+	c.lock.RLock()
+	signer := c.signer
+	c.lock.RUnlock()
+	_, okVoter := snap.Voters[signer]
 
 	// Check in which ring we are currently signing blocks in
 	if !snap.VoterRing {
@@ -1013,17 +1014,14 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		if time >= parent.Time+(minStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
-				// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-				return snap.calcVoterRingDifficulty(c.signer)
+				return snap.calcVoterRingDifficulty(signer)
 			} else {
 				// Set the correct difficulty for preventing switching to the voter ring
-				// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-				return snap.calcRingBreakerDifficulty(c.signer)
+				return snap.calcRingBreakerDifficulty(signer)
 			}
 		} else {
 			// Set the correct difficulty for the sealer ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			return snap.calcSealerRingDifficulty(c.signer)
+			return snap.calcSealerRingDifficulty(signer)
 		}
 	} else {
 		// We are currently signing blocks in the voter ring.
@@ -1031,12 +1029,10 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		// the voter ring. Continue in the voter ring otherwise.
 		if !okVoter {
 			// Set the correct difficulty for disbanding the voter ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			return snap.calcRingBreakerDifficulty(c.signer)
+			return snap.calcRingBreakerDifficulty(signer)
 		} else {
 			// Set the correct difficulty for the voter ring
-			// TODOJAKUB c.signer should be protected by c.lock.RLock()?
-			return snap.calcVoterRingDifficulty(c.signer)
+			return snap.calcVoterRingDifficulty(signer)
 		}
 	}
 }
