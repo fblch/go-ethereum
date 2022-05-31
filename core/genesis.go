@@ -489,7 +489,9 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block
 	}
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
-	if config.Clique != nil && len(block.Extra()) < crypto.SignatureLength {
+	// Importing clique package creates import cycles...
+	//if config.Clique != nil && len(block.Extra()) < clique.ExtraVanity+clique.ExtraVanity {
+	if config.Clique != nil && len(block.Extra()) < 0+crypto.SignatureLength {
 		return nil, errors.New("can't start clique chain without signers")
 	}
 	// All the checks has passed, flush the states derived from the genesis
