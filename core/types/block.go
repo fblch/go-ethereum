@@ -143,8 +143,8 @@ func (h *Header) SanityCheck() error {
 	//  * the number of votes that can be included in extra-data of non-checkpoint blocks,
 	//  * the number of sealers that can be included in extra-data of checkpoint blocks.
 	// MEMO by Jakub Pajek: sealers limit
-	// Set the limit at 10000 for now. Increase as network grows.
-	if eMaxFields := 10000; eMaxFields > 0 {
+	// Set the limit at 30000 for now. Increase as network grows.
+	if eMaxFields := 30000; eMaxFields > 0 {
 		// Importing clique package creates import cycles...
 		//eMaxLen := clique.ExtraVanity + maxAddressNum*(common.AddressLength+1) + clique.ExtraSeal
 		// MODIFIED by Jakub Pajek (zero size extra)
