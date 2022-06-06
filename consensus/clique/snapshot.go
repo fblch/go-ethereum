@@ -419,7 +419,10 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 					})
 				}
 				// If the vote passed, update the list of voters/signers
-				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
+				// Approval rule: majority (51%)
+				//if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
+				// Approval rule: always (1 vote enough)
+				if tally := snap.Tally[address]; tally.Votes > 0 {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
 						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
