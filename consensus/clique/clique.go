@@ -70,7 +70,9 @@ var (
 	// Adjusted to 20min for a 10min period network.
 	//minStallPeriod = uint64(2)
 	// Adjusted to 4min for a 1min period network.
-	minStallPeriod = uint64(4)
+	//minStallPeriod = uint64(4)
+	// Adjusted to 10min for 5min period network.
+	minStallPeriod = uint64(2)
 
 	// MEMO by Jakub Pajek: sealers limit
 	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
@@ -85,7 +87,9 @@ var (
 	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 10min block periods)
 	//minStrikeCount = uint64(5)
 	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 1min block periods)
-	minStrikeCount = uint64(9)
+	//minStrikeCount = uint64(9)
+	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 5min block periods)
+	minStrikeCount = uint64(5)
 
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
