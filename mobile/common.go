@@ -53,8 +53,8 @@ func NewHashFromHex(hex string) (hash *Hash, _ error) {
 }
 
 // ADDED by Jakub Pajek (mobile)
-// NewHashCalcFromString calculates a hash value for the given string.
-func NewHashCalcFromString(str string) (hash *Hash, _ error) {
+// CalcNewHashFromString calculates a hash value for the given string.
+func CalcNewHashFromString(str string) (hash *Hash, _ error) {
 	h := new(Hash)
 	hasher := sha3.NewLegacyKeccak256()
 	hasher.Write([]byte(str))
