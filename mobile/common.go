@@ -26,6 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"golang.org/x/crypto/sha3"
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -46,6 +47,18 @@ func NewHashFromBytes(binary []byte) (hash *Hash, _ error) {
 func NewHashFromHex(hex string) (hash *Hash, _ error) {
 	h := new(Hash)
 	if err := h.SetHex(hex); err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+// ADDED by Jakub Pajek (mobile)
+// NewHashCalcFromString calculates a hash value for the given string.
+func NewHashCalcFromString(str string) (hash *Hash, _ error) {
+	h := new(Hash)
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write([]byte(str))
+	if err := h.SetBytes(hasher.Sum(nil)); err != nil {
 		return nil, err
 	}
 	return h, nil
