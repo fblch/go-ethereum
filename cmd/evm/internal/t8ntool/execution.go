@@ -224,6 +224,7 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		txIndex++
 	}
 	statedb.IntermediateRoot(chainConfig.IsEIP158(vmContext.BlockNumber))
+	// MEMO by Jakub Pajek: mining reward (static block rewards)
 	// Add mining reward?
 	if miningReward > 0 {
 		// Add mining reward. The mining reward may be `0`, which only makes a difference in the cases

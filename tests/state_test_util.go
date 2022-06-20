@@ -233,6 +233,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	if _, err := core.ApplyMessage(evm, msg, gaspool); err != nil {
 		statedb.RevertToSnapshot(snapshot)
 	}
+	// MEMO by Jakub Pajek: mining reward (static block rewards)
 	// Add 0-value mining reward. This only makes a difference in the cases
 	// where
 	// - the coinbase suicided, or
