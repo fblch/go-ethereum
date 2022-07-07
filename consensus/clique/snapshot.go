@@ -19,6 +19,7 @@ package clique
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"math/big"
 	"sort"
 	"time"
@@ -628,7 +629,10 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 // not drop below minStrikeThreshold in order to assure that enough samples are gathered before
 // we decide to drop the signer.
 func (s *Snapshot) calcStrikeThreshold(signerCount uint64) uint64 {
-	strikeThreshold := minOfflineTime / s.config.Period / signerCount
+	var strikeThreshold uint64 = math.MaxUint64
+	if s.config.Period > 0 {
+		strikeThreshold = minOfflineTime / s.config.Period / signerCount
+	}
 	if strikeThreshold < minStrikeCount {
 		return minStrikeCount
 	}
