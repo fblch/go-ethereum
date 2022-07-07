@@ -27,6 +27,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -422,6 +423,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		interrupt   *int32
 		minRecommit = recommit // minimal resubmit interval specified by user.
 		timestamp   int64      // timestamp for each round of sealing.
+		// ADDED by Jakub Pajek (clique voter ring)
+		headTime uint64 // timestamp of the latest block
 	)
 
 	timer := time.NewTimer(0)
@@ -456,12 +459,22 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	for {
 		select {
 		case <-w.startCh:
-			clearPending(w.chain.CurrentBlock().NumberU64())
+			// MODIFIED by Jakub Pajek BEG (clique voter ring)
+			//clearPending(w.chain.CurrentBlock().NumberU64())
+			headBlock := w.chain.CurrentBlock()
+			clearPending(headBlock.NumberU64())
+			headTime = headBlock.Time()
+			// MODIFIED by Jakub Pajek END (clique voter ring)
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
-			clearPending(head.Block.NumberU64())
+			// MODIFIED by Jakub Pajek BEG (clique voter ring)
+			//clearPending(head.Block.NumberU64())
+			headBlock := head.Block
+			clearPending(headBlock.NumberU64())
+			headTime = headBlock.Time()
+			// MODIFIED by Jakub Pajek END (clique voter ring)
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
@@ -472,8 +485,16 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
-					timer.Reset(recommit)
-					continue
+					// MODIFIED by Jakub Pajek BEG (clique voter ring)
+					//timer.Reset(recommit)
+					//continue
+					// Do not short circut if enough stall occured to switch to voter ring.
+					// (If we are here and clique is used, clique period is always greater than zero)
+					if w.chainConfig.Clique == nil || headTime+clique.MinStallPeriod*w.chainConfig.Clique.Period > uint64(time.Now().Unix()) {
+						timer.Reset(recommit)
+						continue
+					}
+					// MODIFIED by Jakub Pajek END (clique voter ring)
 				}
 				commit(true, commitInterruptResubmit)
 			}

@@ -66,13 +66,13 @@ var (
 
 	// Minimal time (in units of the clique period) that needs to pass between consecutive blocks in order for
 	// the voters to be allowed to switch the network to the voter ring. 60s for a 15s period network.
-	//minStallPeriod = uint64(4)
+	//MinStallPeriod = uint64(4)
 	// Adjusted to 20min for a 10min period network.
-	//minStallPeriod = uint64(2)
+	//MinStallPeriod = uint64(2)
 	// Adjusted to 4min for a 1min period network.
-	//minStallPeriod = uint64(4)
+	//MinStallPeriod = uint64(4)
 	// Adjusted to 10min for 5min period network.
-	minStallPeriod = uint64(2)
+	MinStallPeriod = uint64(2)
 
 	// MEMO by Jakub Pajek: sealers limit
 	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
@@ -597,7 +597,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if header.Time < parent.Time+(minStallPeriod*c.config.Period) {
+				if c.config.Period == 0 || header.Time < parent.Time+(MinStallPeriod*c.config.Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
@@ -609,7 +609,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if header.Time < parent.Time+(minStallPeriod*c.config.Period) {
+				if c.config.Period == 0 || header.Time < parent.Time+(MinStallPeriod*c.config.Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
@@ -788,7 +788,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if header.Time >= parent.Time+(minStallPeriod*c.config.Period) {
+		if c.config.Period > 0 && header.Time >= parent.Time+(MinStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				header.Difficulty = snap.calcVoterRingDifficulty(signer)
@@ -1008,7 +1008,7 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if time >= parent.Time+(minStallPeriod*c.config.Period) {
+		if c.config.Period > 0 && time >= parent.Time+(MinStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				return snap.calcVoterRingDifficulty(signer)
