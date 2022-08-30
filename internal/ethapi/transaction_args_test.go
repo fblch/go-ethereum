@@ -236,8 +236,10 @@ func newBackendMock() *backendMock {
 			GasLimit:   8_000_000,
 			GasUsed:    8_000_000,
 			Time:       555,
-			Extra:      make([]byte, 32),
-			BaseFee:    big.NewInt(10),
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//Extra:      make([]byte, 32),
+			Extra:   make([]byte, 0),
+			BaseFee: big.NewInt(10),
 		},
 		config: config,
 	}
