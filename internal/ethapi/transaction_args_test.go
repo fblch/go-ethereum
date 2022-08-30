@@ -312,6 +312,18 @@ func (b *backendMock) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) eve
 func (b *backendMock) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
 	return nil
 }
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeCanonicalBlockEvent registers a subscription of CanonicalBlockEvent.
+func (b *backendMock) SubscribeCanonicalBlockEvent(ch chan<- core.CanonicalBlockEvent) event.Subscription {
+	return nil
+}
+
+// ADDED by Jakub Pajek (subscribe canonical/lost blocks)
+// SubscribeLostBlockEvent registers a subscription of LostBlockEvent.
+func (b *backendMock) SubscribeLostBlockEvent(ch chan<- core.LostBlockEvent) event.Subscription {
+	return nil
+}
 func (b *backendMock) SendTx(ctx context.Context, signedTx *types.Transaction) error { return nil }
 func (b *backendMock) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
 	return nil, [32]byte{}, 0, 0, nil
