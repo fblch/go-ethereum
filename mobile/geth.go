@@ -30,6 +30,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/log"
 
 	// ADDED by Jakub Pajek END
@@ -365,6 +366,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				rawStack.Close()
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
+			// Configure log filter RPC API.
+			utils.RegisterFilterAPI(rawStack, lesBackend.ApiBackend, &ethConf)
 			// If netstats reporting is requested, do it
 			if config.EthereumNetStats != "" {
 				if err := ethstats.New(rawStack, lesBackend.ApiBackend, lesBackend.Engine(), config.EthereumNetStats); err != nil {
@@ -380,6 +383,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
 			ethBackend = backend
+			// Configure log filter RPC API.
+			utils.RegisterFilterAPI(rawStack, backend.APIBackend, &ethConf)
 			// If netstats reporting is requested, do it
 			if config.EthereumNetStats != "" {
 				if err := ethstats.New(rawStack, backend.APIBackend, backend.Engine(), config.EthereumNetStats); err != nil {
