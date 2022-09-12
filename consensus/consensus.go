@@ -101,7 +101,7 @@ type Engine interface {
 	// consensus rules that happen at finalization (e.g. block rewards).
 	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 		// MODIFIED by Jakub Pajek (clique static block rewards)
-		//	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error)
+		//uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error)
 		uncles []*types.Header, receipts []*types.Receipt, dummy bool) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
