@@ -92,7 +92,7 @@ func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) 
 //   - in case of a tie, if the corresponding block used more gas, of
 //   - in case of a tie, if the corresponding header hash is lower.
 //
-// In the deterministic td mode, the new head is chosen if (in order):
+// In the non-deterministic td mode, the new head is chosen if (in order):
 //   - the corresponding total difficulty is higher, or
 //   - in case of a tie, if the corresponding block number is lower, or
 //   - in case of a tie, randomly (reduces the vulnerability to selfish mining).
