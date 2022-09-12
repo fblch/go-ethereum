@@ -64,7 +64,7 @@ type ForkChoice struct {
 }
 
 // MODIFIED by Jakub Pajek (deterministic fork choice rules)
-//func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool) *ForkChoice {
+// func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool) *ForkChoice {
 func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) bool, deterministic func() bool) *ForkChoice {
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -92,11 +92,12 @@ func NewForkChoice(chainReader ChainReader, preserve func(header *types.Header) 
 //   - in case of a tie, if the corresponding block used more gas, of
 //   - in case of a tie, if the corresponding header hash is lower.
 //
-// In the deterministic td mode, the new head is chosen if (in order):
+// In the non-deterministic td mode, the new head is chosen if (in order):
 //   - the corresponding total difficulty is higher, or
 //   - in case of a tie, if the corresponding block number is lower, or
 //   - in case of a tie, randomly (reduces the vulnerability to selfish mining).
-//func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header) (bool, error) {
+//
+// func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header) (bool, error) {
 func (f *ForkChoice) ReorgNeeded(current *types.Header, header *types.Header, dummy bool) (bool, error) {
 	var (
 		localHash    = current.Hash()
