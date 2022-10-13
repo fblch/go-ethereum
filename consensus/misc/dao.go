@@ -47,7 +47,7 @@ var (
 func VerifyDAOHeaderExtraData(config *params.ChainConfig, header *types.Header) error {
 	// ADDED by Jakub Pajek BEG (zero size extra)
 	// Short circuit validation when using zero size extra
-	// DAO fork logic (which requires extra data) does not apply to TheChain
+	// DAO fork logic (which requires extra data) does not apply anymore
 	if params.MaximumExtraDataSize == 0 {
 		return nil
 	}

@@ -56,10 +56,10 @@ const (
 
 // Clique proof-of-authority protocol constants.
 var (
-	FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
-	ToneChainV1BlockReward    = big.NewInt(1e+18) // Block reward in wei for successfully mining a block (TONE Chain v1 network)
+	//FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	//ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+	//ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
+	CliqueBlockReward = big.NewInt(1e+18) // Block reward in wei for successfully mining a block
 
 	// MEMO by Jakub Pajek: sealers limit
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
@@ -1113,7 +1113,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 			blockReward = ConstantinopleBlockReward
 		}
 	*/
-	blockReward := ToneChainV1BlockReward
+	blockReward := CliqueBlockReward
 	// Accumulate the rewards for the miner
 	reward := new(big.Int).Set(blockReward)
 	state.AddBalance(signer, reward)

@@ -97,8 +97,8 @@ func TestIsLAN(t *testing.T) {
 }
 
 // ADDED by Jakub Pajek (mobile connectivity)
-func TestIsToneLAN(t *testing.T) {
-	checkContains(t, IsToneLAN,
+func TestIsMobileLAN(t *testing.T) {
+	checkContains(t, IsMobileLAN,
 		[]string{ // included
 			"10.0.1.1",
 			"10.22.0.3",
