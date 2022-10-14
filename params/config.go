@@ -270,16 +270,22 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
+	//AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
+	//AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
+	//TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int), false)
 )
 
@@ -372,6 +378,11 @@ type ChainConfig struct {
 	MergeNetsplitBlock  *big.Int `json:"mergeNetsplitBlock,omitempty"`  // Virtual fork after The Merge to use as a network splitter
 	ShanghaiBlock       *big.Int `json:"shanghaiBlock,omitempty"`       // Shanghai switch block (nil = no fork, 0 = already on shanghai)
 	CancunBlock         *big.Int `json:"cancunBlock,omitempty"`         // Cancun switch block (nil = no fork, 0 = already on cancun)
+
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	// Private pre-merge hard forks
+	PrivateHardFork1Block *big.Int `json:"privateHardFork1Block,omitempty"` // Private hard fork #1 switch block (nil = no fork, 0 = already on HF1)
+	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -472,6 +483,15 @@ func (c *ChainConfig) String() string {
 	}
 	banner += "\n"
 
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	if c.PrivateHardFork1Block != nil {
+		banner += "Private Pre-Merge hard forks:\n"
+		banner += fmt.Sprintf(" - Hard Fork 1:                 %-8v (https://github.com/fblch/Documentation/blob/main/Meetings/Blockchain/35_PoC_Development_Progress_221004.pdf)\n", c.PrivateHardFork1Block)
+		banner += "\n"
+
+	}
+	// ADDED by Jakub Pajek END (hard fork: list)
+
 	// Add a special section for the merge as it's non-obvious
 	if c.TerminalTotalDifficulty == nil {
 		banner += "The Merge is not yet available for this network!\n"
@@ -558,6 +578,12 @@ func (c *ChainConfig) IsGrayGlacier(num *big.Int) bool {
 	return isForked(c.GrayGlacierBlock, num)
 }
 
+// ADDED by Jakub Pajek (hard fork: HF1)
+// IsPrivateHardFork1 returns whether num is either equal to the HF1 fork block or greater.
+func (c *ChainConfig) IsPrivateHardFork1(num *big.Int) bool {
+	return isForked(c.PrivateHardFork1Block, num)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -618,6 +644,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
+		// ADDED by Jakub Pajek (hard fork: HF1)
+		{name: "privateHardFork1Block", block: c.PrivateHardFork1Block, optional: true},
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiBlock", block: c.ShanghaiBlock, optional: true},
 		{name: "cancunBlock", block: c.CancunBlock, optional: true},
@@ -696,6 +724,11 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.GrayGlacierBlock, newcfg.GrayGlacierBlock, head) {
 		return newCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)
 	}
+	// ADDED by Jakub Pajek BEG (hard fork: HF1)
+	if isForkIncompatible(c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block, head) {
+		return newCompatError("Private HF1 fork block", c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block)
+	}
+	// ADDED by Jakub Pajek END (hard fork: HF1)
 	if isForkIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, head) {
 		return newCompatError("Merge netsplit fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
 	}
