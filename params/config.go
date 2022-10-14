@@ -223,6 +223,7 @@ var (
 
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	AllEthashProtocolChanges = &ChainConfig{
 		ChainID:                       big.NewInt(1337),
 		HomesteadBlock:                big.NewInt(0),
@@ -241,6 +242,7 @@ var (
 		ArrowGlacierBlock:             big.NewInt(0),
 		GrayGlacierBlock:              big.NewInt(0),
 		MergeNetsplitBlock:            nil,
+		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -252,6 +254,7 @@ var (
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	AllCliqueProtocolChanges = &ChainConfig{
 		ChainID:                       big.NewInt(1337),
 		HomesteadBlock:                big.NewInt(0),
@@ -270,6 +273,7 @@ var (
 		ArrowGlacierBlock:             nil,
 		GrayGlacierBlock:              nil,
 		MergeNetsplitBlock:            nil,
+		PrivateHardFork1Block:         big.NewInt(0),
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -281,6 +285,7 @@ var (
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers for testing proposes.
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	TestChainConfig = &ChainConfig{
 		ChainID:                       big.NewInt(1),
 		HomesteadBlock:                big.NewInt(0),
@@ -299,6 +304,7 @@ var (
 		ArrowGlacierBlock:             big.NewInt(0),
 		GrayGlacierBlock:              big.NewInt(0),
 		MergeNetsplitBlock:            nil,
+		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -310,6 +316,7 @@ var (
 
 	// NonActivatedConfig defines the chain configuration without activating
 	// any protocol change (EIPs).
+	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	NonActivatedConfig = &ChainConfig{
 		ChainID:                       big.NewInt(1),
 		HomesteadBlock:                nil,
@@ -328,6 +335,7 @@ var (
 		ArrowGlacierBlock:             nil,
 		GrayGlacierBlock:              nil,
 		MergeNetsplitBlock:            nil,
+		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -423,6 +431,11 @@ type ChainConfig struct {
 	ArrowGlacierBlock   *big.Int `json:"arrowGlacierBlock,omitempty"`   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	GrayGlacierBlock    *big.Int `json:"grayGlacierBlock,omitempty"`    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	MergeNetsplitBlock  *big.Int `json:"mergeNetsplitBlock,omitempty"`  // Virtual fork after The Merge to use as a network splitter
+
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	// Private pre-merge hard forks
+	PrivateHardFork1Block *big.Int `json:"privateHardFork1Block,omitempty"` // Private hard fork #1 switch block (nil = no fork, 0 = already on HF1)
+	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// Fork scheduling was switched from blocks to timestamps here
 
@@ -522,6 +535,15 @@ func (c *ChainConfig) Description() string {
 		banner += fmt.Sprintf(" - Gray Glacier:                #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/gray-glacier.md)\n", c.GrayGlacierBlock)
 	}
 	banner += "\n"
+
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	if c.PrivateHardFork1Block != nil {
+		banner += "Private Pre-Merge hard forks:\n"
+		banner += fmt.Sprintf(" - Hard Fork 1:                 %-8v (https://github.com/fblch/Documentation/blob/main/Meetings/Blockchain/35_PoC_Development_Progress_221004.pdf)\n", c.PrivateHardFork1Block)
+		banner += "\n"
+
+	}
+	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// Add a special section for the merge as it's non-obvious
 	if c.TerminalTotalDifficulty == nil {
@@ -624,6 +646,12 @@ func (c *ChainConfig) IsGrayGlacier(num *big.Int) bool {
 	return isBlockForked(c.GrayGlacierBlock, num)
 }
 
+// ADDED by Jakub Pajek (hard fork: HF1)
+// IsPrivateHardFork1 returns whether num is either equal to the HF1 fork block or greater.
+func (c *ChainConfig) IsPrivateHardFork1(num *big.Int) bool {
+	return isBlockForked(c.PrivateHardFork1Block, num)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -697,6 +725,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
+		// ADDED by Jakub Pajek (hard fork: HF1)
+		{name: "privateHardFork1Block", block: c.PrivateHardFork1Block, optional: true},
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
@@ -792,6 +822,11 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkBlockIncompatible(c.GrayGlacierBlock, newcfg.GrayGlacierBlock, headNumber) {
 		return newBlockCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)
 	}
+	// ADDED by Jakub Pajek BEG (hard fork: HF1)
+	if isForkBlockIncompatible(c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block, headNumber) {
+		return newBlockCompatError("Private HF1 fork block", c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block)
+	}
+	// ADDED by Jakub Pajek END (hard fork: HF1)
 	if isForkBlockIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, headNumber) {
 		return newBlockCompatError("Merge netsplit fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
 	}
