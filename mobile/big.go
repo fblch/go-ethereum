@@ -197,8 +197,8 @@ func (bi *BigFloat) String() string {
 
 // ADDED by Jakub Pajek (big float)
 // Text returns the value of x as a formatted string according to the given format and precision.
-func (bi *BigFloat) Text(format byte, prec int) string {
-	return bi.bigfloat.Text(format, prec)
+func (bi *BigFloat) Text(format int, prec int) string {
+	return bi.bigfloat.Text(byte(format), prec)
 }
 
 // ADDED by Jakub Pajek (big float)
