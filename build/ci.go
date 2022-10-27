@@ -1029,7 +1029,7 @@ func doAndroidArchive(cmdline []string) {
 	build.MustRun(tc.Go("mod", "download"))
 
 	// Build the Android archive and Maven resources
-	// MODIFIED by Jakub Pajek (mobile node)
+	// MODIFIED by Jakub Pajek (mobile make android)
 	// Build arm64-v8a .so libraries only
 	//build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
 	build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android/arm64", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
@@ -1158,6 +1158,8 @@ func doXCodeFramework(cmdline []string) {
 
 	// Build the iOS XCode framework
 	bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
+	// MEMO by Jakub Pajek (mobile make ios)
+	//bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios/arm64", "-v", "github.com/ethereum/go-ethereum/mobile")
 
 	if *local {
 		// If we're building locally, use the build folder and stop afterwards
