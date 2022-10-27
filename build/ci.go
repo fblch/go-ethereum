@@ -24,16 +24,16 @@ Usage: go run build/ci.go <command> <command flags/arguments>
 
 Available commands are:
 
-   install    [ -arch architecture ] [ -cc compiler ] [ packages... ]                          -- builds packages and executables
-   test       [ -coverage ] [ packages... ]                                                    -- runs the tests
-   lint                                                                                        -- runs certain pre-selected linters
-   archive    [ -arch architecture ] [ -type zip|tar ] [ -signer key-envvar ] [ -signify key-envvar ] [ -upload dest ] -- archives build artifacts
-   importkeys                                                                                  -- imports signing keys from env
-   debsrc     [ -signer key-id ] [ -upload dest ]                                              -- creates a debian source package
-   nsis                                                                                        -- creates a Windows NSIS installer
-   aar        [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an Android archive
-   xcode      [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an iOS XCode framework
-   purge      [ -store blobstore ] [ -days threshold ]                                         -- purges old archives from the blobstore
+	install    [ -arch architecture ] [ -cc compiler ] [ packages... ]                          -- builds packages and executables
+	test       [ -coverage ] [ packages... ]                                                    -- runs the tests
+	lint                                                                                        -- runs certain pre-selected linters
+	archive    [ -arch architecture ] [ -type zip|tar ] [ -signer key-envvar ] [ -signify key-envvar ] [ -upload dest ] -- archives build artifacts
+	importkeys                                                                                  -- imports signing keys from env
+	debsrc     [ -signer key-id ] [ -upload dest ]                                              -- creates a debian source package
+	nsis                                                                                        -- creates a Windows NSIS installer
+	aar        [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an Android archive
+	xcode      [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an iOS XCode framework
+	purge      [ -store blobstore ] [ -days threshold ]                                         -- purges old archives from the blobstore
 
 For all commands, -n prevents execution of external programs (dry run mode).
 
@@ -1026,7 +1026,7 @@ func doAndroidArchive(cmdline []string) {
 	build.MustRun(tc.Go("mod", "download"))
 
 	// Build the Android archive and Maven resources
-	// MODIFIED by Jakub Pajek (mobile node)
+	// MODIFIED by Jakub Pajek (mobile make android)
 	// Build arm64-v8a .so libraries only
 	//build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
 	build.MustRun(gomobileTool("bind", "-ldflags", "-s -w", "--target", "android/arm64", "--javapkg", "org.ethereum", "-v", "github.com/ethereum/go-ethereum/mobile"))
@@ -1151,10 +1151,14 @@ func doXCodeFramework(cmdline []string) {
 	tc := new(build.GoToolchain)
 
 	// Build gomobile.
-	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile", "golang.org/x/mobile/cmd/gobind"))
+	// MODIFIED by Jakub Pajek (mobile make ios)
+	//build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile", "golang.org/x/mobile/cmd/gobind"))
+	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
 
 	// Build the iOS XCode framework
 	bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
+	// MEMO by Jakub Pajek (mobile make ios)
+	//bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios/arm64", "-v", "github.com/ethereum/go-ethereum/mobile")
 
 	if *local {
 		// If we're building locally, use the build folder and stop afterwards
