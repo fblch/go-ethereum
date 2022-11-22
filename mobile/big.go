@@ -124,6 +124,16 @@ func (bi *BigInt) DivMod(bi2 *BigInt) *BigInts {
 	return bigInts
 }
 
+// ADDED by Jakub Pajek (big int)
+// Cmp compares x and y and returns:
+//
+//	-1 if x <  y
+//	 0 if x == y
+//	+1 if x >  y
+func (bi *BigInt) Cmp(bi2 *BigInt) int {
+	return bi.bigint.Cmp(bi2.bigint)
+}
+
 // BigInts represents a slice of big ints.
 type BigInts struct{ bigints []*big.Int }
 
@@ -232,7 +242,6 @@ func (bi *BigFloat) SetInt(x *BigInt) {
 //	-1 if x <  0
 //	 0 if x == 0
 //	+1 if x >  0
-//
 func (bi *BigFloat) Sign() int {
 	return bi.bigfloat.Sign()
 }
@@ -267,4 +276,14 @@ func (bi *BigFloat) Mul(bi2 *BigFloat) *BigFloat {
 // Quo returns the rounded quotient bi/bi2 as new big float (panics if both operands are zero or infinities).
 func (bi *BigFloat) Quo(bi2 *BigFloat) *BigFloat {
 	return &BigFloat{new(big.Float).Quo(bi.bigfloat, bi2.bigfloat)}
+}
+
+// ADDED by Jakub Pajek (big float)
+// Cmp compares x and y and returns:
+//
+//	-1 if x <  y
+//	 0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf)
+//	+1 if x >  y
+func (bi *BigFloat) Cmp(bi2 *BigFloat) int {
+	return bi.bigfloat.Cmp(bi2.bigfloat)
 }
