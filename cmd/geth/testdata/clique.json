@@ -10,7 +10,8 @@
     "petersburgBlock": 0,
     "clique": {
       "period": 5,
-      "epoch": 30000
+      "epoch": 30000,
+      "blockReward": 1000000000000000000
     }
   },
   "difficulty": "1",
