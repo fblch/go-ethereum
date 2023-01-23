@@ -56,13 +56,13 @@ const (
 
 // Clique proof-of-authority protocol constants.
 var (
+	// MEMO by Jakub Pajek: sealers limit
+	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+
 	//FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
 	//ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
 	//ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
-	CliqueBlockReward = big.NewInt(1e+18) // Block reward in wei for successfully mining a block
-
-	// MEMO by Jakub Pajek: sealers limit
-	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+	blockReward = big.NewInt(1e+18) // Default block reward in wei for successfully mining a block
 
 	// Minimal time (in units of the clique period) that needs to pass between consecutive blocks in order for
 	// the voters to be allowed to switch the network to the voter ring. 60s for a 15s period network.
@@ -280,6 +280,9 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	conf := *config
 	if conf.Epoch == 0 {
 		conf.Epoch = epochLength
+	}
+	if conf.BlockReward == nil {
+		conf.BlockReward = blockReward
 	}
 	// Allocate the snapshot caches and create the engine
 	recents := lru.NewCache[common.Hash, *Snapshot](inmemorySnapshots)
@@ -829,7 +832,7 @@ func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Heade
 	}
 	// Accumulate any block rewards (excluding uncle rewards).
 	if signer != (common.Address{}) {
-		accumulateRewards(chain.Config(), state, header, uncles, signer)
+		c.accumulateRewards(chain.Config(), state, header, uncles, signer)
 	}
 }
 
@@ -853,7 +856,7 @@ func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *
 		}
 		// Accumulate any block rewards (excluding uncle rewards)
 		if signer != (common.Address{}) {
-			accumulateRewards(chain.Config(), state, header, uncles, signer)
+			c.accumulateRewards(chain.Config(), state, header, uncles, signer)
 		}
 	}
 
@@ -862,6 +865,25 @@ func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *
 
 	// Assemble and return the final block for sealing.
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
+}
+
+// AccumulateRewards credits the signer of the given block with the mining
+// reward. The total reward consists of the static block reward only.
+func (c *Clique) accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, signer common.Address) {
+	// Select the correct block reward based on chain progression
+	/*
+		blockReward := FrontierBlockReward
+		if config.IsByzantium(header.Number) {
+			blockReward = ByzantiumBlockReward
+		}
+		if config.IsConstantinople(header.Number) {
+			blockReward = ConstantinopleBlockReward
+		}
+	*/
+	// Accumulate the rewards for the miner
+	if c.config.BlockReward.Cmp(big.NewInt(0)) > 0 {
+		state.AddBalance(signer, c.config.BlockReward)
+	}
 }
 
 // Authorize injects a private key into the consensus engine to mint new blocks
@@ -1106,23 +1128,4 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())
 	}
-}
-
-// AccumulateRewards credits the signer of the given block with the mining
-// reward. The total reward consists of the static block reward only.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, signer common.Address) {
-	// Select the correct block reward based on chain progression
-	/*
-		blockReward := FrontierBlockReward
-		if config.IsByzantium(header.Number) {
-			blockReward = ByzantiumBlockReward
-		}
-		if config.IsConstantinople(header.Number) {
-			blockReward = ConstantinopleBlockReward
-		}
-	*/
-	blockReward := CliqueBlockReward
-	// Accumulate the rewards for the miner
-	reward := new(big.Int).Set(blockReward)
-	state.AddBalance(signer, reward)
 }
