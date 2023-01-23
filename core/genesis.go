@@ -234,10 +234,10 @@ func (e *GenesisMismatchError) Error() string {
 // SetupGenesisBlock writes or updates the genesis block in db.
 // The block that will be used is:
 //
-//                          genesis == nil       genesis != nil
-//                       +------------------------------------------
-//     db has no genesis |  main-net default  |  genesis
-//     db has genesis    |  from DB           |  genesis (if compatible)
+//	                     genesis == nil       genesis != nil
+//	                  +------------------------------------------
+//	db has no genesis |  main-net default  |  genesis
+//	db has genesis    |  from DB           |  genesis (if compatible)
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
@@ -529,6 +529,8 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 	config.Clique = &params.CliqueConfig{
 		Period: period,
 		Epoch:  config.Clique.Epoch,
+		// ADDED by Jakub Pajek (clique config: block reward)
+		BlockReward: config.Clique.BlockReward,
 	}
 
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
