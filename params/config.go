@@ -158,6 +158,10 @@ var (
 			BlockReward: big.NewInt(0),
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -208,6 +212,10 @@ var (
 			BlockReward: big.NewInt(0),
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -266,28 +274,26 @@ var (
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
-	// MODIFIED by Jakub Pajek (hard fork: HF1)
-	// MODIFIED by Jakub Pajek (clique config: block reward)
-	// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
 	AllCliqueProtocolChanges = &ChainConfig{
-		ChainID:                       big.NewInt(1337),
-		HomesteadBlock:                big.NewInt(0),
-		DAOForkBlock:                  nil,
-		DAOForkSupport:                false,
-		EIP150Block:                   big.NewInt(0),
-		EIP150Hash:                    common.Hash{},
-		EIP155Block:                   big.NewInt(0),
-		EIP158Block:                   big.NewInt(0),
-		ByzantiumBlock:                big.NewInt(0),
-		ConstantinopleBlock:           big.NewInt(0),
-		PetersburgBlock:               big.NewInt(0),
-		IstanbulBlock:                 big.NewInt(0),
-		MuirGlacierBlock:              big.NewInt(0),
-		BerlinBlock:                   big.NewInt(0),
-		LondonBlock:                   big.NewInt(0),
-		ArrowGlacierBlock:             nil,
-		GrayGlacierBlock:              nil,
-		MergeNetsplitBlock:            nil,
+		ChainID:             big.NewInt(1337),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   nil,
+		GrayGlacierBlock:    nil,
+		MergeNetsplitBlock:  nil,
+		// ADDED by Jakub Pajek (hard fork: HF1)
 		PrivateHardFork1Block:         big.NewInt(0),
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -295,31 +301,37 @@ var (
 		TerminalTotalDifficulty:       nil,
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        nil,
-		Clique:                        &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4},
+		// MODIFIED by Jakub Pajek (clique config: block reward)
+		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
+		// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
+		// MODIFIED by Jakub Pajek (clique config: min strike count)
+		//Clique:                        &CliqueConfig{Period: 0, Epoch: 30000},
+		Clique: &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4, MinOfflineTime: uint64(86400 * 31), MinStrikeCount: uint64(100)},
 	}
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers for testing proposes.
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	TestChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(1),
-		HomesteadBlock:                big.NewInt(0),
-		DAOForkBlock:                  nil,
-		DAOForkSupport:                false,
-		EIP150Block:                   big.NewInt(0),
-		EIP150Hash:                    common.Hash{},
-		EIP155Block:                   big.NewInt(0),
-		EIP158Block:                   big.NewInt(0),
-		ByzantiumBlock:                big.NewInt(0),
-		ConstantinopleBlock:           big.NewInt(0),
-		PetersburgBlock:               big.NewInt(0),
-		IstanbulBlock:                 big.NewInt(0),
-		MuirGlacierBlock:              big.NewInt(0),
-		BerlinBlock:                   big.NewInt(0),
-		LondonBlock:                   big.NewInt(0),
-		ArrowGlacierBlock:             big.NewInt(0),
-		GrayGlacierBlock:              big.NewInt(0),
-		MergeNetsplitBlock:            nil,
+		ChainID:             big.NewInt(1),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   big.NewInt(0),
+		GrayGlacierBlock:    big.NewInt(0),
+		MergeNetsplitBlock:  nil,
+		// ADDED by Jakub Pajek (hard fork: HF1)
 		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -334,24 +346,25 @@ var (
 	// any protocol change (EIPs).
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	NonActivatedConfig = &ChainConfig{
-		ChainID:                       big.NewInt(1),
-		HomesteadBlock:                nil,
-		DAOForkBlock:                  nil,
-		DAOForkSupport:                false,
-		EIP150Block:                   nil,
-		EIP150Hash:                    common.Hash{},
-		EIP155Block:                   nil,
-		EIP158Block:                   nil,
-		ByzantiumBlock:                nil,
-		ConstantinopleBlock:           nil,
-		PetersburgBlock:               nil,
-		IstanbulBlock:                 nil,
-		MuirGlacierBlock:              nil,
-		BerlinBlock:                   nil,
-		LondonBlock:                   nil,
-		ArrowGlacierBlock:             nil,
-		GrayGlacierBlock:              nil,
-		MergeNetsplitBlock:            nil,
+		ChainID:             big.NewInt(1),
+		HomesteadBlock:      nil,
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         nil,
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         nil,
+		EIP158Block:         nil,
+		ByzantiumBlock:      nil,
+		ConstantinopleBlock: nil,
+		PetersburgBlock:     nil,
+		IstanbulBlock:       nil,
+		MuirGlacierBlock:    nil,
+		BerlinBlock:         nil,
+		LondonBlock:         nil,
+		ArrowGlacierBlock:   nil,
+		GrayGlacierBlock:    nil,
+		MergeNetsplitBlock:  nil,
+		// ADDED by Jakub Pajek (hard fork: HF1)
 		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -496,6 +509,18 @@ type CliqueConfig struct {
 	// Minimal time (given in multiples of the block period) that needs to pass between consecutive
 	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
 	MinStallPeriod uint64 `json:"minStallPeriod"`
+
+	// ADDED by Jakub Pajek (clique config: min offline time)
+	// Minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
+	// https://www.desmos.com/calculator/qa5ti8owpr
+	MinOfflineTime uint64 `json:"minOfflineTime"`
+
+	// ADDED by Jakub Pajek (clique config: min strike count)
+	// Minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
+	// https://www.desmos.com/calculator/tfvkzctlf0
+	MinStrikeCount uint64 `json:"minStrikeCount"`
 }
 
 // String implements the stringer interface, returning the consensus engine details.
