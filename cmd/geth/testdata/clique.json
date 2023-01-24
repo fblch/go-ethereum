@@ -11,7 +11,8 @@
     "clique": {
       "period": 5,
       "epoch": 30000,
-      "blockReward": 1000000000000000000
+      "blockReward": 1000000000000000000,
+      "minStallPeriod": 4
     }
   },
   "difficulty": "1",
