@@ -634,10 +634,10 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 func (s *Snapshot) calcStrikeThreshold(signerCount uint64) uint64 {
 	var strikeThreshold uint64 = math.MaxUint64
 	if s.config.Period > 0 {
-		strikeThreshold = minOfflineTime / s.config.Period / signerCount
+		strikeThreshold = s.config.MinOfflineTime / s.config.Period / signerCount
 	}
-	if strikeThreshold < minStrikeCount {
-		return minStrikeCount
+	if strikeThreshold < s.config.MinStrikeCount {
+		return s.config.MinStrikeCount
 	}
 	return strikeThreshold
 }
