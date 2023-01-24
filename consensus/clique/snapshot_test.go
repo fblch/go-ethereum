@@ -429,6 +429,8 @@ func (tt *cliqueTest) run(t *testing.T) {
 		Epoch:  tt.epoch,
 		// ADDED by Jakub Pajek (clique config: block reward)
 		BlockReward: blockReward,
+		// ADDED by Jakub Pajek (clique config: min stall period)
+		MinStallPeriod: MinStallPeriod,
 	}
 	genesis.Config = &config
 

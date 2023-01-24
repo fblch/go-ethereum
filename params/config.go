@@ -19,6 +19,7 @@ package params
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -154,6 +155,8 @@ var (
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(0),
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -201,6 +204,8 @@ var (
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(0),
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -261,6 +266,7 @@ var (
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	// MODIFIED by Jakub Pajek (clique config: block reward)
+	// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
 	AllCliqueProtocolChanges = &ChainConfig{
 		ChainID:                       big.NewInt(1337),
 		HomesteadBlock:                big.NewInt(0),
@@ -287,7 +293,7 @@ var (
 		TerminalTotalDifficulty:       nil,
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        nil,
-		Clique:                        &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18)},
+		Clique:                        &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4},
 	}
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
@@ -480,8 +486,14 @@ func (c *EthashConfig) String() string {
 type CliqueConfig struct {
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
+
 	// ADDED by Jakub Pajek (clique config: block reward)
 	BlockReward *big.Int `json:"blockReward"` // Block reward in wei for successfully mining a block
+
+	// ADDED by Jakub Pajek (clique config: min stall period)
+	// Minimal time (given in multiples of the block period) that needs to pass between consecutive
+	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
+	MinStallPeriod uint64 `json:"minStallPeriod"`
 }
 
 // String implements the stringer interface, returning the consensus engine details.

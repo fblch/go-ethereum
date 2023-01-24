@@ -585,6 +585,8 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 		Epoch:  config.Clique.Epoch,
 		// ADDED by Jakub Pajek (clique config: block reward)
 		BlockReward: config.Clique.BlockReward,
+		// ADDED by Jakub Pajek (clique config: min stall period)
+		MinStallPeriod: config.Clique.MinStallPeriod,
 	}
 
 	// Assemble and return the genesis with the precompiles and faucet pre-funded

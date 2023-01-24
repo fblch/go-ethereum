@@ -86,6 +86,8 @@ func init() {
 		Epoch:  30000,
 		// ADDED by Jakub Pajek (clique config: block reward)
 		BlockReward: big.NewInt(1e+18),
+		// ADDED by Jakub Pajek (clique config: min stall period)
+		MinStallPeriod: 4, // Set to four times the block period
 	}
 
 	signer := types.LatestSigner(params.TestChainConfig)
@@ -237,8 +239,9 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 	if isClique {
 		chainConfig = *params.AllCliqueProtocolChanges
 		// MODIFIED by Jakub Pajek (clique config: block reward)
+		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
 		//chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
-		chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000, BlockReward: big.NewInt(1e+18)}
+		chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4}
 		engine = clique.New(chainConfig.Clique, db)
 	} else {
 		chainConfig = *params.AllEthashProtocolChanges
