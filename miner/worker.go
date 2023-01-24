@@ -490,7 +490,16 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 					//continue
 					// Do not short circut if enough stall occured to switch to voter ring.
 					// (If we are here and clique is used, clique period is always greater than zero)
-					if w.chainConfig.Clique == nil || headTime+clique.MinStallPeriod*w.chainConfig.Clique.Period > uint64(time.Now().Unix()) {
+					if cliqueCfg := w.chainConfig.Clique; cliqueCfg != nil {
+						minStallPeriod := cliqueCfg.MinStallPeriod
+						if minStallPeriod == 0 {
+							minStallPeriod = clique.MinStallPeriod
+						}
+						if headTime+minStallPeriod*cliqueCfg.Period > uint64(time.Now().Unix()) {
+							timer.Reset(recommit)
+							continue
+						}
+					} else {
 						timer.Reset(recommit)
 						continue
 					}

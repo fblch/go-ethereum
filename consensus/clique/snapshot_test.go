@@ -423,6 +423,8 @@ func TestClique(t *testing.T) {
 			Epoch:  tt.epoch,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: blockReward,
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: MinStallPeriod,
 		}
 		engine := New(config.Clique, db)
 		engine.fakeDiff = true

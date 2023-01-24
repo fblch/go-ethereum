@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -529,9 +530,17 @@ func (lc *LightChain) SyncCheckpoint(ctx context.Context, checkpoint *params.Tru
 	head := lc.CurrentHeader().Number.Uint64()
 
 	latest := (checkpoint.SectionIndex+1)*lc.indexerConfig.ChtSize - 1
-	if clique := lc.hc.Config().Clique; clique != nil {
-		latest -= latest % clique.Epoch // epoch snapshot for clique
+	// MODIFIED by Jakub Pajek BEG (clique config: min stall period)
+	//if clique := lc.hc.Config().Clique; clique != nil {
+	if cliqueCfg := lc.hc.Config().Clique; cliqueCfg != nil {
+		//latest -= latest % clique.Epoch // epoch snapshot for clique
+		cliqueEpoch := cliqueCfg.Epoch
+		if cliqueEpoch == 0 {
+			cliqueEpoch = clique.EpochLength
+		}
+		latest -= latest % cliqueEpoch // epoch snapshot for clique
 	}
+	// MODIFIED by Jakub Pajek END (clique config: min stall period)
 	if head >= latest {
 		return true
 	}

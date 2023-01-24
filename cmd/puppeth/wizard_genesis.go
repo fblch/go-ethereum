@@ -77,10 +77,17 @@ func (w *wizard) makeGenesis() {
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(1e+18),
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: 4, // Set to four times the block period
 		}
 		fmt.Println()
 		fmt.Println("How many seconds should blocks take? (default = 15)")
 		genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
+
+		// ADDED by Jakub Pajek (clique config: min stall period)
+		fmt.Println()
+		fmt.Println("Minimal stall period given in multiples of the block period? (default = 4)")
+		genesis.Config.Clique.MinStallPeriod = uint64(w.readDefaultInt(4))
 
 		// We also need the initial list of signers
 		fmt.Println()
