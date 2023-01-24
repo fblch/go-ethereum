@@ -79,6 +79,10 @@ func (w *wizard) makeGenesis() {
 			BlockReward: big.NewInt(1e+18),
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: 4, // Set to four times the block period
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: uint64(86400 * 31), // Set to 31 days
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: uint64(100),
 		}
 		fmt.Println()
 		fmt.Println("How many seconds should blocks take? (default = 15)")
@@ -88,6 +92,16 @@ func (w *wizard) makeGenesis() {
 		fmt.Println()
 		fmt.Println("Minimal stall period given in multiples of the block period? (default = 4)")
 		genesis.Config.Clique.MinStallPeriod = uint64(w.readDefaultInt(4))
+
+		// ADDED by Jakub Pajek (clique config: min offline time)
+		fmt.Println()
+		fmt.Println("Minimal offline time given in days? (default = 31)")
+		genesis.Config.Clique.MinOfflineTime = uint64(86400 * w.readDefaultInt(31))
+
+		// ADDED by Jakub Pajek (clique config: min strike count)
+		fmt.Println()
+		fmt.Println("Minimal strike count? (default = 100)")
+		genesis.Config.Clique.MinStrikeCount = uint64(w.readDefaultInt(100))
 
 		// We also need the initial list of signers
 		fmt.Println()

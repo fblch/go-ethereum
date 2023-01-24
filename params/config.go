@@ -201,6 +201,10 @@ var (
 			BlockReward: big.NewInt(0),
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -250,6 +254,10 @@ var (
 			BlockReward: big.NewInt(0),
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
 		},
 	}
 
@@ -291,8 +299,10 @@ var (
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	// MODIFIED by Jakub Pajek (clique config: block reward)
 	// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
+	// ADDED by Jakub Pajek (clique config: min offline time) // Set to 31 days
+	// ADDED by Jakub Pajek (clique config: min strike count)
 	//AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4, MinOfflineTime: uint64(86400 * 31), MinStrikeCount: uint64(100)}}
 
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	//TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
@@ -429,6 +439,18 @@ type CliqueConfig struct {
 	// Minimal time (given in multiples of the block period) that needs to pass between consecutive
 	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
 	MinStallPeriod uint64 `json:"minStallPeriod"`
+
+	// ADDED by Jakub Pajek (clique config: min offline time)
+	// Minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
+	// https://www.desmos.com/calculator/qa5ti8owpr
+	MinOfflineTime uint64 `json:"minOfflineTime"`
+
+	// ADDED by Jakub Pajek (clique config: min strike count)
+	// Minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
+	// https://www.desmos.com/calculator/tfvkzctlf0
+	MinStrikeCount uint64 `json:"minStrikeCount"`
 }
 
 // String implements the stringer interface, returning the consensus engine details.
