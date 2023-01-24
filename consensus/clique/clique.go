@@ -67,21 +67,16 @@ var (
 	MinStallPeriod = uint64(4)
 
 	// MEMO by Jakub Pajek: sealers limit
-	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
-	// offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
-	// https://www.desmos.com/calculator/octei0izoc
+	// Default minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
+	// https://www.desmos.com/calculator/qa5ti8owpr
 	minOfflineTime = uint64(86400 * 31)
+
 	// MEMO by Jakub Pajek: sealers limit
-	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
-	// strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
-	// https://www.desmos.com/calculator/mbgwbxnpdm
-	//minStrikeCount = uint64(17)
-	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 10min block periods)
-	//minStrikeCount = uint64(5)
-	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 1min block periods)
-	//minStrikeCount = uint64(9)
-	// Minimal strike count above which inactive signers are excluded from the authorized signers (adjusted for 5min block periods)
-	minStrikeCount = uint64(5)
+	// Default minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
+	// https://www.desmos.com/calculator/tfvkzctlf0
+	minStrikeCount = uint64(100)
 
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
@@ -278,6 +273,12 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	}
 	if conf.MinStallPeriod == 0 {
 		conf.MinStallPeriod = MinStallPeriod
+	}
+	if conf.MinOfflineTime == 0 {
+		conf.MinOfflineTime = minOfflineTime
+	}
+	if conf.MinStrikeCount == 0 {
+		conf.MinStrikeCount = minStrikeCount
 	}
 
 	// Allocate the snapshot caches and create the engine

@@ -12,7 +12,9 @@
       "period": 5,
       "epoch": 30000,
       "blockReward": 1000000000000000000,
-      "minStallPeriod": 4
+      "minStallPeriod": 4,
+      "minOfflineTime": 2678400,
+      "minStrikeCount": 100
     }
   },
   "difficulty": "1",
