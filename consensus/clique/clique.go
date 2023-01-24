@@ -57,22 +57,14 @@ const (
 // Clique proof-of-authority protocol constants.
 var (
 	// MEMO by Jakub Pajek: sealers limit
-	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+	EpochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 
-	//FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	//ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
-	//ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
-	blockReward = big.NewInt(1e+18) // Default block reward in wei for successfully mining a block
+	// Default block reward in wei for successfully mining a block
+	blockReward = big.NewInt(1e+18)
 
-	// Minimal time (in units of the clique period) that needs to pass between consecutive blocks in order for
-	// the voters to be allowed to switch the network to the voter ring. 60s for a 15s period network.
-	//MinStallPeriod = uint64(4)
-	// Adjusted to 20min for a 10min period network.
-	//MinStallPeriod = uint64(2)
-	// Adjusted to 4min for a 1min period network.
-	//MinStallPeriod = uint64(4)
-	// Adjusted to 10min for 5min period network.
-	MinStallPeriod = uint64(2)
+	// Default min stall period: minimal time (given in multiples of the block period) that needs to pass between consecutive
+	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
+	MinStallPeriod = uint64(4)
 
 	// MEMO by Jakub Pajek: sealers limit
 	// Minimal offline time above which inactive signers are excluded from the authorized signers (adjusted for ~10000 sealers)
@@ -279,11 +271,15 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
-		conf.Epoch = epochLength
+		conf.Epoch = EpochLength
 	}
 	if conf.BlockReward == nil {
 		conf.BlockReward = blockReward
 	}
+	if conf.MinStallPeriod == 0 {
+		conf.MinStallPeriod = MinStallPeriod
+	}
+
 	// Allocate the snapshot caches and create the engine
 	recents := lru.NewCache[common.Hash, *Snapshot](inmemorySnapshots)
 	signatures := lru.NewCache[common.Hash, common.Address](inmemorySignatures)
@@ -603,7 +599,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if c.config.Period == 0 || header.Time < parent.Time+(MinStallPeriod*c.config.Period) {
+				if c.config.Period == 0 || header.Time < parent.Time+(c.config.MinStallPeriod*c.config.Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
@@ -615,7 +611,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if c.config.Period == 0 || header.Time < parent.Time+(MinStallPeriod*c.config.Period) {
+				if c.config.Period == 0 || header.Time < parent.Time+(c.config.MinStallPeriod*c.config.Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
@@ -794,7 +790,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if c.config.Period > 0 && header.Time >= parent.Time+(MinStallPeriod*c.config.Period) {
+		if c.config.Period > 0 && header.Time >= parent.Time+(c.config.MinStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				header.Difficulty = snap.calcVoterRingDifficulty(signer)
@@ -1035,7 +1031,7 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if c.config.Period > 0 && time >= parent.Time+(MinStallPeriod*c.config.Period) {
+		if c.config.Period > 0 && time >= parent.Time+(c.config.MinStallPeriod*c.config.Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				return snap.calcVoterRingDifficulty(signer)
