@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -61,6 +62,11 @@ var (
 
 	// Default block reward in wei for successfully mining a block
 	blockReward = big.NewInt(1e+18)
+
+	// Default voting rule, i.e. proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc.
+	// The value (after replacing 1 with MaxUint64) is used as a denominator when calculating the effective vote threshold.
+	// Effective vote threshold: vote_threshold = voter_count / voting_rule
+	votingRule = int(2)
 
 	// Default min stall period: minimal time (given in multiples of the block period) that needs to pass between consecutive
 	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
@@ -270,6 +276,11 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	}
 	if conf.BlockReward == nil {
 		conf.BlockReward = blockReward
+	}
+	if conf.VotingRule < 1 {
+		conf.VotingRule = votingRule
+	} else if conf.VotingRule == 1 {
+		conf.VotingRule = math.MaxInt
 	}
 	if conf.MinStallPeriod == 0 {
 		conf.MinStallPeriod = MinStallPeriod
