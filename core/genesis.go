@@ -531,6 +531,8 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 		Epoch:  config.Clique.Epoch,
 		// ADDED by Jakub Pajek (clique config: block reward)
 		BlockReward: config.Clique.BlockReward,
+		// ADDED by Jakub Pajek (clique config: voting rule)
+		VotingRule: config.Clique.VotingRule,
 		// ADDED by Jakub Pajek (clique config: min stall period)
 		MinStallPeriod: config.Clique.MinStallPeriod,
 		// ADDED by Jakub Pajek (clique config: min offline time)

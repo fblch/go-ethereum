@@ -199,6 +199,8 @@ var (
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(0),
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: 2, // Set to "majority"
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 			// ADDED by Jakub Pajek (clique config: min offline time)
@@ -252,6 +254,8 @@ var (
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(0),
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: 2, // Set to "majority"
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 			// ADDED by Jakub Pajek (clique config: min offline time)
@@ -298,11 +302,12 @@ var (
 	// adding flags to the config to also have to set these fields.
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	// MODIFIED by Jakub Pajek (clique config: block reward)
+	// MODIFIED by Jakub Pajek (clique config: voting rule) // Set to "majority"
 	// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
-	// ADDED by Jakub Pajek (clique config: min offline time) // Set to 31 days
-	// ADDED by Jakub Pajek (clique config: min strike count)
+	// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
+	// MODIFIED by Jakub Pajek (clique config: min strike count)
 	//AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), MinStallPeriod: 4, MinOfflineTime: uint64(86400 * 31), MinStrikeCount: uint64(100)}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}}
 
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	//TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
@@ -434,6 +439,12 @@ type CliqueConfig struct {
 
 	// ADDED by Jakub Pajek (clique config: block reward)
 	BlockReward *big.Int `json:"blockReward"` // Block reward in wei for successfully mining a block
+
+	// ADDED by Jakub Pajek (clique config: voting rule)
+	// A voting rule, i.e. proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc.
+	// The value (after replacing 1 with MaxUint64) is used as a denominator when calculating the effective vote threshold.
+	// Effective vote threshold: vote_threshold = voter_count / voting_rule
+	VotingRule int `json:"votingRule"`
 
 	// ADDED by Jakub Pajek (clique config: min stall period)
 	// Minimal time (given in multiples of the block period) that needs to pass between consecutive

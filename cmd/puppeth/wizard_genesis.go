@@ -77,16 +77,26 @@ func (w *wizard) makeGenesis() {
 			Epoch:  30000,
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: big.NewInt(1e+18),
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: 2, // Set to "majority"
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: 4, // Set to four times the block period
 			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: uint64(86400 * 31), // Set to 31 days
+			MinOfflineTime: 86400 * 31, // Set to 31 days
 			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: uint64(100),
+			MinStrikeCount: 100,
 		}
 		fmt.Println()
 		fmt.Println("How many seconds should blocks take? (default = 15)")
 		genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
+
+		// ADDED by Jakub Pajek (clique config: voting rule)
+		fmt.Println()
+		fmt.Println("Proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc. (default = 2)")
+		genesis.Config.Clique.VotingRule = w.readDefaultInt(2)
+		if genesis.Config.Clique.VotingRule < 1 {
+			genesis.Config.Clique.VotingRule = 2
+		}
 
 		// ADDED by Jakub Pajek (clique config: min stall period)
 		fmt.Println()
