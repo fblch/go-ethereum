@@ -429,6 +429,8 @@ func (tt *cliqueTest) run(t *testing.T) {
 		Epoch:  tt.epoch,
 		// ADDED by Jakub Pajek (clique config: block reward)
 		BlockReward: blockReward,
+		// ADDED by Jakub Pajek (clique config: voting rule)
+		VotingRule: votingRule,
 		// ADDED by Jakub Pajek (clique config: min stall period)
 		MinStallPeriod: MinStallPeriod,
 		// ADDED by Jakub Pajek (clique config: min offline time)
