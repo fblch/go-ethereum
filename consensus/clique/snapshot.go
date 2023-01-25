@@ -422,11 +422,10 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 						Proposal: proposal,
 					})
 				}
-				// If the vote passed, update the list of voters/signers
-				// Approval rule: majority (51%)
-				//if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/2 {
-				// Approval rule: always (1 vote enough)
-				if tally := snap.Tally[address]; tally.Votes > 0 {
+				// If the vote passed, update the list of voters/signers.
+				// Vote passes if the number of proposals exceeds the effective vote threshold.
+				// Effective vote threshold: vote_threshold = voter_count / voting_rule
+				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/s.config.VotingRule {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
 						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
