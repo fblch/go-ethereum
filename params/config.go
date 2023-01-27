@@ -58,7 +58,9 @@ var (
 
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(1),
+		ChainID: big.NewInt(1),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(1_150_000),
 		DAOForkBlock:                  big.NewInt(1_920_000),
 		DAOForkSupport:                true,
@@ -103,7 +105,9 @@ var (
 
 	// SepoliaChainConfig contains the chain parameters to run a node on the Sepolia test network.
 	SepoliaChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(11155111),
+		ChainID: big.NewInt(11155111),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(0),
 		DAOForkBlock:                  nil,
 		DAOForkSupport:                true,
@@ -134,7 +138,9 @@ var (
 
 	// RinkebyChainConfig contains the chain parameters to run a node on the Rinkeby test network.
 	RinkebyChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(4),
+		ChainID: big.NewInt(4),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
 		HomesteadBlock:      big.NewInt(1),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      true,
@@ -187,7 +193,9 @@ var (
 
 	// GoerliChainConfig contains the chain parameters to run a node on the Görli test network.
 	GoerliChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(5),
+		ChainID: big.NewInt(5),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(0),
 		DAOForkBlock:                  nil,
 		DAOForkSupport:                true,
@@ -244,25 +252,27 @@ var (
 
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
-	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	AllEthashProtocolChanges = &ChainConfig{
-		ChainID:                       big.NewInt(1337),
-		HomesteadBlock:                big.NewInt(0),
-		DAOForkBlock:                  nil,
-		DAOForkSupport:                false,
-		EIP150Block:                   big.NewInt(0),
-		EIP155Block:                   big.NewInt(0),
-		EIP158Block:                   big.NewInt(0),
-		ByzantiumBlock:                big.NewInt(0),
-		ConstantinopleBlock:           big.NewInt(0),
-		PetersburgBlock:               big.NewInt(0),
-		IstanbulBlock:                 big.NewInt(0),
-		MuirGlacierBlock:              big.NewInt(0),
-		BerlinBlock:                   big.NewInt(0),
-		LondonBlock:                   big.NewInt(0),
-		ArrowGlacierBlock:             big.NewInt(0),
-		GrayGlacierBlock:              big.NewInt(0),
-		MergeNetsplitBlock:            nil,
+		ChainID: big.NewInt(1337),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		ArrowGlacierBlock:   big.NewInt(0),
+		GrayGlacierBlock:    big.NewInt(0),
+		MergeNetsplitBlock:  nil,
+		// MODIFIED by Jakub Pajek (hard fork: HF1)
 		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -276,8 +286,9 @@ var (
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	AllCliqueProtocolChanges = &ChainConfig{
-		ChainID:             big.NewInt(1337),
-		HomesteadBlock:      big.NewInt(0),
+		ChainID: big.NewInt(1337),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      true,
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
 		EIP150Block:         big.NewInt(0),
@@ -314,7 +325,9 @@ var (
 	// and accepted by the Ethereum core developers for testing proposes.
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	TestChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(1),
+		ChainID: big.NewInt(1),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
@@ -346,7 +359,9 @@ var (
 	// any protocol change (EIPs).
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	NonActivatedConfig = &ChainConfig{
-		ChainID:             big.NewInt(1),
+		ChainID: big.NewInt(1),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
 		HomesteadBlock:      nil,
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
@@ -439,6 +454,9 @@ type CheckpointOracleConfig struct {
 // set of configuration options.
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
+
+	// ADDED by Jakub Pajek (chain config: refundable fees)
+	RefundableFees bool `json:"refundableFees,omitempty"` // Should the transaction fees go to the sender instead of the miner
 
 	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
 
