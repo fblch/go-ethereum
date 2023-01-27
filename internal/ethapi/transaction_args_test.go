@@ -214,7 +214,9 @@ type backendMock struct {
 
 func newBackendMock() *backendMock {
 	config := &params.ChainConfig{
-		ChainID:             big.NewInt(42),
+		ChainID: big.NewInt(42),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      true,
