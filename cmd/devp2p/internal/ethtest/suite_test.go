@@ -36,6 +36,12 @@ var (
 // Test fails with the following error due to state transition logic modification: no tx fee rewards
 // Error: invalid merkle root (remote: a28e77bd8f8bc0175972bdfc1137caa46111904573a3c4f2053e0682d1fccc87 local: 13a119b1b2baf73ae7f9b2b122a516d000abac942308c6bb92e1bd6467f9bd1d)
 // Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
+// MODIFIED by Jakub Pajek (chain config: refundable fees)
+// Re-enable this test after making refundable fees a config parameter.
+// MODIFIED by Jakub Pajek (zero size extra)
+// Test fails with the following error due to state block header modification: zero size extra
+// ########## BAD BLOCK ######### Error: unknown ancestor
+// Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
 /*
 func TestEthSuite(t *testing.T) {
 	geth, err := runGeth()
@@ -63,6 +69,12 @@ func TestEthSuite(t *testing.T) {
 // MODIFIED by Jakub Pajek (tx fee refund)
 // Test fails with the following error due to state transition logic modification: no tx fee rewards
 // Error: invalid merkle root (remote: a28e77bd8f8bc0175972bdfc1137caa46111904573a3c4f2053e0682d1fccc87 local: 13a119b1b2baf73ae7f9b2b122a516d000abac942308c6bb92e1bd6467f9bd1d)
+// Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
+// MODIFIED by Jakub Pajek (chain config: refundable fees)
+// Re-enable this test after making refundable fees a config parameter.
+// MODIFIED by Jakub Pajek (zero size extra)
+// Test fails with the following error due to state block header modification: zero size extra
+// ########## BAD BLOCK ######### Error: unknown ancestor
 // Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
 /*
 func TestSnapSuite(t *testing.T) {
