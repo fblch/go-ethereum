@@ -3700,13 +3700,17 @@ func TestEIP1559Transition(t *testing.T) {
 	// 3: Ensure that miner received only the tx's tip.
 	actual := state.GetBalance(block.Coinbase())
 	// MODIFIED by Jakub Pajek BEG (no tx fee rewards)
-	/*
-		expected := new(big.Int).Add(
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	var expected *big.Int
+	if gspec.Config.RefundableFees {
+		expected = ethash.ConstantinopleBlockReward
+	} else {
+		expected = new(big.Int).Add(
 			new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
 			ethash.ConstantinopleBlockReward,
 		)
-	*/
-	expected := ethash.ConstantinopleBlockReward
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek END (no tx fee rewards)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
@@ -3714,9 +3718,15 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 4: Ensure the tx sender paid for the gasUsed * (tip + block baseFee).
 	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
-	// MODIFIED by Jakub Pajek (tx fee refund)
-	//expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
-	expected = new(big.Int).SetUint64(0)
+	// MODIFIED by Jakub Pajek BEG (tx fee refund)
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	if gspec.Config.RefundableFees {
+		expected = new(big.Int).SetUint64(0)
+	} else {
+		expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
+	// MODIFIED by Jakub Pajek END (tx fee refund)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -3742,19 +3752,29 @@ func TestEIP1559Transition(t *testing.T) {
 
 	block = chain.GetBlockByNumber(2)
 	state, _ = chain.State()
-	// COMMENTED by Jakub Pajek (tx fee refund)
-	//effectiveTip := block.Transactions()[0].GasTipCap().Uint64() - block.BaseFee().Uint64()
+	// MODIFIED by Jakub Pajek BEG (tx fee refund)
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	effectiveTip := uint64(0)
+	if !gspec.Config.RefundableFees {
+		effectiveTip = block.Transactions()[0].GasTipCap().Uint64() - block.BaseFee().Uint64()
+	}
+	// MODIFIED by Jakub Pajek END (tx fee refund)
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
 
 	// 6+5: Ensure that miner received only the tx's effective tip.
 	actual = state.GetBalance(block.Coinbase())
 	// MODIFIED by Jakub Pajek BEG (no tx fee rewards)
-	/*
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	if gspec.Config.RefundableFees {
+		expected = ethash.ConstantinopleBlockReward
+	} else {
 		expected = new(big.Int).Add(
 			new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
 			ethash.ConstantinopleBlockReward,
 		)
-	*/
-	expected = ethash.ConstantinopleBlockReward
+
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek END (no tx fee rewards)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
@@ -3762,9 +3782,15 @@ func TestEIP1559Transition(t *testing.T) {
 
 	// 4: Ensure the tx sender paid for the gasUsed * (effectiveTip + block baseFee).
 	actual = new(big.Int).Sub(funds, state.GetBalance(addr2))
-	// MODIFIED by Jakub Pajek (tx fee refund)
-	//expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
-	expected = new(big.Int).SetUint64(0)
+	// MODIFIED by Jakub Pajek BEG (tx fee refund)
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	if gspec.Config.RefundableFees {
+		expected = new(big.Int).SetUint64(0)
+	} else {
+		expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
+	// MODIFIED by Jakub Pajek END (tx fee refund)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}

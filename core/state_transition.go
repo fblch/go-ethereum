@@ -22,6 +22,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,8 +42,8 @@ The state transitioning model does all the necessary work to work out a valid ne
 3) Create a new state object if the recipient is \0*32
 4) Value transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+	4a) Attempt to run transaction data
+	4b) If valid, use result as code for the new state object
 == end ==
 5) Run Script section
 6) Derive new state root
@@ -295,8 +296,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	var (
-		msg              = st.msg
-		sender           = vm.AccountRef(msg.From())
+		msg    = st.msg
+		sender = vm.AccountRef(msg.From())
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		refundableFees   = st.evm.ChainConfig().RefundableFees
 		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil)
 		contractCreation = msg.To() == nil
 	)
@@ -335,18 +338,22 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
 		// MODIFIED by Jakub Pajek (tx fee refund)
+		// MODIFIED by Jakub Pajek (chain config: refundable fees)
 		//st.refundGas(params.RefundQuotient)
-		st.refundGas(params.RefundQuotient, false)
+		st.refundGas(params.RefundQuotient, refundableFees)
 	} else {
 		// After EIP-3529: refunds are capped to gasUsed / 5
 		// MODIFIED by Jakub Pajek (tx fee refund)
+		// MODIFIED by Jakub Pajek (chain config: refundable fees)
 		//st.refundGas(params.RefundQuotientEIP3529)
-		st.refundGas(params.RefundQuotientEIP3529, false)
+		st.refundGas(params.RefundQuotientEIP3529, refundableFees)
 	}
-	// MODIFIED by Jakub Pajek (no tx fee rewards)
+	// MODIFIED by Jakub Pajek BEG (no tx fee rewards)
 	// Unlike adding static block reward to clique, this modification runs regardless of consensus protocol in use
 	// and effectively breaks this client's compatibility with Ethereum's PoW networks.
-	/*
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	// Compatibility is restored after making refundable fees a config parameter.
+	if !refundableFees {
 		effectiveTip := st.gasPrice
 		if rules.IsLondon {
 			effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
@@ -362,7 +369,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			fee.Mul(fee, effectiveTip)
 			st.state.AddBalance(st.evm.Context.Coinbase, fee)
 		}
-	*/
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
+	// MODIFIED by Jakub Pajek END (no tx fee rewards)
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
@@ -372,8 +381,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 }
 
 // MODIFIED by Jakub Pajek (tx fee refund)
+// MODIFIED by Jakub Pajek (chain config: refundable fees)
 //func (st *StateTransition) refundGas(refundQuotient uint64) {
-func (st *StateTransition) refundGas(refundQuotient uint64, dummy bool) {
+func (st *StateTransition) refundGas(refundQuotient uint64, refundableFees bool) {
 	// Apply refund counter, capped to a refund quotient
 	refund := st.gasUsed() / refundQuotient
 	if refund > st.state.GetRefund() {
@@ -384,14 +394,18 @@ func (st *StateTransition) refundGas(refundQuotient uint64, dummy bool) {
 	// MODIFIED by Jakub Pajek BEG (tx fee refund)
 	// Unlike adding static block reward to clique, this modification runs regardless of consensus protocol in use
 	// and effectively breaks this client's compatibility with Ethereum's PoW networks.
-	/*
+	// MODIFIED by Jakub Pajek BEG (chain config: refundable fees)
+	// Compatibility is restored after making refundable fees a config parameter.
+	if refundableFees {
+		// Return ETH for initial gas, exchanged at the original rate.
+		initial := new(big.Int).Mul(new(big.Int).SetUint64(st.initialGas), st.gasPrice)
+		st.state.AddBalance(st.msg.From(), initial)
+	} else {
 		// Return ETH for remaining gas, exchanged at the original rate.
 		remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
 		st.state.AddBalance(st.msg.From(), remaining)
-	*/
-	// Return ETH for initial gas, exchanged at the original rate.
-	initial := new(big.Int).Mul(new(big.Int).SetUint64(st.initialGas), st.gasPrice)
-	st.state.AddBalance(st.msg.From(), initial)
+	}
+	// MODIFIED by Jakub Pajek END (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek END (tx fee refund)
 
 	// Also return remaining gas to the block gas counter so it is

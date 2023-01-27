@@ -44,6 +44,8 @@ func (w *wizard) makeGenesis() {
 		Difficulty: big.NewInt(524288),
 		Alloc:      make(core.GenesisAlloc),
 		Config: &params.ChainConfig{
+			// ADDED by Jakub Pajek (chain config: refundable fees)
+			RefundableFees:      false,
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
 			EIP155Block:         big.NewInt(0),

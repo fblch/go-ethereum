@@ -60,7 +60,9 @@ var (
 
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(1),
+		ChainID: big.NewInt(1),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(1_150_000),
 		DAOForkBlock:                  big.NewInt(1_920_000),
 		DAOForkSupport:                true,
@@ -105,7 +107,9 @@ var (
 
 	// RopstenChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	RopstenChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(3),
+		ChainID: big.NewInt(3),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(0),
 		DAOForkBlock:                  nil,
 		DAOForkSupport:                true,
@@ -148,7 +152,9 @@ var (
 
 	// SepoliaChainConfig contains the chain parameters to run a node on the Sepolia test network.
 	SepoliaChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(11155111),
+		ChainID: big.NewInt(11155111),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(0),
 		DAOForkBlock:                  nil,
 		DAOForkSupport:                true,
@@ -178,7 +184,9 @@ var (
 
 	// RinkebyChainConfig contains the chain parameters to run a node on the Rinkeby test network.
 	RinkebyChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(4),
+		ChainID: big.NewInt(4),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:      false,
 		HomesteadBlock:      big.NewInt(1),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      true,
@@ -232,7 +240,9 @@ var (
 
 	// GoerliChainConfig contains the chain parameters to run a node on the Görli test network.
 	GoerliChainConfig = &ChainConfig{
-		ChainID:                       big.NewInt(5),
+		ChainID: big.NewInt(5),
+		// ADDED by Jakub Pajek (chain config: refundable fees)
+		RefundableFees:                false,
 		HomesteadBlock:                big.NewInt(0),
 		DAOForkBlock:                  nil,
 		DAOForkSupport:                true,
@@ -291,15 +301,17 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
+	// MODIFIED by Jakub Pajek (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	//AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), false, big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
+	// MODIFIED by Jakub Pajek (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	// MODIFIED by Jakub Pajek (clique config: block reward)
 	// MODIFIED by Jakub Pajek (clique config: voting rule) // Set to "majority"
@@ -307,11 +319,12 @@ var (
 	// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
 	// MODIFIED by Jakub Pajek (clique config: min strike count)
 	//AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), true, big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, big.NewInt(0), nil, false, nil, &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}}
 
+	// MODIFIED by Jakub Pajek (chain config: refundable fees)
 	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	//TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, false, new(EthashConfig), nil}
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), false, big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, false, new(EthashConfig), nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int), false)
 )
 
@@ -379,6 +392,9 @@ type CheckpointOracleConfig struct {
 // set of configuration options.
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
+
+	// ADDED by Jakub Pajek (chain config: refundable fees)
+	RefundableFees bool `json:"refundableFees,omitempty"` // Should the transaction fees go to the sender instead of the miner
 
 	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
 
