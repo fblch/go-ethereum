@@ -227,8 +227,8 @@ type Proposal struct {
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
-	config *params.CliqueConfig // Consensus engine configuration parameters
-	db     ethdb.Database       // Database to store and retrieve snapshot checkpoints
+	config params.CliqueConfig // Consensus engine configuration parameters
+	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
 	recents    *lru.Cache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
 	signatures *sigLRU                            // Signatures of recent blocks to speed up mining
@@ -268,28 +268,56 @@ func (c *Clique) storeProposals() error {
 
 // New creates a Clique proof-of-authority consensus engine with the initial
 // permissions set to the ones provided by the user.
-func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
+func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
-	conf := *config
-	if conf.Epoch == 0 {
-		conf.Epoch = EpochLength
+	conf := append([]params.CliqueConfigEntry{}, config...)
+	if conf[0].MaxSealerCount == 0 {
+		conf[0].MaxSealerCount = math.MaxUint64
 	}
-	if conf.BlockReward == nil {
-		conf.BlockReward = blockReward
+	if conf[0].Epoch == 0 {
+		conf[0].Epoch = EpochLength
 	}
-	if conf.VotingRule < 1 {
-		conf.VotingRule = votingRule
-	} else if conf.VotingRule == 1 {
-		conf.VotingRule = math.MaxInt
+	if conf[0].BlockReward == nil {
+		conf[0].BlockReward = blockReward
 	}
-	if conf.MinStallPeriod == 0 {
-		conf.MinStallPeriod = MinStallPeriod
+	if conf[0].VotingRule < 1 {
+		conf[0].VotingRule = votingRule
+	} else if conf[0].VotingRule == 1 {
+		conf[0].VotingRule = math.MaxInt
 	}
-	if conf.MinOfflineTime == 0 {
-		conf.MinOfflineTime = minOfflineTime
+	if conf[0].MinStallPeriod == 0 {
+		conf[0].MinStallPeriod = MinStallPeriod
 	}
-	if conf.MinStrikeCount == 0 {
-		conf.MinStrikeCount = minStrikeCount
+	if conf[0].MinOfflineTime == 0 {
+		conf[0].MinOfflineTime = minOfflineTime
+	}
+	if conf[0].MinStrikeCount == 0 {
+		conf[0].MinStrikeCount = minStrikeCount
+	}
+	for i := 1; i < len(conf); i++ {
+		if conf[i].MaxSealerCount == 0 || conf[i].MaxSealerCount <= conf[i-1].MaxSealerCount {
+			panic(errors.New("sealer count in clique config must be strictly increasing"))
+		}
+		if conf[i].Epoch == 0 {
+			conf[i].Epoch = conf[i-1].Epoch
+		}
+		if conf[i].BlockReward == nil {
+			conf[i].BlockReward = conf[i-1].BlockReward
+		}
+		if conf[i].VotingRule < 1 {
+			conf[i].VotingRule = conf[i-1].VotingRule
+		} else if conf[i].VotingRule == 1 {
+			conf[i].VotingRule = conf[i-1].VotingRule
+		}
+		if conf[i].MinStallPeriod == 0 {
+			conf[i].MinStallPeriod = conf[i-1].MinStallPeriod
+		}
+		if conf[i].MinOfflineTime == 0 {
+			conf[i].MinOfflineTime = conf[i-1].MinOfflineTime
+		}
+		if conf[i].MinStrikeCount == 0 {
+			conf[i].MinStrikeCount = conf[i-1].MinStrikeCount
+		}
 	}
 
 	// Allocate the snapshot caches and create the engine
@@ -306,7 +334,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	}
 
 	return &Clique{
-		config:     &conf,
+		config:     conf,
 		db:         db,
 		recents:    recents,
 		signatures: signatures,
@@ -368,7 +396,7 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 		return errMissingSignature
 	}
 	// Ensure that the extra-data contains permissions list on checkpoint, optional votes list otherwise
-	checkpoint := number%c.config.Epoch == 0
+	checkpoint := number%c.config[0].Epoch == 0
 	extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
 	if checkpoint && extraBytes%(common.AddressLength+1) != 0 {
 		return errInvalidCheckpointPermissions
@@ -433,7 +461,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time+c.config.Period > header.Time {
+	if parent.Time+c.config[0].Period > header.Time {
 		return errInvalidTimestamp
 	}
 	// Verify that the gasUsed is <= gasLimit
@@ -458,7 +486,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		return err
 	}
 	// If the block is a checkpoint block, verify the permissions list
-	if number%c.config.Epoch == 0 {
+	if number%c.config[0].Epoch == 0 {
 		permissions := make([]byte, len(snap.Signers)*(common.AddressLength+1))
 		for i, authorizedSigner := range snap.signers() {
 			index := i * (common.AddressLength + 1)
@@ -503,7 +531,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// at a checkpoint block without a parent (light client CHT), or we have piled
 		// up more headers than allowed to be reorged (chain reinit from a freezer),
 		// consider the checkpoint trusted and snapshot it.
-		if number == 0 || (number%c.config.Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
+		if number == 0 || (number%c.config[0].Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
@@ -611,7 +639,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if c.config.Period == 0 || header.Time < parent.Time+(c.config.MinStallPeriod*c.config.Period) {
+				if c.config[0].Period == 0 || header.Time < parent.Time+(c.config[0].MinStallPeriod*c.config[0].Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
@@ -623,7 +651,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
-				if c.config.Period == 0 || header.Time < parent.Time+(c.config.MinStallPeriod*c.config.Period) {
+				if c.config[0].Period == 0 || header.Time < parent.Time+(c.config[0].MinStallPeriod*c.config[0].Period) {
 					return errWrongDifficultySealerRing
 				}
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
@@ -675,7 +703,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 	}
 	// If a vote is cast...
 	extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
-	if number%c.config.Epoch != 0 && extraBytes > 0 {
+	if number%c.config[0].Epoch != 0 && extraBytes > 0 {
 		// Check the signer against voters
 		if _, ok := snap.Voters[signer]; !ok {
 			return errUnauthorizedVoter
@@ -732,7 +760,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 	// If the block is a checkpoint, include permissions list.
 	// Otherwise, if the signer is a voter, cast all valid votes.
-	if number%c.config.Epoch == 0 {
+	if number%c.config[0].Epoch == 0 {
 		for _, authorizedSigner := range snap.signers() {
 			header.Extra = append(header.Extra, authorizedSigner[:]...)
 			if _, ok := snap.Voters[authorizedSigner]; ok {
@@ -791,7 +819,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + c.config.Period
+	header.Time = parent.Time + c.config[0].Period
 	if header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
 	}
@@ -802,7 +830,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if c.config.Period > 0 && header.Time >= parent.Time+(c.config.MinStallPeriod*c.config.Period) {
+		if c.config[0].Period > 0 && header.Time >= parent.Time+(c.config[0].MinStallPeriod*c.config[0].Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				header.Difficulty = snap.calcVoterRingDifficulty(signer)
@@ -889,8 +917,8 @@ func (c *Clique) accumulateRewards(config *params.ChainConfig, state *state.Stat
 		}
 	*/
 	// Accumulate the rewards for the miner
-	if c.config.BlockReward.Cmp(big.NewInt(0)) > 0 {
-		state.AddBalance(signer, c.config.BlockReward)
+	if c.config[0].BlockReward.Cmp(big.NewInt(0)) > 0 {
+		state.AddBalance(signer, c.config[0].BlockReward)
 	}
 }
 
@@ -916,7 +944,7 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	}
 	// MODIFIED by Jakub Pajek (clique empty blocks)
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
-	if c.config.Period == 0 && len(block.Transactions()) == 0 {
+	if c.config[0].Period == 0 && len(block.Transactions()) == 0 {
 		// MODIFIED by Jakub Pajek (clique empty blocks, clique voter ring)
 		// For any-period chains, refuse to seal empty blocks, unless disbanding the voter ring
 		//if len(block.Transactions()) == 0 && !(snap.VoterRing && header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) > 0) {
@@ -1043,7 +1071,7 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
 		// If there is a significant stall in block creation and we are a signer, preemptively prevent
 		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if c.config.Period > 0 && time >= parent.Time+(c.config.MinStallPeriod*c.config.Period) {
+		if c.config[0].Period > 0 && time >= parent.Time+(c.config[0].MinStallPeriod*c.config[0].Period) {
 			if okVoter {
 				// Set the correct difficulty for the voter ring
 				return snap.calcVoterRingDifficulty(signer)
