@@ -527,20 +527,23 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// MEMO by Jakub Pajek (clique special case)
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+			// MODIFIED by Jakub Pajek (clique config: variable period)
+			//if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique[0].Period > 0) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
 					// MODIFIED by Jakub Pajek BEG (clique voter ring)
+					// MODIFIED by Jakub Pajek BEG (clique config: variable period)
 					//timer.Reset(recommit)
 					//continue
 					// Do not short circut if enough stall occured to switch to voter ring.
 					// (If we are here and clique is used, clique period is always greater than zero)
 					if cliqueCfg := w.chainConfig.Clique; cliqueCfg != nil {
-						minStallPeriod := cliqueCfg.MinStallPeriod
+						minStallPeriod := cliqueCfg[0].MinStallPeriod
 						if minStallPeriod == 0 {
 							minStallPeriod = clique.MinStallPeriod
 						}
-						if headTime+minStallPeriod*cliqueCfg.Period > uint64(time.Now().Unix()) {
+						if headTime+minStallPeriod*cliqueCfg[0].Period > uint64(time.Now().Unix()) {
 							timer.Reset(recommit)
 							continue
 						}
@@ -548,6 +551,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 						timer.Reset(recommit)
 						continue
 					}
+					// MODIFIED by Jakub Pajek END (clique config: variable period)
 					// MODIFIED by Jakub Pajek END (clique voter ring)
 				}
 				commit(true, commitInterruptResubmit)
@@ -685,7 +689,9 @@ func (w *worker) mainLoop() {
 				// Special case, if the consensus engine is 0 period clique(dev mode),
 				// submit sealing work here since all empty submission will be rejected
 				// by clique. Of course the advance sealing(empty submission) is disabled.
-				if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+				// MODIFIED by Jakub Pajek (clique config: variable period)
+				//if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+				if w.chainConfig.Clique != nil && w.chainConfig.Clique[0].Period == 0 {
 					w.commitWork(nil, true, time.Now().Unix())
 				}
 			}

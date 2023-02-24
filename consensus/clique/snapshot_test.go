@@ -424,19 +424,23 @@ func (tt *cliqueTest) run(t *testing.T) {
 
 	// Assemble a chain of headers from the cast votes
 	config := *params.TestChainConfig
-	config.Clique = &params.CliqueConfig{
-		Period: 1,
-		Epoch:  tt.epoch,
-		// ADDED by Jakub Pajek (clique config: block reward)
-		BlockReward: blockReward,
-		// ADDED by Jakub Pajek (clique config: voting rule)
-		VotingRule: votingRule,
-		// ADDED by Jakub Pajek (clique config: min stall period)
-		MinStallPeriod: MinStallPeriod,
-		// ADDED by Jakub Pajek (clique config: min offline time)
-		MinOfflineTime: minOfflineTime,
-		// ADDED by Jakub Pajek (clique config: min strike count)
-		MinStrikeCount: minStrikeCount,
+	// MODIFIED by Jakub Pajek (clique config: variable period)
+	//config.Clique = &params.CliqueConfig{
+	config.Clique = []params.CliqueConfigEntry{
+		{
+			Period: 1,
+			Epoch:  tt.epoch,
+			// ADDED by Jakub Pajek (clique config: block reward)
+			BlockReward: blockReward,
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: votingRule,
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: MinStallPeriod,
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: minOfflineTime,
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: minStrikeCount,
+		},
 	}
 	genesis.Config = &config
 
