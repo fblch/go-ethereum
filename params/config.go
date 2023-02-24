@@ -155,19 +155,23 @@ var (
 		BerlinBlock:         big.NewInt(8_290_928),
 		LondonBlock:         big.NewInt(8_897_988),
 		ArrowGlacierBlock:   nil,
-		Clique: &CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-			// ADDED by Jakub Pajek (clique config: block reward)
-			BlockReward: big.NewInt(0),
-			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: 2, // Set to "majority"
-			// ADDED by Jakub Pajek (clique config: min stall period)
-			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
-			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
-			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
+		// MODIFIED by Jakub Pajek (clique config: variable period)
+		//Clique: &CliqueConfig{
+		Clique: []CliqueConfigEntry{
+			{
+				Period: 15,
+				Epoch:  30000,
+				// ADDED by Jakub Pajek (clique config: block reward)
+				BlockReward: big.NewInt(0),
+				// ADDED by Jakub Pajek (clique config: voting rule)
+				VotingRule: 2, // Set to "majority"
+				// ADDED by Jakub Pajek (clique config: min stall period)
+				MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+				// ADDED by Jakub Pajek (clique config: min offline time)
+				MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+				// ADDED by Jakub Pajek (clique config: min strike count)
+				MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
+			},
 		},
 	}
 
@@ -213,19 +217,23 @@ var (
 		TerminalTotalDifficulty:       big.NewInt(10_790_000),
 		TerminalTotalDifficultyPassed: true,
 		ShanghaiTime:                  newUint64(1678832736),
-		Clique: &CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-			// ADDED by Jakub Pajek (clique config: block reward)
-			BlockReward: big.NewInt(0),
-			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: 2, // Set to "majority"
-			// ADDED by Jakub Pajek (clique config: min stall period)
-			MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
-			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
-			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
+		// MODIFIED by Jakub Pajek (clique config: variable period)
+		//Clique: &CliqueConfig{
+		Clique: []CliqueConfigEntry{
+			{
+				Period: 15,
+				Epoch:  30000,
+				// ADDED by Jakub Pajek (clique config: block reward)
+				BlockReward: big.NewInt(0),
+				// ADDED by Jakub Pajek (clique config: voting rule)
+				VotingRule: 2, // Set to "majority"
+				// ADDED by Jakub Pajek (clique config: min stall period)
+				MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
+				// ADDED by Jakub Pajek (clique config: min offline time)
+				MinOfflineTime: math.MaxUint64 / 2, // Set to some high value to disable
+				// ADDED by Jakub Pajek (clique config: min strike count)
+				MinStrikeCount: math.MaxUint64 / 2, // Set to some high value to disable
+			},
 		},
 	}
 
@@ -317,8 +325,9 @@ var (
 		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
 		// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
 		// MODIFIED by Jakub Pajek (clique config: min strike count)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//Clique:                        &CliqueConfig{Period: 0, Epoch: 30000},
-		Clique: &CliqueConfig{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100},
+		Clique: []CliqueConfigEntry{{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}},
 	}
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
@@ -501,7 +510,9 @@ type ChainConfig struct {
 
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
+	// MODIFIED by Jakub Pajek (clique config: variable period)
+	//Clique *CliqueConfig `json:"clique,omitempty"`
+	Clique CliqueConfig `json:"clique,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -512,8 +523,17 @@ func (c *EthashConfig) String() string {
 	return "ethash"
 }
 
+// MODIFIED by Jakub Pajek (clique config: variable period)
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
-type CliqueConfig struct {
+// type CliqueConfig struct {
+type CliqueConfig []CliqueConfigEntry
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// CliqueConfigEntry is a specific Clique PoA config for up to a given number of sealers.
+type CliqueConfigEntry struct {
+	// ADDED by Jakub Pajek (clique config: variable period)
+	MaxSealerCount uint64 `json:"maxSealerCount"` // Maximum number of sealers up to which the config entry applies
+
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
 
