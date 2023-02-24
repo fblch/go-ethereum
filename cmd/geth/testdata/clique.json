@@ -8,7 +8,7 @@
     "byzantiumBlock": 0,
     "constantinopleBlock": 0,
     "petersburgBlock": 0,
-    "clique": {
+    "clique": [{
       "period": 5,
       "epoch": 30000,
       "blockReward": 1000000000000000000,
@@ -16,7 +16,7 @@
       "minStallPeriod": 4,
       "minOfflineTime": 2678400,
       "minStrikeCount": 100
-    }
+    }]
   },
   "difficulty": "1",
   "gasLimit": "8000000",
