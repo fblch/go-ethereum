@@ -295,8 +295,11 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 		conf[0].MinStrikeCount = minStrikeCount
 	}
 	for i := 1; i < len(conf); i++ {
-		if conf[i].MaxSealerCount == 0 || conf[i].MaxSealerCount <= conf[i-1].MaxSealerCount {
-			panic(errors.New("sealer count in clique config must be strictly increasing"))
+		if conf[i].MaxSealerCount == 0 {
+			conf[i].MaxSealerCount = math.MaxUint64
+		}
+		if conf[i].MaxSealerCount <= conf[i-1].MaxSealerCount {
+			panic(errors.New("maximum sealer count in clique config must be strictly increasing"))
 		}
 		if conf[i].Epoch == 0 {
 			conf[i].Epoch = conf[i-1].Epoch
