@@ -81,19 +81,23 @@ func init() {
 	*ethashChainConfig = *params.TestChainConfig
 	cliqueChainConfig = new(params.ChainConfig)
 	*cliqueChainConfig = *params.TestChainConfig
-	cliqueChainConfig.Clique = &params.CliqueConfig{
-		Period: 10,
-		Epoch:  30000,
-		// ADDED by Jakub Pajek (clique config: block reward)
-		BlockReward: big.NewInt(1e+18),
-		// ADDED by Jakub Pajek (clique config: voting rule)
-		VotingRule: 2, // Set to "majority"
-		// ADDED by Jakub Pajek (clique config: min stall period)
-		MinStallPeriod: 4, // Set to four times the block period
-		// ADDED by Jakub Pajek (clique config: min offline time)
-		MinOfflineTime: 86400 * 31, // Set to 31 days
-		// ADDED by Jakub Pajek (clique config: min strike count)
-		MinStrikeCount: 100,
+	// MODIFIED by Jakub Pajek (clique config: variable period)
+	//cliqueChainConfig.Clique = &params.CliqueConfig{
+	cliqueChainConfig.Clique = []params.CliqueConfigEntry{
+		{
+			Period: 10,
+			Epoch:  30000,
+			// ADDED by Jakub Pajek (clique config: block reward)
+			BlockReward: big.NewInt(1e+18),
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: 2, // Set to "majority"
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: 4, // Set to four times the block period
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: 86400 * 31, // Set to 31 days
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: 100,
+		},
 	}
 
 	signer := types.LatestSigner(params.TestChainConfig)
@@ -249,8 +253,9 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
 		// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
 		// MODIFIED by Jakub Pajek (clique config: min strike count)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
-		chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}
+		chainConfig.Clique = []params.CliqueConfigEntry{{Period: 1, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}}
 		engine = clique.New(chainConfig.Clique, db)
 	} else {
 		chainConfig = *params.AllEthashProtocolChanges
