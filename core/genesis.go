@@ -580,19 +580,23 @@ func DefaultSepoliaGenesisBlock() *Genesis {
 func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
-	config.Clique = &params.CliqueConfig{
-		Period: period,
-		Epoch:  config.Clique.Epoch,
-		// ADDED by Jakub Pajek (clique config: block reward)
-		BlockReward: config.Clique.BlockReward,
-		// ADDED by Jakub Pajek (clique config: voting rule)
-		VotingRule: config.Clique.VotingRule,
-		// ADDED by Jakub Pajek (clique config: min stall period)
-		MinStallPeriod: config.Clique.MinStallPeriod,
-		// ADDED by Jakub Pajek (clique config: min offline time)
-		MinOfflineTime: config.Clique.MinOfflineTime,
-		// ADDED by Jakub Pajek (clique config: min strike count)
-		MinStrikeCount: config.Clique.MinStrikeCount,
+	// MODIFIED by Jakub Pajek (clique config: variable period)
+	//config.Clique = &params.CliqueConfig{
+	config.Clique = []params.CliqueConfigEntry{
+		{
+			Period: period,
+			Epoch:  config.Clique[0].Epoch,
+			// ADDED by Jakub Pajek (clique config: block reward)
+			BlockReward: config.Clique[0].BlockReward,
+			// ADDED by Jakub Pajek (clique config: voting rule)
+			VotingRule: config.Clique[0].VotingRule,
+			// ADDED by Jakub Pajek (clique config: min stall period)
+			MinStallPeriod: config.Clique[0].MinStallPeriod,
+			// ADDED by Jakub Pajek (clique config: min offline time)
+			MinOfflineTime: config.Clique[0].MinOfflineTime,
+			// ADDED by Jakub Pajek (clique config: min strike count)
+			MinStrikeCount: config.Clique[0].MinStrikeCount,
+		},
 	}
 
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
