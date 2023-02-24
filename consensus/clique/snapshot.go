@@ -58,8 +58,8 @@ type Signer struct {
 
 // Snapshot is the state of the authorization voting at a given point in time.
 type Snapshot struct {
-	config   *params.CliqueConfig // Consensus engine parameters to fine tune behavior
-	sigcache *lru.ARCCache        // Cache of recent block signatures to speed up ecrecover
+	config   params.CliqueConfig // Consensus engine parameters to fine tune behavior
+	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
 
 	Number    uint64                    `json:"number"`    // Block number where the snapshot was created
 	Hash      common.Hash               `json:"hash"`      // Block hash where the snapshot was created
@@ -81,7 +81,7 @@ func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the signers most recently signed blocks, so only ever
 // use it for the genesis block.
-func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
+func newGenesisSnapshot(config params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
 	snap := &Snapshot{
 		config:    config,
 		sigcache:  sigcache,
@@ -103,7 +103,7 @@ func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, num
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
+func loadSnapshot(config params.CliqueConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
 	blob, err := db.Get(append([]byte("clique-"), hash[:]...))
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (s *Snapshot) store(db ethdb.Database) error {
 	return db.Put(append([]byte("clique-"), s.Hash[:]...), blob)
 }
 
-// copy creates a deep copy of the snapshot, though not the individual votes.
+// copy creates a deep copy of the snapshot, though not the config nor the individual votes.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
 		config:    s.config,
@@ -241,7 +241,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 	for i, header := range headers {
 		// Remove any votes on checkpoint blocks
 		number := header.Number.Uint64()
-		if number%s.config.Epoch == 0 {
+		if number%s.config[0].Epoch == 0 {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
@@ -375,7 +375,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 
 		// If a vote is cast...
 		extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
-		if number%s.config.Epoch != 0 && extraBytes > 0 {
+		if number%s.config[0].Epoch != 0 && extraBytes > 0 {
 			// ...check the signer against voters
 			if _, ok := snap.Voters[signer]; !ok {
 				return nil, errUnauthorizedVoter
@@ -422,7 +422,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				// If the vote passed, update the list of voters/signers.
 				// Vote passes if the number of proposals exceeds the effective vote threshold.
 				// Effective vote threshold: vote_threshold = voter_count / voting_rule
-				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/s.config.VotingRule {
+				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/s.config[0].VotingRule {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
 						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
@@ -629,11 +629,11 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 // we decide to drop the signer.
 func (s *Snapshot) calcStrikeThreshold(signerCount uint64) uint64 {
 	var strikeThreshold uint64 = math.MaxUint64
-	if s.config.Period > 0 {
-		strikeThreshold = s.config.MinOfflineTime / s.config.Period / signerCount
+	if s.config[0].Period > 0 {
+		strikeThreshold = s.config[0].MinOfflineTime / s.config[0].Period / signerCount
 	}
-	if strikeThreshold < s.config.MinStrikeCount {
-		return s.config.MinStrikeCount
+	if strikeThreshold < s.config[0].MinStrikeCount {
+		return s.config[0].MinStrikeCount
 	}
 	return strikeThreshold
 }

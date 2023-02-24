@@ -534,7 +534,9 @@ func (lc *LightChain) SyncCheckpoint(ctx context.Context, checkpoint *params.Tru
 	//if clique := lc.hc.Config().Clique; clique != nil {
 	if cliqueCfg := lc.hc.Config().Clique; cliqueCfg != nil {
 		//latest -= latest % clique.Epoch // epoch snapshot for clique
-		cliqueEpoch := cliqueCfg.Epoch
+		// MODIFIED by Jakub Pajek (clique config: variable period)
+		// What happens if epoch config changes with the number of sealers?
+		cliqueEpoch := cliqueCfg[0].Epoch
 		if cliqueEpoch == 0 {
 			cliqueEpoch = clique.EpochLength
 		}

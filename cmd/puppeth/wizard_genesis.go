@@ -74,46 +74,56 @@ func (w *wizard) makeGenesis() {
 	case choice == "" || choice == "2":
 		// In the case of clique, configure the consensus parameters
 		genesis.Difficulty = big.NewInt(1)
-		genesis.Config.Clique = &params.CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-			// ADDED by Jakub Pajek (clique config: block reward)
-			BlockReward: big.NewInt(1e+18),
-			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: 2, // Set to "majority"
-			// ADDED by Jakub Pajek (clique config: min stall period)
-			MinStallPeriod: 4, // Set to four times the block period
-			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: 86400 * 31, // Set to 31 days
-			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: 100,
+		// MODIFIED by Jakub Pajek (clique config: variable period)
+		//genesis.Config.Clique = &params.CliqueConfig{
+		genesis.Config.Clique = []params.CliqueConfigEntry{
+			{
+				Period: 15,
+				Epoch:  30000,
+				// ADDED by Jakub Pajek (clique config: block reward)
+				BlockReward: big.NewInt(1e+18),
+				// ADDED by Jakub Pajek (clique config: voting rule)
+				VotingRule: 2, // Set to "majority"
+				// ADDED by Jakub Pajek (clique config: min stall period)
+				MinStallPeriod: 4, // Set to four times the block period
+				// ADDED by Jakub Pajek (clique config: min offline time)
+				MinOfflineTime: 86400 * 31, // Set to 31 days
+				// ADDED by Jakub Pajek (clique config: min strike count)
+				MinStrikeCount: 100,
+			},
 		}
 		fmt.Println()
 		fmt.Println("How many seconds should blocks take? (default = 15)")
-		genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
+		// MODIFIED by Jakub Pajek (clique config: variable period)
+		//genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
+		genesis.Config.Clique[0].Period = uint64(w.readDefaultInt(15))
 
 		// ADDED by Jakub Pajek (clique config: voting rule)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		fmt.Println()
 		fmt.Println("Proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc. (default = 2)")
-		genesis.Config.Clique.VotingRule = w.readDefaultInt(2)
-		if genesis.Config.Clique.VotingRule < 1 {
-			genesis.Config.Clique.VotingRule = 2
+		genesis.Config.Clique[0].VotingRule = w.readDefaultInt(2)
+		if genesis.Config.Clique[0].VotingRule < 1 {
+			genesis.Config.Clique[0].VotingRule = 2
 		}
 
 		// ADDED by Jakub Pajek (clique config: min stall period)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		fmt.Println()
 		fmt.Println("Minimal stall period given in multiples of the block period? (default = 4)")
-		genesis.Config.Clique.MinStallPeriod = uint64(w.readDefaultInt(4))
+		genesis.Config.Clique[0].MinStallPeriod = uint64(w.readDefaultInt(4))
 
 		// ADDED by Jakub Pajek (clique config: min offline time)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		fmt.Println()
 		fmt.Println("Minimal offline time given in days? (default = 31)")
-		genesis.Config.Clique.MinOfflineTime = uint64(86400 * w.readDefaultInt(31))
+		genesis.Config.Clique[0].MinOfflineTime = uint64(86400 * w.readDefaultInt(31))
 
 		// ADDED by Jakub Pajek (clique config: min strike count)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		fmt.Println()
 		fmt.Println("Minimal strike count? (default = 100)")
-		genesis.Config.Clique.MinStrikeCount = uint64(w.readDefaultInt(100))
+		genesis.Config.Clique[0].MinStrikeCount = uint64(w.readDefaultInt(100))
 
 		// We also need the initial list of signers
 		fmt.Println()
