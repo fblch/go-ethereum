@@ -338,13 +338,15 @@ func (beacon *Beacon) Prepare(chain consensus.ChainHeaderReader, header *types.H
 
 // Finalize implements consensus.Engine and processes withdrawals on top.
 // MODIFIED by Jakub Pajek (clique static block rewards)
+// MODIFIED by Jakub Pajek (clique config: variable period)
 // func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal) {
-func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) {
+func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) error {
 	if !beacon.IsPoSHeader(header) {
 		// MODIFIED by Jakub Pajek (clique static block rewards)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//beacon.ethone.Finalize(chain, header, state, txs, uncles, nil)
-		beacon.ethone.Finalize(chain, header, state, txs, uncles, nil, dummy)
-		return
+		//return
+		return beacon.ethone.Finalize(chain, header, state, txs, uncles, nil, dummy)
 	}
 	// Withdrawals processing.
 	for _, w := range withdrawals {
@@ -354,6 +356,8 @@ func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.
 		state.AddBalance(w.Address, amount)
 	}
 	// No block reward which is issued by consensus layer instead.
+	// ADDED by Jakub Pajek (clique config: variable period)
+	return nil
 }
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and
@@ -429,6 +433,13 @@ func (beacon *Beacon) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 // Close shutdowns the consensus engine
 func (beacon *Beacon) Close() error {
 	return beacon.ethone.Close()
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// EthOneEngine implements consensus.PoS, retrieving the original consensus engine
+// used in eth1, e.g. ethash or clique.
+func (beacon *Beacon) EthOneEngine() consensus.Engine {
+	return beacon.ethone
 }
 
 // IsPoSHeader reports the header belongs to the PoS-stage with some special fields.

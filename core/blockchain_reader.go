@@ -423,3 +423,9 @@ func (bc *BlockChain) SubscribeCanonicalBlockEvent(ch chan<- CanonicalBlockEvent
 func (bc *BlockChain) SubscribeLostBlockEvent(ch chan<- LostBlockEvent) event.Subscription {
 	return bc.scope.Track(bc.lostBlockFeed.Subscribe(ch))
 }
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// IsStub returns true when using a stub chain header reader during tests
+func (hc *BlockChain) IsStub() bool {
+	return false
+}

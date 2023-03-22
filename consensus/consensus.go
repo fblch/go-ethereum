@@ -30,6 +30,10 @@ import (
 // ChainHeaderReader defines a small collection of methods needed to access the local
 // blockchain during header verification.
 type ChainHeaderReader interface {
+	// ADDED by Jakub Pajek (clique config: variable period)
+	// IsStub returns true when using a stub chain header reader during tests
+	IsStub() bool
+
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
 
@@ -91,8 +95,9 @@ type Engine interface {
 	// that happen at finalization (e.g. block rewards).
 	Finalize(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 		// MODIFIED by Jakub Pajek (clique static block rewards)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//uncles []*types.Header, withdrawals []*types.Withdrawal)
-		uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool)
+		uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) error
 
 	// FinalizeAndAssemble runs any post-transaction state modifications (e.g. block
 	// rewards or process withdrawals) and assembles the final block.
@@ -131,4 +136,29 @@ type PoW interface {
 
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// PoASnapshot is a snapshot of a consensus engine based on proof-of-authority.
+type PoASnapshot interface {
+	// CurrentConfig returns the current config entry of a consensus engine.
+	CurrentConfig() *params.CliqueConfigEntry
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// PoA is a consensus engine based on proof-of-authority.
+type PoA interface {
+	Engine
+
+	// Snapshot retrieves the authorization snapshot at a given point in time.
+	Snapshot(chain ChainHeaderReader, number uint64, hash common.Hash, parents []*types.Header) (PoASnapshot, error)
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// PoS is a consensus engine based on proof-of-stake.
+type PoS interface {
+	Engine
+
+	// EthOneEngine retrieves the original consensus engine used in eth1, e.g. ethash or clique.
+	EthOneEngine() Engine
 }

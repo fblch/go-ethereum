@@ -438,6 +438,9 @@ func (cr *fakeChainReader) Config() *params.ChainConfig {
 	return cr.config
 }
 
+// ADDED by Jakub Pajek (clique config: variable period)
+// IsStub returns true when using a stub chain header reader during tests
+func (cr *fakeChainReader) IsStub() bool                                            { return true }
 func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
 func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
