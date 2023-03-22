@@ -538,7 +538,7 @@ type CliqueConfig []CliqueConfigEntry
 // CliqueConfigEntry is a specific Clique PoA config for up to a given number of sealers.
 type CliqueConfigEntry struct {
 	// ADDED by Jakub Pajek (clique config: variable period)
-	MaxSealerCount uint64 `json:"maxSealerCount"` // Maximum number of sealers up to which the config entry applies
+	MaxSealerCount int `json:"maxSealerCount"` // Maximum number of sealers up to which the config entry applies
 
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
@@ -548,7 +548,7 @@ type CliqueConfigEntry struct {
 
 	// ADDED by Jakub Pajek (clique config: voting rule)
 	// A voting rule, i.e. proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc.
-	// The value (after replacing 1 with MaxUint64) is used as a denominator when calculating the effective vote threshold.
+	// The value (after replacing 1 with MaxInt) is used as a denominator when calculating the effective vote threshold.
 	// Effective vote threshold: vote_threshold = voter_count / voting_rule
 	VotingRule int `json:"votingRule"`
 

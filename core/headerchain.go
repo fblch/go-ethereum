@@ -694,3 +694,9 @@ func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }
 func (hc *HeaderChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return nil
 }
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// IsStub returns true when using a stub chain header reader during tests
+func (hc *HeaderChain) IsStub() bool {
+	return false
+}
