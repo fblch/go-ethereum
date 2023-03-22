@@ -27,7 +27,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -468,8 +467,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		interrupt   *int32
 		minRecommit = recommit // minimal resubmit interval specified by user.
 		timestamp   int64      // timestamp for each round of sealing.
-		// ADDED by Jakub Pajek (clique voter ring)
-		headTime uint64 // timestamp of the latest block
 	)
 
 	timer := time.NewTimer(0)
@@ -504,22 +501,12 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	for {
 		select {
 		case <-w.startCh:
-			// MODIFIED by Jakub Pajek BEG (clique voter ring)
-			//clearPending(w.chain.CurrentBlock().NumberU64())
-			headBlock := w.chain.CurrentBlock()
-			clearPending(headBlock.NumberU64())
-			headTime = headBlock.Time()
-			// MODIFIED by Jakub Pajek END (clique voter ring)
+			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
-			// MODIFIED by Jakub Pajek BEG (clique voter ring)
-			//clearPending(head.Block.NumberU64())
-			headBlock := head.Block
-			clearPending(headBlock.NumberU64())
-			headTime = headBlock.Time()
-			// MODIFIED by Jakub Pajek END (clique voter ring)
+			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
@@ -527,35 +514,46 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			// MEMO by Jakub Pajek (clique special case)
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			// MODIFIED by Jakub Pajek (clique config: variable period)
-			//if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
-			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique[0].Period > 0) {
-				// Short circuit if no new transaction arrives.
-				if atomic.LoadInt32(&w.newTxs) == 0 {
-					// MODIFIED by Jakub Pajek BEG (clique voter ring)
-					// MODIFIED by Jakub Pajek BEG (clique config: variable period)
-					//timer.Reset(recommit)
-					//continue
-					// Do not short circut if enough stall occured to switch to voter ring.
-					// (If we are here and clique is used, clique period is always greater than zero)
-					if cliqueCfg := w.chainConfig.Clique; cliqueCfg != nil {
-						minStallPeriod := cliqueCfg[0].MinStallPeriod
-						if minStallPeriod == 0 {
-							minStallPeriod = clique.MinStallPeriod
-						}
-						if headTime+minStallPeriod*cliqueCfg[0].Period > uint64(time.Now().Unix()) {
-							timer.Reset(recommit)
-							continue
-						}
-					} else {
+			// MODIFIED by Jakub Pajek BEG (clique voter ring)
+			// MODIFIED by Jakub Pajek BEG (clique config: variable period)
+			/*
+				if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+					// Short circuit if no new transaction arrives.
+					if atomic.LoadInt32(&w.newTxs) == 0 {
 						timer.Reset(recommit)
 						continue
 					}
-					// MODIFIED by Jakub Pajek END (clique config: variable period)
-					// MODIFIED by Jakub Pajek END (clique voter ring)
+					commit(true, commitInterruptResubmit)
 				}
-				commit(true, commitInterruptResubmit)
+			*/
+			if w.isRunning() {
+				var cliqueCfg *params.CliqueConfigEntry
+				var headTime uint64
+				if poa := w.poaEngine(); poa != nil {
+					headBlock := w.chain.CurrentBlock()
+					snap, err := poa.Snapshot(w.chain, headBlock.NumberU64(), headBlock.Hash(), nil)
+					if err != nil {
+						log.Error("Failed to get clique shapshot", "number", headBlock.Number(), "hash", headBlock.Hash(), "err", err)
+						continue
+					}
+					cliqueCfg = snap.CurrentConfig()
+					headTime = headBlock.Time()
+				}
+				if cliqueCfg == nil || cliqueCfg.Period > 0 {
+					// Short circuit if no new transaction arrives.
+					if atomic.LoadInt32(&w.newTxs) == 0 {
+						// Do not short circut if enough stall occured to switch to the voter ring.
+						// (If we are here and clique is used, clique period is always greater than zero)
+						if cliqueCfg == nil || headTime+cliqueCfg.MinStallPeriod*cliqueCfg.Period > uint64(time.Now().Unix()) {
+							timer.Reset(recommit)
+							continue
+						}
+					}
+					commit(true, commitInterruptResubmit)
+				}
 			}
+			// MODIFIED by Jakub Pajek END (clique config: variable period)
+			// MODIFIED by Jakub Pajek END (clique voter ring)
 
 		case interval := <-w.resubmitIntervalCh:
 			// Adjust resubmit interval explicitly by user.
@@ -689,11 +687,22 @@ func (w *worker) mainLoop() {
 				// Special case, if the consensus engine is 0 period clique(dev mode),
 				// submit sealing work here since all empty submission will be rejected
 				// by clique. Of course the advance sealing(empty submission) is disabled.
-				// MODIFIED by Jakub Pajek (clique config: variable period)
-				//if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
-				if w.chainConfig.Clique != nil && w.chainConfig.Clique[0].Period == 0 {
-					w.commitWork(nil, true, time.Now().Unix())
+				// MODIFIED by Jakub Pajek BEG (clique config: variable period)
+				/*
+					if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+						w.commitWork(nil, true, time.Now().Unix())
+					}
+				*/
+				if poa := w.poaEngine(); poa != nil {
+					chainHead := w.chain.CurrentBlock()
+					snap, err := poa.Snapshot(w.chain, chainHead.NumberU64(), chainHead.Hash(), nil)
+					if err != nil {
+						log.Error("Failed to get clique shapshot", "number", chainHead.Number(), "hash", chainHead.Hash(), "err", err)
+					} else if snap.CurrentConfig().Period == 0 {
+						w.commitWork(nil, true, time.Now().Unix())
+					}
 				}
+				// MODIFIED by Jakub Pajek END (clique config: variable period)
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
 
@@ -708,6 +717,21 @@ func (w *worker) mainLoop() {
 			return
 		}
 	}
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// poaEngine returns the PoA consensus engine, or nil if PoW or PoS is being used.
+func (w *worker) poaEngine() consensus.PoA {
+	if w.chainConfig.Clique != nil {
+		if pos, ok := w.engine.(consensus.PoS); ok {
+			if poa, ok := pos.EthOneEngine().(consensus.PoA); ok {
+				return poa
+			}
+		} else if poa, ok := w.engine.(consensus.PoA); ok {
+			return poa
+		}
+	}
+	return nil
 }
 
 // taskLoop is a standalone goroutine to fetch sealing task from the generator and
