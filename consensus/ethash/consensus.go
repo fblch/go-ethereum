@@ -600,10 +600,12 @@ func (ethash *Ethash) Prepare(chain consensus.ChainHeaderReader, header *types.H
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards.
 // MODIFIED by Jakub Pajek (clique static block rewards)
+// MODIFIED by Jakub Pajek (clique config: variable period)
 // func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal) {
-func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) {
+func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) error {
 	// Accumulate any block and uncle rewards
 	accumulateRewards(chain.Config(), state, header, uncles)
+	return nil
 }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
