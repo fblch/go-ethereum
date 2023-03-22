@@ -23,6 +23,12 @@ func newMockChain() *mockChain {
 	}
 }
 
+// ADDED by Jakub Pajek (clique config: variable period)
+// IsStub returns true when using a stub chain header reader during tests
+func (m *mockChain) IsStub() bool {
+	return true
+}
+
 func (m *mockChain) Config() *params.ChainConfig {
 	return m.config
 }

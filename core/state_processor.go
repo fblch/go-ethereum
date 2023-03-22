@@ -89,8 +89,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	// MODIFIED by Jakub Pajek (clique static block rewards)
+	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles())
-	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), false)
+	if err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), false); err != nil {
+		return nil, nil, 0, err
+	}
 
 	return receipts, allLogs, *usedGas, nil
 }

@@ -19,6 +19,7 @@ package clique
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"math"
 	"math/big"
 	"sort"
@@ -63,6 +64,7 @@ type Snapshot struct {
 
 	Number    uint64                    `json:"number"`    // Block number where the snapshot was created
 	Hash      common.Hash               `json:"hash"`      // Block hash where the snapshot was created
+	ConfigIdx int                       `json:"configIdx"` // Index of the current config entry inside the config array
 	VoterRing bool                      `json:"voterRing"` // Flag to indicate the ring in which blocks are signed (the sealer ring or the voter ring)
 	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their most recently signed block
 	Signers   map[common.Address]Signer `json:"signers"`   // Set of authorized signers at this moment and their state
@@ -87,6 +89,7 @@ func newGenesisSnapshot(config params.CliqueConfig, sigcache *lru.ARCCache, numb
 		sigcache:  sigcache,
 		Number:    number,
 		Hash:      hash,
+		ConfigIdx: 0,
 		VoterRing: false,
 		Voters:    make(map[common.Address]uint64),
 		Signers:   make(map[common.Address]Signer),
@@ -112,6 +115,9 @@ func loadSnapshot(config params.CliqueConfig, sigcache *lru.ARCCache, db ethdb.D
 	if err := json.Unmarshal(blob, snap); err != nil {
 		return nil, err
 	}
+	if snap.ConfigIdx >= len(config) {
+		return nil, errors.New("config index out of range")
+	}
 	snap.config = config
 	snap.sigcache = sigcache
 
@@ -134,6 +140,7 @@ func (s *Snapshot) copy() *Snapshot {
 		sigcache:  s.sigcache,
 		Number:    s.Number,
 		Hash:      s.Hash,
+		ConfigIdx: s.ConfigIdx,
 		VoterRing: s.VoterRing,
 		Voters:    make(map[common.Address]uint64),
 		Signers:   make(map[common.Address]Signer),
@@ -215,8 +222,12 @@ func (s *Snapshot) uncast(address common.Address, proposal uint64) bool {
 	return true
 }
 
-// apply creates a new authorization snapshot by applying the given headers to
-// the original one.
+// apply creates a new authorization snapshot by applying the given headers to the original one.
+// For each applied header, the processing order is as follows:
+//   - If necessary, switch between the sealer and the voter ring
+//   - If in the sealer ring, apply offline penalties (drop inactive signers)
+//   - If any votes are cast, process the votes
+//   - Update the current config entry index based on the final sealer count
 func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
@@ -231,17 +242,20 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 	if headers[0].Number.Uint64() != s.Number+1 {
 		return nil, errInvalidVotingChain
 	}
-	// Iterate through the headers and create a new snapshot
-	snap := s.copy()
 
+	// Iterate through the headers and create a new snapshot
 	var (
+		snap   = s.copy()
 		start  = time.Now()
 		logged = time.Now()
 	)
 	for i, header := range headers {
+		var (
+			currConfig = snap.CurrentConfig()
+			number     = header.Number.Uint64()
+		)
 		// Remove any votes on checkpoint blocks
-		number := header.Number.Uint64()
-		if number%s.config[0].Epoch == 0 {
+		if number%currConfig.Epoch == 0 {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
@@ -335,8 +349,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		// If in the sealer ring, apply offline penalties (drop inactive signers)
 		if !snap.VoterRing {
 			// Select the next signer in turn based on the current block number, and check it's activity
-			signerCount := uint64(len(snap.Signers))
-			address := snap.signers()[number%signerCount]
+			address := snap.signers()[number%uint64(len(snap.Signers))]
 			if signed, _ := snap.Signers[address]; signed.SignedCount > 0 {
 				// The signer signed at least one new block since the last check.
 				// Decrease the strike count, zero out the signed block count, save the state.
@@ -354,7 +367,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				snap.Signers[address] = signed
 				// If the strike count exceeded threshold, drop the signer from authorized signers.
 				// This does not apply to voters. Voters can only be removed thru explicit voting.
-				if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold(signerCount) {
+				if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold() {
 					// Delete the signer from authorized signers
 					delete(snap.Signers, address)
 					// Add the signer to dropped signers
@@ -373,22 +386,25 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			}
 		}
 
-		// If a vote is cast...
+		// If any votes are cast, process the votes
 		extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
-		if number%s.config[0].Epoch != 0 && extraBytes > 0 {
-			// ...check the signer against voters
+		if number%currConfig.Epoch != 0 && extraBytes > 0 {
+			// Check the signer against voters
 			if _, ok := snap.Voters[signer]; !ok {
 				return nil, errUnauthorizedVoter
 			}
-
-			// For every vote...
+			// Calculate the effective vote threshold at the beginning of vote processing
+			// (Voter count might change later due to passed votes)
+			// Effective vote threshold: vote_threshold = voter_count / voting_rule
+			voteThreshold := len(snap.Voters) / currConfig.VotingRule
+			// Process every vote
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
 				index := ExtraVanity + voteIdx*(common.AddressLength+1)
 				var address common.Address
 				copy(address[:], header.Extra[index:])
 
-				// Header authorized, discard any previous votes from the voter
+				// Discard any previous votes from the voter
 				for i, vote := range snap.Votes {
 					if vote.Voter == signer && vote.Address == address {
 						// Uncast the vote from the cached tally
@@ -421,8 +437,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				}
 				// If the vote passed, update the list of voters/signers.
 				// Vote passes if the number of proposals exceeds the effective vote threshold.
-				// Effective vote threshold: vote_threshold = voter_count / voting_rule
-				if tally := snap.Tally[address]; tally.Votes > len(snap.Voters)/s.config[0].VotingRule {
+				if tally := snap.Tally[address]; tally.Votes > voteThreshold {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
 						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
@@ -468,6 +483,15 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				logged = time.Now()
 			}
 		}
+
+		// Update the current config entry index based on the final sealer count.
+		// The last entry's MaxSealerCount is always MaxInt, so the for loop will always break.
+		for i := range snap.config {
+			if len(snap.Signers) <= snap.config[i].MaxSealerCount {
+				snap.ConfigIdx = i
+				break
+			}
+		}
 	}
 	if time.Since(start) > 8*time.Second {
 		log.Info("Reconstructed voting history", "processed", len(headers), "elapsed", common.PrettyDuration(time.Since(start)))
@@ -476,6 +500,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 	snap.Hash = headers[len(headers)-1].Hash()
 
 	return snap, nil
+}
+
+// CurrentConfig implements consensus.PoASnapshot,
+// returning the current config entry of a consensus engine.
+func (s *Snapshot) CurrentConfig() *params.CliqueConfigEntry {
+	return &s.config[s.ConfigIdx]
 }
 
 // voters retrieves the list of authorized voters in ascending order.
@@ -619,7 +649,8 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 }
 
 // calcStrikeThreshold returns the strike threshold above which inactive signers are excluded
-// from the authorized signers. The value of this threshold depends on the current signer count.
+// from the authorized signers. The value of this threshold depends on the current config and
+// the current signer count.
 //
 // The lower the signer count, the higher the threshold value, in order to assure that we do not
 // drop the offline signer too soon. The signer must be offline for at least minStrikeThreshold
@@ -627,13 +658,15 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 // The higher the signer count, the lower the threshold value, however the threshold value will
 // not drop below minStrikeThreshold in order to assure that enough samples are gathered before
 // we decide to drop the signer.
-func (s *Snapshot) calcStrikeThreshold(signerCount uint64) uint64 {
-	var strikeThreshold uint64 = math.MaxUint64
-	if s.config[0].Period > 0 {
-		strikeThreshold = s.config[0].MinOfflineTime / s.config[0].Period / signerCount
+func (s *Snapshot) calcStrikeThreshold() uint64 {
+	currConfig := s.CurrentConfig()
+	signerCount := uint64(len(s.Signers))
+	strikeThreshold := uint64(math.MaxUint64)
+	if currConfig.Period > 0 {
+		strikeThreshold = currConfig.MinOfflineTime / currConfig.Period / signerCount
 	}
-	if strikeThreshold < s.config[0].MinStrikeCount {
-		return s.config[0].MinStrikeCount
+	if strikeThreshold < currConfig.MinStrikeCount {
+		return currConfig.MinStrikeCount
 	}
 	return strikeThreshold
 }

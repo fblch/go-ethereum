@@ -325,19 +325,23 @@ func (beacon *Beacon) Prepare(chain consensus.ChainHeaderReader, header *types.H
 
 // Finalize implements consensus.Engine, setting the final state on the header
 // MODIFIED by Jakub Pajek (clique static block rewards)
+// MODIFIED by Jakub Pajek (clique config: variable period)
 //func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
-func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, dummy bool) {
+func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, dummy bool) error {
 	// Finalize is different with Prepare, it can be used in both block generation
 	// and verification. So determine the consensus rules by header type.
 	if !beacon.IsPoSHeader(header) {
 		// MODIFIED by Jakub Pajek (clique static block rewards)
+		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//beacon.ethone.Finalize(chain, header, state, txs, uncles)
-		beacon.ethone.Finalize(chain, header, state, txs, uncles, dummy)
-		return
+		//return
+		return beacon.ethone.Finalize(chain, header, state, txs, uncles, dummy)
 	}
 	// The block reward is no longer handled here. It's done by the
 	// external consensus engine.
 	header.Root = state.IntermediateRoot(true)
+	// ADDED by Jakub Pajek (clique config: variable period)
+	return nil
 }
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and
@@ -399,6 +403,13 @@ func (beacon *Beacon) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 // Close shutdowns the consensus engine
 func (beacon *Beacon) Close() error {
 	return beacon.ethone.Close()
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// EthOneEngine implements consensus.PoS, retrieving the original consensus engine
+// used in eth1, e.g. ethash or clique.
+func (beacon *Beacon) EthOneEngine() consensus.Engine {
+	return beacon.ethone
 }
 
 // IsPoSHeader reports the header belongs to the PoS-stage with some special fields.
