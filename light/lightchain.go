@@ -541,7 +541,7 @@ func (lc *LightChain) SyncCheckpoint(ctx context.Context, checkpoint *params.Tru
 	if cliqueCfg := lc.hc.Config().Clique; cliqueCfg != nil {
 		//latest -= latest % clique.Epoch // epoch snapshot for clique
 		// MODIFIED by Jakub Pajek (clique config: variable period)
-		// What happens if epoch config changes with the number of sealers?
+		// How to handle variable epoch changing with the number of sealers?
 		cliqueEpoch := cliqueCfg[0].Epoch
 		if cliqueEpoch == 0 {
 			cliqueEpoch = clique.EpochLength
@@ -626,4 +626,10 @@ func (lc *LightChain) DisableCheckFreq() {
 // EnableCheckFreq enables header validation.
 func (lc *LightChain) EnableCheckFreq() {
 	atomic.StoreInt32(&lc.disableCheckFreq, 0)
+}
+
+// ADDED by Jakub Pajek (clique config: variable period)
+// IsStub returns true when using a stub chain header reader during tests
+func (hc *LightChain) IsStub() bool {
+	return false
 }
