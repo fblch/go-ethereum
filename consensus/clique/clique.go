@@ -502,10 +502,11 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	// If the block is a checkpoint block, verify the permissions list
 	if checkpoint {
 		permissions := make([]byte, len(snap.Signers)*(common.AddressLength+1))
-		for i, authorizedSigner := range snap.signers() {
+		authorizedSigners := snap.signers()
+		for i := 0; i < len(authorizedSigners); i++ {
 			index := i * (common.AddressLength + 1)
-			copy(permissions[index:], authorizedSigner[:])
-			if _, ok := snap.Voters[authorizedSigner]; ok {
+			copy(permissions[index:], authorizedSigners[i][:])
+			if _, ok := snap.Voters[authorizedSigners[i]]; ok {
 				permissions[index+common.AddressLength] = ExtraVoterMarker
 			} else {
 				permissions[index+common.AddressLength] = ExtraSignerMarker
@@ -781,9 +782,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	// If the block is a checkpoint, include permissions list.
 	// Otherwise, if the signer is a voter, cast all valid votes.
 	if number%currConfig.Epoch == 0 {
-		for _, authorizedSigner := range snap.signers() {
-			header.Extra = append(header.Extra, authorizedSigner[:]...)
-			if _, ok := snap.Voters[authorizedSigner]; ok {
+		authorizedSigners := snap.signers()
+		for i := 0; i < len(authorizedSigners); i++ {
+			header.Extra = append(header.Extra, authorizedSigners[i][:]...)
+			if _, ok := snap.Voters[authorizedSigners[i]]; ok {
 				header.Extra = append(header.Extra, ExtraVoterMarker)
 			} else {
 				header.Extra = append(header.Extra, ExtraSignerMarker)
@@ -816,13 +818,14 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 			}
 		}
 		// If there's pending proposals, cast votes on them
-		for _, address := range addresses {
-			header.Extra = append(header.Extra, address[:]...)
-			if c.proposals[address].Proposal == proposalVoterVote {
+		for i := range addresses {
+			header.Extra = append(header.Extra, addresses[i][:]...)
+			switch c.proposals[addresses[i]].Proposal {
+			case proposalVoterVote:
 				header.Extra = append(header.Extra, ExtraVoterVote)
-			} else if c.proposals[address].Proposal == proposalSignerVote {
+			case proposalSignerVote:
 				header.Extra = append(header.Extra, ExtraSignerVote)
-			} else if c.proposals[address].Proposal == proposalDropVote {
+			case proposalDropVote:
 				header.Extra = append(header.Extra, ExtraDropVote)
 			}
 		}
