@@ -126,7 +126,13 @@ func (p *triePrefetcher) copy() *triePrefetcher {
 	// If the prefetcher is already a copy, duplicate the data
 	if p.fetches != nil {
 		for root, fetch := range p.fetches {
-			copy.fetches[root] = p.db.CopyTrie(fetch)
+			// MODIFIED by Jakub Pajek (RPC method eth_sendTransaction crashed: unknown trie type <nil>)
+			//copy.fetches[root] = p.db.CopyTrie(fetch)
+			if fetch != nil {
+				copy.fetches[root] = p.db.CopyTrie(fetch)
+			} else {
+				copy.fetches[root] = nil
+			}
 		}
 		return copy
 	}
