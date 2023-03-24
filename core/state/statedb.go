@@ -702,8 +702,10 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 func (s *StateDB) Copy() *StateDB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
-		db:                   s.db,
-		trie:                 s.db.CopyTrie(s.trie),
+		db: s.db,
+		// MODIFIED by Jakub Pajek (RPC method eth_sendTransaction crashed: unknown trie type <nil>)
+		//trie:                 s.db.CopyTrie(s.trie),
+		trie:                 nil,
 		originalRoot:         s.originalRoot,
 		stateObjects:         make(map[common.Address]*stateObject, len(s.journal.dirties)),
 		stateObjectsPending:  make(map[common.Address]struct{}, len(s.stateObjectsPending)),
@@ -715,6 +717,10 @@ func (s *StateDB) Copy() *StateDB {
 		preimages:            make(map[common.Hash][]byte, len(s.preimages)),
 		journal:              newJournal(),
 		hasher:               crypto.NewKeccakState(),
+	}
+	// ADDED by Jakub Pajek (RPC method eth_sendTransaction crashed: unknown trie type <nil>)
+	if s.trie != nil {
+		state.trie = s.db.CopyTrie(s.trie)
 	}
 	// Copy the dirty states, logs, and preimages
 	for addr := range s.journal.dirties {
