@@ -96,11 +96,11 @@ func newGenesisSnapshot(config params.CliqueConfig, sigcache *lru.ARCCache, numb
 		Dropped:   make(map[common.Address]uint64),
 		Tally:     make(map[common.Address]Tally),
 	}
-	for _, voter := range voters {
-		snap.Voters[voter] = 0
+	for i := 0; i < len(voters); i++ {
+		snap.Voters[voters[i]] = 0
 	}
-	for _, signer := range signers {
-		snap.Signers[signer] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
+	for i := 0; i < len(signers); i++ {
+		snap.Signers[signers[i]] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
 	}
 	return snap
 }
@@ -168,13 +168,12 @@ func (s *Snapshot) copy() *Snapshot {
 // validVote returns whether it makes sense to cast the specified vote in the
 // given snapshot context (e.g. don't try to add an already authorized signer).
 func (s *Snapshot) validVote(address common.Address, proposal uint64) bool {
-	_, voter := s.Voters[address]
-	_, signer := s.Signers[address]
+	_, sealer := s.Signers[address]
 	switch proposal {
 	case proposalVoterVote, proposalSignerVote:
-		return (!voter && !signer)
+		return !sealer
 	case proposalDropVote:
-		return (voter || signer)
+		return sealer
 	default:
 		return false
 	}
