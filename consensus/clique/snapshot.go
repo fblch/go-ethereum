@@ -400,6 +400,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			// Effective vote threshold: vote_threshold = voter_count / voting_rule
 			voteThreshold := len(snap.Voters) / currConfig.VotingRule
 			// Process every vote
+			// Note that the protocol forbids casting other votes when voting on dropping self.
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
 				index := ExtraVanity + voteIdx*(common.AddressLength+1)
