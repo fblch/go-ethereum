@@ -127,6 +127,10 @@ var (
 	// an invalid list of votes (i.e. non divisible by 20+1 bytes).
 	errInvalidVotes = errors.New("invalid votes list in extra-data")
 
+	// errForbiddenVotes is returned if a votes list in extra contains a forbidden combination
+	// of votes (i.e. vote on dropping self, as wel as other votes)
+	errForbiddenVotes = errors.New("forbidden votes combination in extra-data")
+
 	// errInvalidVote is returned if a vote marker value in extra is something else than the three
 	// allowed constants of 0x00, 0x01, 0x02.
 	errInvalidVote = errors.New("invalid vote marker in extra-data")
@@ -747,6 +751,12 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 				header.Extra[index] != ExtraDropVote {
 				return errInvalidVote
 			}
+			// If voting on dropping self, no other votes are allowed
+			if address == signer &&
+				header.Extra[index] == ExtraDropVote &&
+				voteCount > 1 {
+				return errForbiddenVotes
+			}
 		}
 	}
 	return nil
@@ -796,11 +806,14 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 		// Gather all the proposals that make sense voting on
 		// On that occasion, also purge already passed and old proposals
-		addresses, purged := make([]common.Address, 0, len(c.proposals)), 0
+		addresses, purged, dropSelf := make([]common.Address, 0, len(c.proposals)), 0, false
 		for address, proposal := range c.proposals {
 			// Vote should be valid, and cast after the signer was dropped for inactivity,
 			// in order not to automatically vote on re-adding those dropped signers
 			if snap.validVote(address, proposal.Proposal) && snap.Dropped[address] < proposal.Block {
+				if address == signer && proposal.Proposal == proposalDropVote {
+					dropSelf = true
+				}
 				addresses = append(addresses, address)
 			} else if number > proposal.Block && number-proposal.Block > params.FullImmutabilityThreshold {
 				delete(c.proposals, address)
@@ -817,16 +830,22 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 			}
 		}
 		// If there's pending proposals, cast votes on them
-		for i := range addresses {
-			header.Extra = append(header.Extra, addresses[i][:]...)
-			switch c.proposals[addresses[i]].Proposal {
-			case proposalVoterVote:
-				header.Extra = append(header.Extra, ExtraVoterVote)
-			case proposalSignerVote:
-				header.Extra = append(header.Extra, ExtraSignerVote)
-			case proposalDropVote:
-				header.Extra = append(header.Extra, ExtraDropVote)
+		// Note that the protocol forbids casting other votes when voting on dropping self.
+		if !dropSelf {
+			for i := range addresses {
+				header.Extra = append(header.Extra, addresses[i][:]...)
+				switch c.proposals[addresses[i]].Proposal {
+				case proposalVoterVote:
+					header.Extra = append(header.Extra, ExtraVoterVote)
+				case proposalSignerVote:
+					header.Extra = append(header.Extra, ExtraSignerVote)
+				case proposalDropVote:
+					header.Extra = append(header.Extra, ExtraDropVote)
+				}
 			}
+		} else {
+			header.Extra = append(header.Extra, signer[:]...)
+			header.Extra = append(header.Extra, ExtraDropVote)
 		}
 		// Write lock needed for proposal purging
 		c.lock.Unlock() //c.lock.RUnlock()
