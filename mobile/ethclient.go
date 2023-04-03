@@ -350,6 +350,14 @@ func (ec *EthereumClient) SuggestGasPrice(ctx *Context) (price *BigInt, _ error)
 	return &BigInt{rawPrice}, err
 }
 
+// ADDED by Jakub Pajek (dynamic fee tx)
+// SuggestGasTipCap retrieves the currently suggested gas tip cap after 1559 to
+// allow a timely execution of a transaction.
+func (ec *EthereumClient) SuggestGasTipCap(ctx *Context) (price *BigInt, _ error) {
+	rawGasTipCap, err := ec.client.SuggestGasTipCap(ctx.context)
+	return &BigInt{rawGasTipCap}, err
+}
+
 // EstimateGas tries to estimate the gas needed to execute a specific transaction based on
 // the current pending state of the backend blockchain. There is no guarantee that this is
 // the true gas limit requirement as other transactions may be added or removed by miners,
