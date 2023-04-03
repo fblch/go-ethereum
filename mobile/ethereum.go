@@ -50,8 +50,15 @@ func NewCallMsg() *CallMsg {
 func (msg *CallMsg) GetFrom() *Address    { return &Address{msg.msg.From} }
 func (msg *CallMsg) GetGas() int64        { return int64(msg.msg.Gas) }
 func (msg *CallMsg) GetGasPrice() *BigInt { return &BigInt{msg.msg.GasPrice} }
-func (msg *CallMsg) GetValue() *BigInt    { return &BigInt{msg.msg.Value} }
-func (msg *CallMsg) GetData() []byte      { return msg.msg.Data }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (msg *CallMsg) GetGasFeeCap() *BigInt { return &BigInt{msg.msg.GasFeeCap} }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (msg *CallMsg) GetGasTipCap() *BigInt { return &BigInt{msg.msg.GasTipCap} }
+
+func (msg *CallMsg) GetValue() *BigInt { return &BigInt{msg.msg.Value} }
+func (msg *CallMsg) GetData() []byte   { return msg.msg.Data }
 func (msg *CallMsg) GetTo() *Address {
 	if to := msg.msg.To; to != nil {
 		return &Address{*msg.msg.To}
@@ -62,8 +69,15 @@ func (msg *CallMsg) GetTo() *Address {
 func (msg *CallMsg) SetFrom(address *Address)  { msg.msg.From = address.address }
 func (msg *CallMsg) SetGas(gas int64)          { msg.msg.Gas = uint64(gas) }
 func (msg *CallMsg) SetGasPrice(price *BigInt) { msg.msg.GasPrice = price.bigint }
-func (msg *CallMsg) SetValue(value *BigInt)    { msg.msg.Value = value.bigint }
-func (msg *CallMsg) SetData(data []byte)       { msg.msg.Data = common.CopyBytes(data) }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (msg *CallMsg) SetGasFeeCap(feeCap *BigInt) { msg.msg.GasFeeCap = feeCap.bigint }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (msg *CallMsg) SetGasTipCap(tipCap *BigInt) { msg.msg.GasTipCap = tipCap.bigint }
+
+func (msg *CallMsg) SetValue(value *BigInt) { msg.msg.Value = value.bigint }
+func (msg *CallMsg) SetData(data []byte)    { msg.msg.Data = common.CopyBytes(data) }
 func (msg *CallMsg) SetTo(address *Address) {
 	if address == nil {
 		msg.msg.To = nil
