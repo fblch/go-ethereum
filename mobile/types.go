@@ -143,6 +143,9 @@ func (h *Header) GetMixDigest() *Hash    { return &Hash{h.header.MixDigest} }
 func (h *Header) GetNonce() *Nonce       { return &Nonce{h.header.Nonce} }
 func (h *Header) GetHash() *Hash         { return &Hash{h.header.Hash()} }
 
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (h *Header) GetBaseFee() *BigInt { return &BigInt{h.header.BaseFee} }
+
 // Headers represents a slice of headers.
 type Headers struct{ headers []*types.Header }
 
@@ -225,24 +228,56 @@ func (b *Block) GetTransaction(hash *Hash) *Transaction {
 	return &Transaction{b.block.Transaction(hash.hash)}
 }
 
+// ADDED by Jakub Pajek (dynamic fee tx)
+// Transaction types.
+const (
+	TxTypeLegacy     = int(types.LegacyTxType)
+	TxTypeAccessList = int(types.AccessListTxType)
+	TxTypeDynamicFee = int(types.DynamicFeeTxType)
+)
+
 // Transaction represents a single Ethereum transaction.
 type Transaction struct {
 	tx *types.Transaction
 }
 
-// NewContractCreation creates a new transaction for deploying a new contract with
-// the given properties.
-func NewContractCreation(nonce int64, amount *BigInt, gasLimit int64, gasPrice *BigInt, data []byte) *Transaction {
-	return &Transaction{types.NewContractCreation(uint64(nonce), amount.bigint, uint64(gasLimit), gasPrice.bigint, common.CopyBytes(data))}
+// ADDED by Jakub Pajek (dynamic fee tx)
+// NewLegacyTx creates a new legacy transaction with the given properties. Contracts
+// can be created by transacting with a nil recipient.
+func NewLegacyTx(nonce int64, to *Address, amount *BigInt, gasLimit int64, gasPrice *BigInt, data []byte) *Transaction {
+	var recipient *common.Address = nil
+	if to != nil {
+		recipient = &to.address
+	}
+	return &Transaction{types.NewTx(&types.LegacyTx{
+		Nonce:    uint64(nonce),
+		To:       recipient,
+		Value:    amount.bigint,
+		Gas:      uint64(gasLimit),
+		GasPrice: gasPrice.bigint,
+		Data:     common.CopyBytes(data),
+	})}
 }
 
-// NewTransaction creates a new transaction with the given properties. Contracts
+// ADDED by Jakub Pajek (dynamic fee tx)
+// NewDynamicFeeTx creates a new dynamic fee transaction with the given properties. Contracts
 // can be created by transacting with a nil recipient.
-func NewTransaction(nonce int64, to *Address, amount *BigInt, gasLimit int64, gasPrice *BigInt, data []byte) *Transaction {
-	if to == nil {
-		return &Transaction{types.NewContractCreation(uint64(nonce), amount.bigint, uint64(gasLimit), gasPrice.bigint, common.CopyBytes(data))}
+func NewDynamicFeeTx(chainId *BigInt, nonce int64, to *Address, amount *BigInt, gasLimit int64, gasFeeCap *BigInt, gasTipCap *BigInt, data []byte) *Transaction {
+	var recipient *common.Address = nil
+	if to != nil {
+		recipient = &to.address
 	}
-	return &Transaction{types.NewTransaction(uint64(nonce), to.address, amount.bigint, uint64(gasLimit), gasPrice.bigint, common.CopyBytes(data))}
+	return &Transaction{types.NewTx(&types.DynamicFeeTx{
+		ChainID:    chainId.bigint,
+		Nonce:      uint64(nonce),
+		To:         recipient,
+		Value:      amount.bigint,
+		Gas:        uint64(gasLimit),
+		GasFeeCap:  gasFeeCap.bigint,
+		GasTipCap:  gasTipCap.bigint,
+		Data:       common.CopyBytes(data),
+		AccessList: types.AccessList{},
+	})}
 }
 
 // NewTransactionFromRLP parses a transaction from an RLP data dump.
@@ -283,11 +318,27 @@ func (tx *Transaction) String() string {
 	return encodeOrError(tx)
 }
 
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (tx *Transaction) GetTxType() int { return int(tx.tx.Type()) }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (tx *Transaction) GetChainId() *BigInt { return &BigInt{tx.tx.ChainId()} }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+//func (tx *Transaction) GetAccessList() AccessList { return &AccessList{tx.tx.AccessList()} }
+
 func (tx *Transaction) GetData() []byte      { return tx.tx.Data() }
 func (tx *Transaction) GetGas() int64        { return int64(tx.tx.Gas()) }
 func (tx *Transaction) GetGasPrice() *BigInt { return &BigInt{tx.tx.GasPrice()} }
-func (tx *Transaction) GetValue() *BigInt    { return &BigInt{tx.tx.Value()} }
-func (tx *Transaction) GetNonce() int64      { return int64(tx.tx.Nonce()) }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (tx *Transaction) GetGasTipCap() *BigInt { return &BigInt{tx.tx.GasTipCap()} }
+
+// ADDED by Jakub Pajek (dynamic fee tx)
+func (tx *Transaction) GetGasFeeCap() *BigInt { return &BigInt{tx.tx.GasFeeCap()} }
+
+func (tx *Transaction) GetValue() *BigInt { return &BigInt{tx.tx.Value()} }
+func (tx *Transaction) GetNonce() int64   { return int64(tx.tx.Nonce()) }
 
 func (tx *Transaction) GetHash() *Hash   { return &Hash{tx.tx.Hash()} }
 func (tx *Transaction) GetCost() *BigInt { return &BigInt{tx.tx.Cost()} }
