@@ -27,6 +27,7 @@ import (
 	// ADDED by Jakub Pajek BEG
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -148,6 +149,10 @@ type NodeConfig struct {
 	MinerGasPrice *BigInt
 
 	// ADDED by Jakub Pajek
+	// MinerRecommit sets the time interval in nanoseconds for miner to re-create mining work.
+	MinerRecommit int64
+
+	// ADDED by Jakub Pajek
 	// MinerExtraData sets block extra data set by the miner (default = client version).
 	// Maximum size is 32 bytes.
 	// MODIFIED by Jakub Pajek (zero size extra)
@@ -172,6 +177,7 @@ var defaultNodeConfig = &NodeConfig{
 	UseLightweightKDF: false,
 	MinerGasLimit:     int64(ethconfig.Defaults.Miner.GasCeil),
 	MinerGasPrice:     NewBigInt(ethconfig.Defaults.Miner.GasPrice.Int64()),
+	MinerRecommit:     int64(ethconfig.Defaults.Miner.Recommit),
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//MinerExtraData:    "",
 	// ADDED by Jakub Pajek END
@@ -237,6 +243,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	}
 	if config.MinerGasPrice == nil || config.MinerGasPrice.Sign() <= 0 {
 		config.MinerGasPrice = defaultNodeConfig.MinerGasPrice
+	}
+	if config.MinerRecommit <= 0 {
+		config.MinerRecommit = defaultNodeConfig.MinerRecommit
 	}
 
 	natif, err := nat.Parse(config.NAT)
@@ -343,6 +352,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// ADDED by Jakub Pajek BEG
 		ethConf.Miner.GasCeil = uint64(config.MinerGasLimit)
 		ethConf.Miner.GasPrice = new(big.Int).SetBytes(config.MinerGasPrice.GetBytes())
+		ethConf.Miner.Recommit = time.Duration(config.MinerRecommit)
 		// MODIFIED by Jakub Pajek (zero size extra)
 		//ethConf.Miner.ExtraData = []byte(config.MinerExtraData)
 		// ADDED by Jakub Pajek END
