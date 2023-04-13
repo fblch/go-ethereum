@@ -285,15 +285,24 @@ func NewTransactionFromRLP(data []byte) (*Transaction, error) {
 	tx := &Transaction{
 		tx: new(types.Transaction),
 	}
-	if err := rlp.DecodeBytes(common.CopyBytes(data), tx.tx); err != nil {
+	// MODIFIED by Jakub Pajek BEG (dynamic fee tx)
+	/*
+		if err := rlp.DecodeBytes(common.CopyBytes(data), tx.tx); err != nil {
+			return nil, err
+		}
+	*/
+	if err := tx.tx.UnmarshalBinary(common.CopyBytes(data)); err != nil {
 		return nil, err
 	}
+	// MODIFIED by Jakub Pajek END (dynamic fee tx)
 	return tx, nil
 }
 
 // EncodeRLP encodes a transaction into an RLP data dump.
 func (tx *Transaction) EncodeRLP() ([]byte, error) {
-	return rlp.EncodeToBytes(tx.tx)
+	// MODIFIED by Jakub Pajek (dynamic fee tx)
+	//return rlp.EncodeToBytes(tx.tx)
+	return tx.tx.MarshalBinary()
 }
 
 // NewTransactionFromJSON parses a transaction from a JSON data dump.
@@ -301,15 +310,24 @@ func NewTransactionFromJSON(data string) (*Transaction, error) {
 	tx := &Transaction{
 		tx: new(types.Transaction),
 	}
-	if err := json.Unmarshal([]byte(data), tx.tx); err != nil {
+	// MODIFIED by Jakub Pajek BEG (dynamic fee tx)
+	/*
+		if err := json.Unmarshal([]byte(data), tx.tx); err != nil {
+			return nil, err
+		}
+	*/
+	if err := tx.tx.UnmarshalJSON([]byte(data)); err != nil {
 		return nil, err
 	}
+	// MODIFIED by Jakub Pajek END (dynamic fee tx)
 	return tx, nil
 }
 
 // EncodeJSON encodes a transaction into a JSON data dump.
 func (tx *Transaction) EncodeJSON() (string, error) {
-	data, err := json.Marshal(tx.tx)
+	// MODIFIED by Jakub Pajek (dynamic fee tx)
+	//data, err := json.Marshal(tx.tx)
+	data, err := tx.tx.MarshalJSON()
 	return string(data), err
 }
 
