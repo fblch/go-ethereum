@@ -4251,7 +4251,9 @@ func testCreateThenDelete(t *testing.T, config *params.ChainConfig) {
 	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), nil, gspec, nil, engine, vm.Config{
 		//Debug:  true,
 		//Tracer: logger.NewJSONLogger(nil, os.Stdout),
-	}, nil, nil)
+		// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+		//}, nil, nil)
+	}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
