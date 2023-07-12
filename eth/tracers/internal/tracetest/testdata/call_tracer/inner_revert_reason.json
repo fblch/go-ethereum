@@ -34,10 +34,10 @@
       "muirGlacierBlock": 0,
       "berlinBlock": 0,
       "londonBlock": 0,
-      "clique": {
+      "clique": [{
         "period": 0,
         "epoch": 30000
-      }
+      }]
     }
   },
   "context": {
