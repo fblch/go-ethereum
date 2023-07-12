@@ -23,11 +23,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -192,6 +194,10 @@ type Config struct {
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
 
+	// MODIFIED by Jakub Pajek BEG (revert revert drop support for static & trusted node list files)
+	staticNodesWarning  bool
+	trustedNodesWarning bool
+	// MODIFIED by Jakub Pajek END (revert revert drop support for static & trusted node list files)
 	oldGethResourceWarning bool
 
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
@@ -341,10 +347,17 @@ func (c *Config) ResolvePath(path string) string {
 			oldpath = filepath.Join(c.DataDir, path)
 		}
 		if oldpath != "" && common.FileExist(oldpath) {
-			if warn && !c.oldGethResourceWarning {
-				c.oldGethResourceWarning = true
-				log.Warn("Using deprecated resource file, please move this file to the 'geth' subdirectory of datadir.", "file", oldpath)
+			// MODIFIED by Jakub Pajek BEG (revert revert drop support for static & trusted node list files)
+			/*
+				if warn && !c.oldGethResourceWarning {
+					c.oldGethResourceWarning = true
+					log.Warn("Using deprecated resource file, please move this file to the 'geth' subdirectory of datadir.", "file", oldpath)
+				}
+			*/
+			if warn {
+				c.warnOnce(&c.oldGethResourceWarning, "Using deprecated resource file %s, please move this file to the 'geth' subdirectory of datadir.", oldpath)
 			}
+			// MODIFIED by Jakub Pajek END (revert revert drop support for static & trusted node list files)
 			return oldpath
 		}
 	}
@@ -396,13 +409,27 @@ func (c *Config) NodeKey() *ecdsa.PrivateKey {
 	return key
 }
 
+// MODIFIED by Jakub Pajek BEG (revert revert drop support for static & trusted node list files)
 // CheckLegacyFiles inspects the datadir for signs of legacy static-nodes
 // and trusted-nodes files. If they exist it raises an error.
+/*
 func (c *Config) checkLegacyFiles() {
 	c.checkLegacyFile(c.ResolvePath(datadirStaticNodes))
 	c.checkLegacyFile(c.ResolvePath(datadirTrustedNodes))
 }
+*/
 
+// StaticNodes returns a list of node enode URLs configured as static nodes.
+func (c *Config) StaticNodes() []*enode.Node {
+	return c.parsePersistentNodes(&c.staticNodesWarning, c.ResolvePath(datadirStaticNodes))
+}
+
+// TrustedNodes returns a list of node enode URLs configured as trusted nodes.
+func (c *Config) TrustedNodes() []*enode.Node {
+	return c.parsePersistentNodes(&c.trustedNodesWarning, c.ResolvePath(datadirTrustedNodes))
+}
+
+/*
 // checkLegacyFile will only raise an error if a file at the given path exists.
 func (c *Config) checkLegacyFile(path string) {
 	// Short circuit if no node config is present
@@ -426,6 +453,43 @@ func (c *Config) checkLegacyFile(path string) {
 		logger.Error("Ignoring deprecated file.", "file", path)
 	}
 }
+*/
+
+// parsePersistentNodes parses a list of discovery node URLs loaded from a .json
+// file from within the data directory.
+func (c *Config) parsePersistentNodes(w *bool, path string) []*enode.Node {
+	// Short circuit if no node config is present
+	if c.DataDir == "" {
+		return nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil
+	}
+	c.warnOnce(w, "Found deprecated node list file %s, please use the TOML config file instead.", path)
+
+	// Load the nodes from the config file.
+	var nodelist []string
+	if err := common.LoadJSON(path, &nodelist); err != nil {
+		log.Error(fmt.Sprintf("Can't load node list file: %v", err))
+		return nil
+	}
+	// Interpret the list as a discovery node array
+	var nodes []*enode.Node
+	for _, url := range nodelist {
+		if url == "" {
+			continue
+		}
+		node, err := enode.Parse(enode.ValidSchemes, url)
+		if err != nil {
+			log.Error(fmt.Sprintf("Node URL %s: %v\n", url, err))
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+// MODIFIED by Jakub Pajek END (revert revert drop support for static & trusted node list files)
 
 // KeyDirConfig determines the settings for keydirectory
 func (c *Config) KeyDirConfig() (string, error) {
@@ -471,3 +535,23 @@ func getKeyStoreDir(conf *Config) (string, bool, error) {
 
 	return keydir, isEphemeral, nil
 }
+
+// MODIFIED by Jakub Pajek BEG (revert revert drop support for static & trusted node list files)
+var warnLock sync.Mutex
+
+func (c *Config) warnOnce(w *bool, format string, args ...interface{}) {
+	warnLock.Lock()
+	defer warnLock.Unlock()
+
+	if *w {
+		return
+	}
+	l := c.Logger
+	if l == nil {
+		l = log.Root()
+	}
+	l.Warn(fmt.Sprintf(format, args...))
+	*w = true
+}
+
+// MODIFIED by Jakub Pajek END (revert revert drop support for static & trusted node list files)

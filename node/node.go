@@ -133,7 +133,15 @@ func New(conf *Config) (*Node, error) {
 	node.server.Config.PrivateKey = node.config.NodeKey()
 	node.server.Config.Name = node.config.NodeName()
 	node.server.Config.Logger = node.log
-	node.config.checkLegacyFiles()
+	// MODIFIED by Jakub Pajek BEG (revert revert drop support for static & trusted node list files)
+	//node.config.checkLegacyFiles()
+	if node.server.Config.StaticNodes == nil {
+		node.server.Config.StaticNodes = node.config.StaticNodes()
+	}
+	if node.server.Config.TrustedNodes == nil {
+		node.server.Config.TrustedNodes = node.config.TrustedNodes()
+	}
+	// MODIFIED by Jakub Pajek END (revert revert drop support for static & trusted node list files)
 	if node.server.Config.NodeDatabase == "" {
 		node.server.Config.NodeDatabase = node.config.NodeDB()
 	}
