@@ -347,8 +347,10 @@ func TestStateProcessorErrors(t *testing.T) {
 					},
 				},
 			}
-			genesis        = gspec.MustCommit(db)
-			blockchain, _  = NewBlockChain(db, nil, gspec, nil, beacon.New(ethash.NewFaker()), vm.Config{}, nil, nil)
+			genesis = gspec.MustCommit(db)
+			// MODIFIED by Jakub Pajek (deterministic fork choice rules)
+			//blockchain, _  = NewBlockChain(db, nil, gspec, nil, beacon.New(ethash.NewFaker()), vm.Config{}, nil, nil)
+			blockchain, _  = NewBlockChain(db, nil, gspec, nil, beacon.New(ethash.NewFaker()), vm.Config{}, nil, nil, nil)
 			tooBigInitCode = [params.MaxInitCodeSize + 1]byte{}
 			smallInitCode  = [320]byte{}
 		)
