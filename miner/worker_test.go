@@ -601,7 +601,9 @@ func testGetSealingWork(t *testing.T, chainConfig *params.ChainConfig, engine co
 		}
 		_, isClique := engine.(*clique.Clique)
 		if !isClique {
-			if len(block.Extra()) != 2 {
+			// MODIFIED by Jakub Pajek (zero size extra)
+			//if len(block.Extra()) != 2 {
+			if len(block.Extra()) != 0 {
 				t.Error("Unexpected extra field")
 			}
 			if block.Coinbase() != coinbase {
