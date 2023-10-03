@@ -280,7 +280,7 @@ var (
 		ArrowGlacierBlock:   big.NewInt(0),
 		GrayGlacierBlock:    big.NewInt(0),
 		MergeNetsplitBlock:  nil,
-		// MODIFIED by Jakub Pajek (hard fork: HF1)
+		// ADDED by Jakub Pajek (hard fork: HF1)
 		PrivateHardFork1Block:         nil,
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -297,6 +297,7 @@ var (
 		ChainID: big.NewInt(1337),
 		// ADDED by Jakub Pajek (chain config: refundable fees)
 		RefundableFees:      true,
+		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
 		EIP150Block:         big.NewInt(0),
@@ -332,7 +333,6 @@ var (
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers for testing proposes.
-	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	TestChainConfig = &ChainConfig{
 		ChainID: big.NewInt(1),
 		// ADDED by Jakub Pajek (chain config: refundable fees)
@@ -366,7 +366,6 @@ var (
 
 	// NonActivatedConfig defines the chain configuration without activating
 	// any protocol change (EIPs).
-	// MODIFIED by Jakub Pajek (hard fork: HF1)
 	NonActivatedConfig = &ChainConfig{
 		ChainID: big.NewInt(1),
 		// ADDED by Jakub Pajek (chain config: refundable fees)
@@ -1076,7 +1075,9 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
-	IsMerge, IsShanghai, IsCancun, IsPrague                 bool
+	// ADDED by Jakub Pajek (hard fork: HF1)
+	IsPrivateHardFork1                      bool
+	IsMerge, IsShanghai, IsCancun, IsPrague bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1097,9 +1098,11 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
-		IsMerge:          isMerge,
-		IsShanghai:       c.IsShanghai(timestamp),
-		IsCancun:         c.IsCancun(timestamp),
-		IsPrague:         c.IsPrague(timestamp),
+		// ADDED by Jakub Pajek (hard fork: HF1)
+		IsPrivateHardFork1: c.IsPrivateHardFork1(num),
+		IsMerge:            isMerge,
+		IsShanghai:         c.IsShanghai(timestamp),
+		IsCancun:           c.IsCancun(timestamp),
+		IsPrague:           c.IsPrague(timestamp),
 	}
 }
