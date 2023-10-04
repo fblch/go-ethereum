@@ -329,6 +329,20 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 	if etherbase != (common.Address{}) {
 		return etherbase, nil
 	}
+	// ADDED by Jakub Pajek BEG (revert require explicit etherbase address)
+	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
+		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+			etherbase := accounts[0].Address
+
+			s.lock.Lock()
+			s.etherbase = etherbase
+			s.lock.Unlock()
+
+			log.Info("Etherbase automatically configured", "address", etherbase)
+			return etherbase, nil
+		}
+	}
+	// ADDED by Jakub Pajek END (revert require explicit etherbase address)
 	return common.Address{}, fmt.Errorf("etherbase must be explicitly specified")
 }
 
@@ -444,7 +458,9 @@ func (s *Ethereum) StartMining(threads int) error {
 		// introduced to speed sync times.
 		atomic.StoreUint32(&s.handler.acceptTxs, 1)
 
-		go s.miner.Start()
+		// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+		//go s.miner.Start()
+		go s.miner.Start(eb)
 	}
 	return nil
 }

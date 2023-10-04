@@ -45,7 +45,9 @@ type Backend interface {
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase  common.Address `toml:",omitempty"` // Public address for block mining rewards
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//Etherbase  common.Address `toml:",omitempty"` // Public address for block mining rewards
+	Etherbase  common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
 	Notify     []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
 	NotifyFull bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
 	ExtraData  hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
@@ -73,11 +75,15 @@ var DefaultConfig = Config{
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mux     *event.TypeMux
-	eth     Backend
-	engine  consensus.Engine
-	exitCh  chan struct{}
-	startCh chan struct{}
+	mux *event.TypeMux
+	// ADDED by Jakub Pajek (revert require explicit etherbase address)
+	coinbase common.Address
+	eth      Backend
+	engine   consensus.Engine
+	exitCh   chan struct{}
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//startCh  chan struct{}
+	startCh chan common.Address
 	stopCh  chan struct{}
 	worker  *worker
 
@@ -86,11 +92,13 @@ type Miner struct {
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(header *types.Header) bool) *Miner {
 	miner := &Miner{
-		mux:     mux,
-		eth:     eth,
-		engine:  engine,
-		exitCh:  make(chan struct{}),
-		startCh: make(chan struct{}),
+		mux:    mux,
+		eth:    eth,
+		engine: engine,
+		exitCh: make(chan struct{}),
+		// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+		//startCh: make(chan struct{}),
+		startCh: make(chan common.Address),
 		stopCh:  make(chan struct{}),
 		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
 	}
@@ -137,17 +145,25 @@ func (miner *Miner) update() {
 			case downloader.FailedEvent:
 				canStart = true
 				if shouldStart {
+					// ADDED by Jakub Pajek (revert require explicit etherbase address)
+					miner.SetEtherbase(miner.coinbase)
 					miner.worker.start()
 				}
 			case downloader.DoneEvent:
 				canStart = true
 				if shouldStart {
+					// ADDED by Jakub Pajek (revert require explicit etherbase address)
+					miner.SetEtherbase(miner.coinbase)
 					miner.worker.start()
 				}
 				// Stop reacting to downloader events
 				events.Unsubscribe()
 			}
-		case <-miner.startCh:
+		// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+		//case <-miner.startCh:
+		case addr := <-miner.startCh:
+			miner.SetEtherbase(addr)
+			// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 			if canStart {
 				miner.worker.start()
 			}
@@ -162,9 +178,18 @@ func (miner *Miner) update() {
 	}
 }
 
+// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+/*
 func (miner *Miner) Start() {
 	miner.startCh <- struct{}{}
 }
+*/
+
+func (miner *Miner) Start(coinbase common.Address) {
+	miner.startCh <- coinbase
+}
+
+// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 
 func (miner *Miner) Stop() {
 	miner.stopCh <- struct{}{}
@@ -219,6 +244,8 @@ func (miner *Miner) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 }
 
 func (miner *Miner) SetEtherbase(addr common.Address) {
+	// ADDED by Jakub Pajek (revert require explicit etherbase address)
+	miner.coinbase = addr
 	miner.worker.setEtherbase(addr)
 }
 
