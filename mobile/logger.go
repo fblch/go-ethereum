@@ -1,4 +1,4 @@
-// Copyright 2019 The go-ethereum Authors
+// Copyright 2016 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,20 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:build tools
-// +build tools
-
-package tools
+package geth
 
 import (
-	// Tool imports for go:generate.
-	_ "github.com/fjl/gencodec"
-	_ "github.com/golang/protobuf/protoc-gen-go"
-	_ "golang.org/x/tools/cmd/stringer"
+	"os"
 
-	// ADDED by Jakub Pajek BEG (revert mobile nuke)
-	// Tool imports for mobile build.
-	_ "golang.org/x/mobile/cmd/gobind"
-	_ "golang.org/x/mobile/cmd/gomobile"
-	// ADDED by Jakub Pajek END (revert mobile nuke)
+	"github.com/ethereum/go-ethereum/log"
 )
+
+// SetVerbosity sets the global verbosity level (between 0 and 6 - see logger/verbosity.go).
+func SetVerbosity(level int) {
+	log.Root().SetHandler(log.LvlFilterHandler(log.Lvl(level), log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+}
