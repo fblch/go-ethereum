@@ -13,6 +13,8 @@ eth/tracers/                    @s1na
 graphql/                        @s1na
 les/                            @zsfelfoldi @rjl493456442
 light/                          @zsfelfoldi @rjl493456442
+# ADDED by Jakub Pajek (revert mobile nuke)
+mobile/                         @karalabe @ligi
 node/                           @fjl
 p2p/                            @fjl @zsfelfoldi
 rpc/                            @fjl @holiman
