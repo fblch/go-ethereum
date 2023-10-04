@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -539,8 +538,12 @@ var (
 		Category: flags.MinerCategory,
 	}
 	MinerEtherbaseFlag = &cli.StringFlag{
-		Name:     "miner.etherbase",
-		Usage:    "0x prefixed public address for block mining rewards",
+		Name: "miner.etherbase",
+		// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+		//Usage:    "0x prefixed public address for block mining rewards",
+		Usage: "Public address for block mining rewards (default = first account)",
+		Value: "0",
+		// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 		Category: flags.MinerCategory,
 	}
 	MinerExtraDataFlag = &cli.StringFlag{
@@ -1347,6 +1350,8 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	return accs[index], nil
 }
 
+// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+/*
 // setEtherbase retrieves the etherbase from the directly specified command line flags.
 func setEtherbase(ctx *cli.Context, cfg *ethconfig.Config) {
 	if !ctx.IsSet(MinerEtherbaseFlag.Name) {
@@ -1363,6 +1368,31 @@ func setEtherbase(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 	cfg.Miner.Etherbase = common.BytesToAddress(b)
 }
+*/
+
+// setEtherbase retrieves the etherbase either from the directly specified
+// command line flags or from the keystore if CLI indexed.
+func setEtherbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *ethconfig.Config) {
+	// Extract the current etherbase
+	var etherbase string
+	if ctx.IsSet(MinerEtherbaseFlag.Name) {
+		etherbase = ctx.String(MinerEtherbaseFlag.Name)
+	}
+	// Convert the etherbase into an address and configure it
+	if etherbase != "" {
+		if ks != nil {
+			account, err := MakeAddress(ks, etherbase)
+			if err != nil {
+				Fatalf("Invalid miner etherbase: %v", err)
+			}
+			cfg.Miner.Etherbase = account.Address
+		} else {
+			Fatalf("No etherbase configured")
+		}
+	}
+}
+
+// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 
 // MakePasswordList reads password lines from the file specified by the global --password flag.
 func MakePasswordList(ctx *cli.Context) []string {
@@ -1738,7 +1768,14 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(LightServeFlag.Name) && ctx.Uint64(TxLookupLimitFlag.Name) != 0 {
 		log.Warn("LES server cannot serve old transaction status and cannot connect below les/4 protocol version if transaction lookup index is limited")
 	}
-	setEtherbase(ctx, cfg)
+	// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+	//setEtherbase(ctx, cfg)
+	var ks *keystore.KeyStore
+	if keystores := stack.AccountManager().Backends(keystore.KeyStoreType); len(keystores) > 0 {
+		ks = keystores[0].(*keystore.KeyStore)
+	}
+	setEtherbase(ctx, ks, cfg)
+	// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 	setGPO(ctx, &cfg.GPO, ctx.String(SyncModeFlag.Name) == "light")
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)
@@ -1912,16 +1949,20 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			passphrase = list[0]
 		}
 
-		// Unlock the developer account by local keystore.
-		var ks *keystore.KeyStore
-		if keystores := stack.AccountManager().Backends(keystore.KeyStoreType); len(keystores) > 0 {
-			ks = keystores[0].(*keystore.KeyStore)
-		}
-		if ks == nil {
-			Fatalf("Keystore is not available")
-		}
+		// COMMENTED by Jakub Pajek (revert require explicit etherbase address)
+		/*
+			// Unlock the developer account by local keystore.
+			var ks *keystore.KeyStore
+			if keystores := stack.AccountManager().Backends(keystore.KeyStoreType); len(keystores) > 0 {
+				ks = keystores[0].(*keystore.KeyStore)
+			}
+			if ks == nil {
+				Fatalf("Keystore is not available")
+			}
 
-		// Figure out the dev account address.
+			// Figure out the dev account address.
+		*/
+
 		// setEtherbase has been called above, configuring the miner address from command line flags.
 		if cfg.Miner.Etherbase != (common.Address{}) {
 			developer = accounts.Account{Address: cfg.Miner.Etherbase}
@@ -1933,9 +1974,12 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 				Fatalf("Failed to create developer account: %v", err)
 			}
 		}
-		// Make sure the address is configured as fee recipient, otherwise
-		// the miner will fail to start.
-		cfg.Miner.Etherbase = developer.Address
+		// COMMENTED by Jakub Pajek (revert require explicit etherbase address)
+		/*
+			// Make sure the address is configured as fee recipient, otherwise
+			// the miner will fail to start.
+			cfg.Miner.Etherbase = developer.Address
+		*/
 
 		if err := ks.Unlock(developer, passphrase); err != nil {
 			Fatalf("Failed to unlock developer account: %v", err)
