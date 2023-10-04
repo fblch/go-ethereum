@@ -64,8 +64,10 @@ var (
 		Usage: "Output file for the generated binding (default = stdout)",
 	}
 	langFlag = &cli.StringFlag{
-		Name:  "lang",
-		Usage: "Destination language for the bindings (go)",
+		Name: "lang",
+		// MODIFIED by Jakub Pajek (revert mobile nuke)
+		//Usage: "Destination language for the bindings (go)",
+		Usage: "Destination language for the bindings (go, java, objc)",
 		Value: "go",
 	}
 	aliasFlag = &cli.StringFlag{
@@ -102,6 +104,13 @@ func abigen(c *cli.Context) error {
 	switch c.String(langFlag.Name) {
 	case "go":
 		lang = bind.LangGo
+	// ADDED by Jakub Pajek BEG (revert mobile nuke)
+	case "java":
+		lang = bind.LangJava
+	case "objc":
+		lang = bind.LangObjC
+		utils.Fatalf("Objc binding generation is uncompleted")
+	// ADDED by Jakub Pajek END (revert mobile nuke)
 	default:
 		utils.Fatalf("Unsupported destination language \"%s\" (--lang)", c.String(langFlag.Name))
 	}
