@@ -272,18 +272,20 @@ type worker struct {
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(header *types.Header) bool, init bool) *worker {
 	worker := &worker{
-		config:             config,
-		chainConfig:        chainConfig,
-		engine:             engine,
-		eth:                eth,
-		chain:              eth.BlockChain(),
-		mux:                mux,
-		isLocalBlock:       isLocalBlock,
-		localUncles:        make(map[common.Hash]*types.Block),
-		remoteUncles:       make(map[common.Hash]*types.Block),
-		unconfirmed:        newUnconfirmedBlocks(eth.BlockChain(), sealingLogAtDepth),
-		coinbase:           config.Etherbase,
-		extra:              config.ExtraData,
+		config:       config,
+		chainConfig:  chainConfig,
+		engine:       engine,
+		eth:          eth,
+		chain:        eth.BlockChain(),
+		mux:          mux,
+		isLocalBlock: isLocalBlock,
+		localUncles:  make(map[common.Hash]*types.Block),
+		remoteUncles: make(map[common.Hash]*types.Block),
+		unconfirmed:  newUnconfirmedBlocks(eth.BlockChain(), sealingLogAtDepth),
+		// COMMENTED by Jakub Pajek BEG (revert require explicit etherbase address)
+		//coinbase:           config.Etherbase,
+		//extra:              config.ExtraData,
+		// COMMENTED by Jakub Pajek END (revert require explicit etherbase address)
 		pendingTasks:       make(map[common.Hash]*task),
 		txsCh:              make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:        make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -342,12 +344,15 @@ func (w *worker) setEtherbase(addr common.Address) {
 	w.coinbase = addr
 }
 
+// COMMENTED by Jakub Pajek (revert require explicit etherbase address)
+/*
 // etherbase retrieves the configured etherbase address.
 func (w *worker) etherbase() common.Address {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.coinbase
 }
+*/
 
 func (w *worker) setGasCeil(ceil uint64) {
 	w.mu.Lock()
@@ -1128,11 +1133,20 @@ func (w *worker) commitWork(interrupt *int32, noempty bool, timestamp int64) {
 	// Set the coinbase if the worker is running or it's required
 	var coinbase common.Address
 	if w.isRunning() {
-		coinbase = w.etherbase()
-		if coinbase == (common.Address{}) {
+		// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+		/*
+			coinbase = w.etherbase()
+			if coinbase == (common.Address{}) {
+				log.Error("Refusing to mine without etherbase")
+				return
+			}
+		*/
+		if w.coinbase == (common.Address{}) {
 			log.Error("Refusing to mine without etherbase")
 			return
 		}
+		coinbase = w.coinbase // Use the preset address as the fee recipient
+		// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 	}
 	work, err := w.prepareWork(&generateParams{
 		timestamp: uint64(timestamp),
