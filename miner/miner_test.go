@@ -87,7 +87,9 @@ func TestMiner(t *testing.T) {
 	miner, mux, cleanup := createMiner(t)
 	defer cleanup(false)
 
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -116,7 +118,9 @@ func TestMinerDownloaderFirstFails(t *testing.T) {
 	miner, mux, cleanup := createMiner(t)
 	defer cleanup(false)
 
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -149,7 +153,9 @@ func TestMinerStartStopAfterDownloaderEvents(t *testing.T) {
 	miner, mux, cleanup := createMiner(t)
 	defer cleanup(false)
 
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -162,7 +168,9 @@ func TestMinerStartStopAfterDownloaderEvents(t *testing.T) {
 	miner.Stop()
 	waitForMiningState(t, miner, false)
 
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x678910"))
 	waitForMiningState(t, miner, true)
 
 	miner.Stop()
@@ -173,13 +181,17 @@ func TestStartWhileDownload(t *testing.T) {
 	miner, mux, cleanup := createMiner(t)
 	defer cleanup(false)
 	waitForMiningState(t, miner, false)
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	// Stop the downloader and wait for the update loop to run
 	mux.Post(downloader.StartEvent{})
 	waitForMiningState(t, miner, false)
 	// Starting the miner after the downloader should not work
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, false)
 }
 
@@ -187,7 +199,9 @@ func TestStartStopMiner(t *testing.T) {
 	miner, _, cleanup := createMiner(t)
 	defer cleanup(false)
 	waitForMiningState(t, miner, false)
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	miner.Stop()
 	waitForMiningState(t, miner, false)
@@ -197,7 +211,9 @@ func TestCloseMiner(t *testing.T) {
 	miner, _, cleanup := createMiner(t)
 	defer cleanup(true)
 	waitForMiningState(t, miner, false)
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x12345"))
 	waitForMiningState(t, miner, true)
 	// Terminate the miner and wait for the update loop to run
 	miner.Close()
@@ -209,22 +225,36 @@ func TestCloseMiner(t *testing.T) {
 func TestMinerSetEtherbase(t *testing.T) {
 	miner, mux, cleanup := createMiner(t)
 	defer cleanup(false)
-	miner.Start()
+	// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+	//miner.Start()
+	// Start with a 'bad' mining address
+	miner.Start(common.HexToAddress("0xdead"))
+	// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
 	waitForMiningState(t, miner, false)
 	// Now user tries to configure proper mining address
-	miner.Start()
+	// MODIFIED by Jakub Pajek (revert require explicit etherbase address)
+	//miner.Start()
+	miner.Start(common.HexToAddress("0x1337"))
 	// Stop the downloader and wait for the update loop to run
 	mux.Post(downloader.DoneEvent{})
 	waitForMiningState(t, miner, true)
 
-	coinbase := common.HexToAddress("0xdeedbeef")
-	miner.SetEtherbase(coinbase)
-	if addr := miner.worker.etherbase(); addr != coinbase {
-		t.Fatalf("Unexpected etherbase want %x got %x", coinbase, addr)
+	// MODIFIED by Jakub Pajek BEG (revert require explicit etherbase address)
+	/*
+		coinbase := common.HexToAddress("0xdeedbeef")
+		miner.SetEtherbase(coinbase)
+		if addr := miner.worker.etherbase(); addr != coinbase {
+			t.Fatalf("Unexpected etherbase want %x got %x", coinbase, addr)
+		}
+	*/
+	// The miner should now be using the good address
+	if got, exp := miner.coinbase, common.HexToAddress("0x1337"); got != exp {
+		t.Fatalf("Wrong coinbase, got %x expected %x", got, exp)
 	}
+	// MODIFIED by Jakub Pajek END (revert require explicit etherbase address)
 }
 
 // waitForMiningState waits until either
