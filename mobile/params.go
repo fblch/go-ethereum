@@ -32,15 +32,6 @@ func MainnetGenesis() string {
 	return ""
 }
 
-// RopstenGenesis returns the JSON spec to use for the Ropsten test network.
-func RopstenGenesis() string {
-	enc, err := json.Marshal(core.DefaultRopstenGenesisBlock())
-	if err != nil {
-		panic(err)
-	}
-	return string(enc)
-}
-
 // SepoliaGenesis returns the JSON spec to use for the Sepolia test network.
 func SepoliaGenesis() string {
 	enc, err := json.Marshal(core.DefaultSepoliaGenesisBlock())
@@ -73,21 +64,6 @@ func GoerliGenesis() string {
 func FoundationBootnodes() *Enodes {
 	nodes := &Enodes{nodes: make([]*enode.Node, len(params.MainnetBootnodes))}
 	for i, url := range params.MainnetBootnodes {
-		var err error
-		nodes.nodes[i], err = enode.Parse(enode.ValidSchemes, url)
-		if err != nil {
-			panic("invalid node URL: " + err.Error())
-		}
-	}
-	return nodes
-}
-
-// ADDED by Jakub Pajek (mobile node)
-// RopstenBootnodes returns the enode URLs of the P2P bootstrap nodes running on the
-// Ropsten test network, operated by the foundation (running the V5 discovery protocol?).
-func RopstenBootnodes() *Enodes {
-	nodes := &Enodes{nodes: make([]*enode.Node, len(params.RopstenBootnodes))}
-	for i, url := range params.RopstenBootnodes {
 		var err error
 		nodes.nodes[i], err = enode.Parse(enode.ValidSchemes, url)
 		if err != nil {
