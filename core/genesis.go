@@ -384,7 +384,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *trie.Database, gen
 // provided genesis specification. Note the returned clique config can
 // be nil if we are not in the clique network.
 // MODIFIED by Jakub Pajek (clique config: variable period)
-//func LoadCliqueConfig(db ethdb.Database, genesis *Genesis) (*params.CliqueConfig, error) {
+// func LoadCliqueConfig(db ethdb.Database, genesis *Genesis) (*params.CliqueConfig, error) {
 func LoadCliqueConfig(db ethdb.Database, genesis *Genesis) (params.CliqueConfig, error) {
 	// Load the stored chain config from the database. It can be nil
 	// in case the database is empty. Notably, we only care about the
