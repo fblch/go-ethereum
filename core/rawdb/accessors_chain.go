@@ -333,7 +333,10 @@ func ReadHeaderRange(db ethdb.Reader, number uint64, count uint64) []rlp.RawValu
 		return rlpHeaders
 	}
 	// read remaining from ancients
-	max := count * 700
+	// MODIFIED by Jakub Pajek (sync bugfix)
+	// Increase the max bytes limit when reading headers from ancients in order to handle big headers with multiple votes.
+	//max := count * 700
+	max := count * 1024
 	data, err := db.AncientRange(chainFreezerHeaderTable, i+1-count, count, max)
 	if err == nil && uint64(len(data)) == count {
 		// the data is on the order [h, h+1, .., n] -- reordering needed
