@@ -333,17 +333,25 @@ func ReadHeaderRange(db ethdb.Reader, number uint64, count uint64) []rlp.RawValu
 		return rlpHeaders
 	}
 	// read remaining from ancients
-	// MODIFIED by Jakub Pajek (sync bugfix)
+	// MODIFIED by Jakub Pajek BEG (sync bugfix)
 	// Increase the max bytes limit when reading headers from ancients in order to handle big headers with multiple votes.
+	// Newer version of geth can set the max bytes limit to 0 in order to disable it.
 	//max := count * 700
 	max := count * 1024
 	data, err := db.AncientRange(chainFreezerHeaderTable, i+1-count, count, max)
-	if err == nil && uint64(len(data)) == count {
-		// the data is on the order [h, h+1, .., n] -- reordering needed
-		for i := range data {
-			rlpHeaders = append(rlpHeaders, data[len(data)-1-i])
-		}
+	if err != nil {
+		log.Error("Failed to read headers from freezer", "err", err)
+		return rlpHeaders
 	}
+	if uint64(len(data)) != count {
+		log.Warn("Incomplete read of headers from freezer", "wanted", count, "read", len(data))
+		return rlpHeaders
+	}
+	// The data is on the order [h, h+1, .., n] -- reordering needed
+	for i := range data {
+		rlpHeaders = append(rlpHeaders, data[len(data)-1-i])
+	}
+	// MODIFIED by Jakub Pajek END (sync bugfix)
 	return rlpHeaders
 }
 
