@@ -538,7 +538,11 @@ func TestSkeletonSyncRetrievals(t *testing.T) {
 		sidechain = append(sidechain, &types.Header{
 			ParentHash: sidechain[i-1].Hash(),
 			Number:     big.NewInt(int64(i)),
-			Extra:      []byte("B"), // force a different hash
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
+			//Extra: []byte("B"), // force a different hash
+			Extra: []byte{},
+			Nonce: types.EncodeNonce(666), // force a different hash
+			// MODIFIED by Jakub Pajek END (zero size extra)
 		})
 	}
 	tests := []struct {
