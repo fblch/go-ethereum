@@ -463,20 +463,26 @@ func testGetNodeData(t *testing.T, protocol uint, drop bool) {
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//block.SetExtra([]byte("yeehaw"))
 			block.SetExtra([]byte{})
+			block.SetNonce(types.EncodeNonce(666))
+			// MODIFIED by Jakub Pajek END (zero size extra)
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 			b2 := block.PrevBlock(1).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b2.Extra = []byte("foo")
 			b2.Extra = []byte{}
+			b2.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			block.AddUncle(b2)
 			b3 := block.PrevBlock(2).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b3.Extra = []byte("foo")
 			b3.Extra = []byte{}
+			b3.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			block.AddUncle(b3)
 		}
 	}
@@ -587,20 +593,26 @@ func testGetBlockReceipts(t *testing.T, protocol uint) {
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//block.SetExtra([]byte("yeehaw"))
 			block.SetExtra([]byte{})
+			block.SetNonce(types.EncodeNonce(666))
+			// MODIFIED by Jakub Pajek END (zero size extra)
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 			b2 := block.PrevBlock(1).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b2.Extra = []byte("foo")
 			b2.Extra = []byte{}
+			b2.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			block.AddUncle(b2)
 			b3 := block.PrevBlock(2).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b3.Extra = []byte("foo")
 			b3.Extra = []byte{}
+			b3.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			block.AddUncle(b3)
 		}
 	}

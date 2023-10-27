@@ -17,10 +17,13 @@
 package ethtest
 
 import (
+	"os"
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/internal/utesting"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 )
@@ -42,7 +45,8 @@ var (
 // Test fails with the following error due to state block header modification: zero size extra
 // ########## BAD BLOCK ######### Error: unknown ancestor
 // Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
-/*
+// MODIFIED by Jakub Pajek (zero size extra)
+// Re-enable this test after reverting modifications to extraData in ./testdata/genesis.json.
 func TestEthSuite(t *testing.T) {
 	geth, err := runGeth()
 	if err != nil {
@@ -63,7 +67,6 @@ func TestEthSuite(t *testing.T) {
 		})
 	}
 }
-*/
 
 // MODIFIED by Jakub Pajek (no tx fee rewards)
 // MODIFIED by Jakub Pajek (tx fee refund)
@@ -76,7 +79,8 @@ func TestEthSuite(t *testing.T) {
 // Test fails with the following error due to state block header modification: zero size extra
 // ########## BAD BLOCK ######### Error: unknown ancestor
 // Fix requires modifying binary file ./testdata/halfchain.rlp, so just comment out for now.
-/*
+// MODIFIED by Jakub Pajek (zero size extra)
+// Re-enable this test after reverting modifications to extraData in ./testdata/genesis.json.
 func TestSnapSuite(t *testing.T) {
 	geth, err := runGeth()
 	if err != nil {
@@ -97,7 +101,6 @@ func TestSnapSuite(t *testing.T) {
 		})
 	}
 }
-*/
 
 // runGeth creates and starts a geth node
 func runGeth() (*node.Node, error) {
