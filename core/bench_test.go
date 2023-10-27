@@ -162,14 +162,18 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 func genUncles(i int, gen *BlockGen) {
 	if i >= 7 {
 		b2 := gen.PrevBlock(i - 6).Header()
-		// MODIFIED by Jakub Pajek (zero size extra)
+		// MODIFIED by Jakub Pajek BEG (zero size extra)
 		//b2.Extra = []byte("foo")
 		b2.Extra = []byte{}
+		b2.Nonce = types.EncodeNonce(666)
+		// MODIFIED by Jakub Pajek END (zero size extra)
 		gen.AddUncle(b2)
 		b3 := gen.PrevBlock(i - 6).Header()
-		// MODIFIED by Jakub Pajek (zero size extra)
+		// MODIFIED by Jakub Pajek BEG (zero size extra)
 		//b3.Extra = []byte("bar")
 		b3.Extra = []byte{}
+		b3.Nonce = types.EncodeNonce(667)
+		// MODIFIED by Jakub Pajek END (zero size extra)
 		gen.AddUncle(b3)
 	}
 }

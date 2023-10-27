@@ -255,9 +255,11 @@ func makeBenchBlock() *Block {
 		GasLimit:   12345678,
 		GasUsed:    1476322,
 		Time:       9876543,
-		// MODIFIED by Jakub Pajek (zero size extra)
+		// MODIFIED by Jakub Pajek BEG (zero size extra)
 		//Extra:      []byte("coolest block on chain"),
 		Extra: []byte{},
+		Nonce: EncodeNonce(666),
+		// MODIFIED by Jakub Pajek END (zero size extra)
 	}
 	for i := range txs {
 		amount := math.BigPow(2, int64(i))
@@ -278,9 +280,11 @@ func makeBenchBlock() *Block {
 			GasLimit:   12345678,
 			GasUsed:    1476322,
 			Time:       9876543,
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//Extra:      []byte("benchmark uncle"),
 			Extra: []byte{},
+			Nonce: EncodeNonce(667),
+			// MODIFIED by Jakub Pajek END (zero size extra)
 		}
 	}
 	return NewBlock(header, txs, uncles, receipts, newHasher())
