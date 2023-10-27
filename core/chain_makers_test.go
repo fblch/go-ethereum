@@ -66,20 +66,26 @@ func ExampleGenerateChain() {
 		case 2:
 			// Block 3 is empty but was mined by addr3.
 			gen.SetCoinbase(addr3)
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//gen.SetExtra([]byte("yeehaw"))
 			gen.SetExtra([]byte{})
+			gen.SetNonce(types.EncodeNonce(666))
+			// MODIFIED by Jakub Pajek END (zero size extra)
 		case 3:
 			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
 			b2 := gen.PrevBlock(1).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b2.Extra = []byte("foo")
 			b2.Extra = []byte{}
+			b2.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			gen.AddUncle(b2)
 			b3 := gen.PrevBlock(2).Header()
-			// MODIFIED by Jakub Pajek (zero size extra)
+			// MODIFIED by Jakub Pajek BEG (zero size extra)
 			//b3.Extra = []byte("foo")
 			b3.Extra = []byte{}
+			b3.Nonce = types.EncodeNonce(667)
+			// MODIFIED by Jakub Pajek END (zero size extra)
 			gen.AddUncle(b3)
 		}
 	})
