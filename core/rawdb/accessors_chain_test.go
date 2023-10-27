@@ -326,9 +326,9 @@ func TestHeadStorage(t *testing.T) {
 	//blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block header")})
 	//blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block full")})
 	//blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block fast")})
-	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
-	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
-	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte{}})
+	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte{}, Nonce: types.EncodeNonce(666)})
+	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte{}, Nonce: types.EncodeNonce(667)})
+	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte{}, Nonce: types.EncodeNonce(668)})
 	// MODIFIED by Jakub Pajek END (zero size extra)
 
 	// Check that no head entries are in a pristine database
