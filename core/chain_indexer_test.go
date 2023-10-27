@@ -94,7 +94,7 @@ func testChainIndexer(t *testing.T, count int) {
 	inject := func(number uint64) {
 		// MODIFIED by Jakub Pajek (zero size extra)
 		//header := &types.Header{Number: big.NewInt(int64(number)), Extra: big.NewInt(rand.Int63()).Bytes()}
-		header := &types.Header{Number: big.NewInt(int64(number)), Extra: []byte{}}
+		header := &types.Header{Number: big.NewInt(int64(number)), Extra: []byte{}, Nonce: types.EncodeNonce(uint64(rand.Int()))}
 		if number > 0 {
 			header.ParentHash = rawdb.ReadCanonicalHash(db, number-1)
 		}
