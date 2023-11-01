@@ -126,7 +126,7 @@ jobs:
         - sdkmanager "platform-tools" "platforms;android-15" "platforms;android-19" "platforms;android-24" "ndk-bundle"
 
         # Install Go to allow building with
-        - curl https://dl.google.com/go/go1.20.1.linux-amd64.tar.gz | tar -xz
+        - curl https://dl.google.com/go/go1.20.2.linux-amd64.tar.gz | tar -xz
         - export PATH=`pwd`/go/bin:$PATH
         - export GOROOT=`pwd`/go
         - export GOPATH=$HOME/go
