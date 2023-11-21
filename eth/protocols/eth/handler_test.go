@@ -75,7 +75,9 @@ func newTestBackendWithGenerator(blocks int, shanghai bool, generator func(int, 
 
 	if shanghai {
 		config = &params.ChainConfig{
-			ChainID:                       big.NewInt(1),
+			ChainID: big.NewInt(1),
+			// ADDED by Jakub Pajek (chain config: refundable fees)
+			RefundableFees:                false,
 			HomesteadBlock:                big.NewInt(0),
 			DAOForkBlock:                  nil,
 			DAOForkSupport:                true,

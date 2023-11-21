@@ -280,8 +280,10 @@ var (
 		ArrowGlacierBlock:   big.NewInt(0),
 		GrayGlacierBlock:    big.NewInt(0),
 		MergeNetsplitBlock:  nil,
-		// ADDED by Jakub Pajek (hard fork: HF1)
-		PrivateHardFork1Block:         nil,
+		// ADDED by Jakub Pajek BEG (hard fork: list)
+		PrivateHardFork1Block: nil,
+		PrivateHardFork2Block: nil,
+		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -313,8 +315,10 @@ var (
 		ArrowGlacierBlock:   nil,
 		GrayGlacierBlock:    nil,
 		MergeNetsplitBlock:  nil,
-		// ADDED by Jakub Pajek (hard fork: HF1)
-		PrivateHardFork1Block:         big.NewInt(0),
+		// ADDED by Jakub Pajek BEG (hard fork: list)
+		PrivateHardFork1Block: big.NewInt(0),
+		PrivateHardFork2Block: big.NewInt(0),
+		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -353,8 +357,10 @@ var (
 		ArrowGlacierBlock:   big.NewInt(0),
 		GrayGlacierBlock:    big.NewInt(0),
 		MergeNetsplitBlock:  nil,
-		// ADDED by Jakub Pajek (hard fork: HF1)
-		PrivateHardFork1Block:         nil,
+		// ADDED by Jakub Pajek BEG (hard fork: list)
+		PrivateHardFork1Block: nil,
+		PrivateHardFork2Block: nil,
+		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -386,8 +392,10 @@ var (
 		ArrowGlacierBlock:   nil,
 		GrayGlacierBlock:    nil,
 		MergeNetsplitBlock:  nil,
-		// ADDED by Jakub Pajek (hard fork: HF1)
-		PrivateHardFork1Block:         nil,
+		// ADDED by Jakub Pajek BEG (hard fork: list)
+		PrivateHardFork1Block: nil,
+		PrivateHardFork2Block: nil,
+		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
 		PragueTime:                    nil,
@@ -490,6 +498,7 @@ type ChainConfig struct {
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	// Private pre-merge hard forks
 	PrivateHardFork1Block *big.Int `json:"privateHardFork1Block,omitempty"` // Private hard fork #1 switch block (nil = no fork, 0 = already on HF1)
+	PrivateHardFork2Block *big.Int `json:"privateHardFork2Block,omitempty"` // Private hard fork #2 switch block (nil = no fork, 0 = already on HF2)
 	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// Fork scheduling was switched from blocks to timestamps here
@@ -629,12 +638,14 @@ func (c *ChainConfig) Description() string {
 	banner += "\n"
 
 	// ADDED by Jakub Pajek BEG (hard fork: list)
+	banner += "Private Pre-Merge hard forks (block based):\n"
 	if c.PrivateHardFork1Block != nil {
-		banner += "Private Pre-Merge hard forks:\n"
-		banner += fmt.Sprintf(" - Hard Fork 1:                 %-8v (https://github.com/fblch/Documentation/blob/main/Meetings/Blockchain/35_PoC_Development_Progress_221004.pdf)\n", c.PrivateHardFork1Block)
-		banner += "\n"
-
+		banner += fmt.Sprintf(" - Hard Fork 1:                 %-8v (https://github.com/fblch/Documentation/blob/main/NetworkUpgrades/Private_Hard_Fork_01.pdf)\n", c.PrivateHardFork1Block)
 	}
+	if c.PrivateHardFork2Block != nil {
+		banner += fmt.Sprintf(" - Hard Fork 2:                 %-8v (https://github.com/fblch/Documentation/blob/main/NetworkUpgrades/Private_Hard_Fork_02.pdf)\n", c.PrivateHardFork2Block)
+	}
+	banner += "\n"
 	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// Add a special section for the merge as it's non-obvious
@@ -744,6 +755,12 @@ func (c *ChainConfig) IsPrivateHardFork1(num *big.Int) bool {
 	return isBlockForked(c.PrivateHardFork1Block, num)
 }
 
+// ADDED by Jakub Pajek (hard fork: HF2)
+// IsPrivateHardFork2 returns whether num is either equal to the HF2 fork block or greater.
+func (c *ChainConfig) IsPrivateHardFork2(num *big.Int) bool {
+	return isBlockForked(c.PrivateHardFork2Block, num)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -817,8 +834,10 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "londonBlock", block: c.LondonBlock},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
-		// ADDED by Jakub Pajek (hard fork: HF1)
+		// ADDED by Jakub Pajek BEG (hard fork: list)
 		{name: "privateHardFork1Block", block: c.PrivateHardFork1Block, optional: true},
+		{name: "privateHardFork2Block", block: c.PrivateHardFork2Block, optional: true},
+		// ADDED by Jakub Pajek END (hard fork: list)
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
@@ -914,11 +933,14 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkBlockIncompatible(c.GrayGlacierBlock, newcfg.GrayGlacierBlock, headNumber) {
 		return newBlockCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)
 	}
-	// ADDED by Jakub Pajek BEG (hard fork: HF1)
+	// ADDED by Jakub Pajek BEG (hard fork: list)
 	if isForkBlockIncompatible(c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block, headNumber) {
 		return newBlockCompatError("Private HF1 fork block", c.PrivateHardFork1Block, newcfg.PrivateHardFork1Block)
 	}
-	// ADDED by Jakub Pajek END (hard fork: HF1)
+	if isForkBlockIncompatible(c.PrivateHardFork2Block, newcfg.PrivateHardFork2Block, headNumber) {
+		return newBlockCompatError("Private HF2 fork block", c.PrivateHardFork2Block, newcfg.PrivateHardFork2Block)
+	}
+	// ADDED by Jakub Pajek END (hard fork: list)
 	if isForkBlockIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, headNumber) {
 		return newBlockCompatError("Merge netsplit fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
 	}
@@ -1075,8 +1097,8 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
-	// ADDED by Jakub Pajek (hard fork: HF1)
-	IsPrivateHardFork1                      bool
+	// ADDED by Jakub Pajek (hard fork: list)
+	IsPrivateHardFork1, IsPrivateHardFork2  bool
 	IsMerge, IsShanghai, IsCancun, IsPrague bool
 }
 
@@ -1098,11 +1120,13 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
-		// ADDED by Jakub Pajek (hard fork: HF1)
+		// ADDED by Jakub Pajek BEG (hard fork: list)
 		IsPrivateHardFork1: c.IsPrivateHardFork1(num),
-		IsMerge:            isMerge,
-		IsShanghai:         c.IsShanghai(timestamp),
-		IsCancun:           c.IsCancun(timestamp),
-		IsPrague:           c.IsPrague(timestamp),
+		IsPrivateHardFork2: c.IsPrivateHardFork2(num),
+		// ADDED by Jakub Pajek END (hard fork: list)
+		IsMerge:    isMerge,
+		IsShanghai: c.IsShanghai(timestamp),
+		IsCancun:   c.IsCancun(timestamp),
+		IsPrague:   c.IsPrague(timestamp),
 	}
 }

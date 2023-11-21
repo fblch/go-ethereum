@@ -1031,12 +1031,16 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.MergeNetsplitBlock = block
 		canon = false
 	}
-	// ADDED by Jakub Pajek BEG (hard fork: HF1)
+	// ADDED by Jakub Pajek BEG (hard fork: list)
 	if block := override.PrivateHardFork1Block; block != nil {
 		copy.PrivateHardFork1Block = block
 		canon = false
 	}
-	// ADDED by Jakub Pajek END (hard fork: HF1)
+	if block := override.PrivateHardFork2Block; block != nil {
+		copy.PrivateHardFork2Block = block
+		canon = false
+	}
+	// ADDED by Jakub Pajek END (hard fork: list)
 	if timestamp := override.ShanghaiTime; timestamp != nil {
 		copy.ShanghaiTime = timestamp
 		canon = false
