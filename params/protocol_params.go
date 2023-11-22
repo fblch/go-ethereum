@@ -180,7 +180,13 @@ var (
 // Clique proof-of-authority protocol constants, which are accessed from outside the clique package.
 var (
 	// MEMO by Jakub Pajek: sealers limit
-	CliqueEpoch = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+	// CliqueMaxSealerCount limits the the number of sealers that can be included in extra-data of checkpoint blocks.
+	// This limit is only enforced by the network protocol, not by the consensus protocol, in order not having to hard fork
+	// once we decide to change it. Set to 30000 for now. Increase as the network grows.
+	CliqueMaxSealerCount = 30000
+
+	// Default number of blocks after which to checkpoint and reset the pending votes
+	CliqueEpoch = uint64(30000)
 
 	// Default block reward in wei for successfully mining a block
 	CliqueBlockReward = big.NewInt(1e+18)
@@ -194,13 +200,11 @@ var (
 	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
 	CliqueMinStallPeriod = uint64(4)
 
-	// MEMO by Jakub Pajek: sealers limit
 	// Default minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
 	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
 	// https://www.desmos.com/calculator/qa5ti8owpr
 	CliqueMinOfflineTime = uint64(86400 * 31)
 
-	// MEMO by Jakub Pajek: sealers limit
 	// Default minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
 	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
 	// https://www.desmos.com/calculator/tfvkzctlf0

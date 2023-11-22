@@ -140,16 +140,15 @@ func (h *Header) SanityCheck() error {
 		}
 	}
 	// MODIFIED by Jakub Pajek BEG (clique permissions, clique multiple votes)
-	//if eLen := len(h.Extra); eLen > 100*1024 {
-	//	return fmt.Errorf("too large block extradata: size %d", eLen)
-	//}
-	// MEMO by Jakub Pajek: sealers limit (clique permissions, clique multiple votes)
+	/*
+		if eLen := len(h.Extra); eLen > 100*1024 {
+			return fmt.Errorf("too large block extradata: size %d", eLen)
+		}
+	*/
 	// If set to a value greater than 0, eMaxFields will effectively limit:
 	//  * the number of votes that can be included in extra-data of non-checkpoint blocks,
 	//  * the number of sealers that can be included in extra-data of checkpoint blocks.
-	// MEMO by Jakub Pajek: sealers limit
-	// Set the limit at 30000 for now. Increase as network grows.
-	if eMaxFields := 30000; eMaxFields > 0 {
+	if eMaxFields := params.CliqueMaxSealerCount; eMaxFields > 0 {
 		eMaxLen := params.CliqueExtraVanity + eMaxFields*(common.AddressLength+1) + params.CliqueExtraSeal
 		if eLen := len(h.Extra); eLen > eMaxLen {
 			return fmt.Errorf("too large block extradata: size %d", eLen)
