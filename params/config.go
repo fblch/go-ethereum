@@ -325,14 +325,25 @@ var (
 		TerminalTotalDifficulty:       nil,
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        nil,
-		// MODIFIED by Jakub Pajek (clique config: block reward)
-		// MODIFIED by Jakub Pajek (clique config: voting rule) // Set to "majority"
-		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
-		// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
-		// MODIFIED by Jakub Pajek (clique config: min strike count)
 		// MODIFIED by Jakub Pajek (clique config: variable period)
-		//Clique:                        &CliqueConfig{Period: 0, Epoch: 30000},
-		Clique: []CliqueConfigEntry{{Period: 0, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}},
+		//Clique: &CliqueConfig{Period: 0, Epoch: 30000},
+		Clique: []CliqueConfigEntry{
+			{
+				Period: 0,
+				// MODIFIED by Jakub Pajek (clique params)
+				Epoch: CliqueEpoch,
+				// ADDED by Jakub Pajek (clique config: block reward)
+				BlockReward: CliqueBlockReward,
+				// ADDED by Jakub Pajek (clique config: voting rule)
+				VotingRule: CliqueVotingRule,
+				// ADDED by Jakub Pajek (clique config: min stall period)
+				MinStallPeriod: CliqueMinStallPeriod,
+				// ADDED by Jakub Pajek (clique config: min offline time)
+				MinOfflineTime: CliqueMinOfflineTime,
+				// ADDED by Jakub Pajek (clique config: min strike count)
+				MinStrikeCount: CliqueMinStrikeCount,
+			},
+		},
 	}
 
 	// TestChainConfig contains every protocol change (EIPs) introduced

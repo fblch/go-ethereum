@@ -92,17 +92,18 @@ func init() {
 	cliqueChainConfig.Clique = []params.CliqueConfigEntry{
 		{
 			Period: 10,
-			Epoch:  30000,
+			// MODIFIED by Jakub Pajek (clique params)
+			Epoch: params.CliqueEpoch,
 			// ADDED by Jakub Pajek (clique config: block reward)
-			BlockReward: big.NewInt(1e+18),
+			BlockReward: params.CliqueBlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: 2, // Set to "majority"
+			VotingRule: params.CliqueVotingRule,
 			// ADDED by Jakub Pajek (clique config: min stall period)
-			MinStallPeriod: 4, // Set to four times the block period
+			MinStallPeriod: params.CliqueMinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: 86400 * 31, // Set to 31 days
+			MinOfflineTime: params.CliqueMinOfflineTime,
 			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: 100,
+			MinStrikeCount: params.CliqueMinStrikeCount,
 		},
 	}
 
@@ -251,14 +252,25 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 	)
 	if isClique {
 		chainConfig = *params.AllCliqueProtocolChanges
-		// MODIFIED by Jakub Pajek (clique config: block reward)
-		// MODIFIED by Jakub Pajek (clique config: voting rule) // Set to "majority"
-		// MODIFIED by Jakub Pajek (clique config: min stall period) // Set to four times the block period
-		// MODIFIED by Jakub Pajek (clique config: min offline time) // Set to 31 days
-		// MODIFIED by Jakub Pajek (clique config: min strike count)
 		// MODIFIED by Jakub Pajek (clique config: variable period)
 		//chainConfig.Clique = &params.CliqueConfig{Period: 1, Epoch: 30000}
-		chainConfig.Clique = []params.CliqueConfigEntry{{Period: 1, Epoch: 30000, BlockReward: big.NewInt(1e+18), VotingRule: 2, MinStallPeriod: 4, MinOfflineTime: 86400 * 31, MinStrikeCount: 100}}
+		chainConfig.Clique = []params.CliqueConfigEntry{
+			{
+				Period: 1,
+				// MODIFIED by Jakub Pajek (clique params)
+				Epoch: params.CliqueEpoch,
+				// ADDED by Jakub Pajek (clique config: block reward)
+				BlockReward: params.CliqueBlockReward,
+				// ADDED by Jakub Pajek (clique config: voting rule)
+				VotingRule: params.CliqueVotingRule,
+				// ADDED by Jakub Pajek (clique config: min stall period)
+				MinStallPeriod: params.CliqueMinStallPeriod,
+				// ADDED by Jakub Pajek (clique config: min offline time)
+				MinOfflineTime: params.CliqueMinOfflineTime,
+				// ADDED by Jakub Pajek (clique config: min strike count)
+				MinStrikeCount: params.CliqueMinStrikeCount,
+			},
+		}
 		engine = clique.New(chainConfig.Clique, db)
 	} else {
 		chainConfig = *params.AllEthashProtocolChanges
