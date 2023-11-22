@@ -57,47 +57,9 @@ const (
 
 // Clique proof-of-authority protocol constants.
 var (
-	// MEMO by Jakub Pajek: sealers limit
-	EpochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
-
-	// Default block reward in wei for successfully mining a block
-	blockReward = big.NewInt(1e+18)
-
-	// Default voting rule, i.e. proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc.
-	// The value (after replacing 1 with MaxUint64) is used as a denominator when calculating the effective vote threshold.
-	// Effective vote threshold: vote_threshold = voter_count / voting_rule
-	votingRule = int(2)
-
-	// Default min stall period: minimal time (given in multiples of the block period) that needs to pass between consecutive
-	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
-	MinStallPeriod = uint64(4)
-
-	// MEMO by Jakub Pajek: sealers limit
-	// Default minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
-	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
-	// https://www.desmos.com/calculator/qa5ti8owpr
-	minOfflineTime = uint64(86400 * 31)
-
-	// MEMO by Jakub Pajek: sealers limit
-	// Default minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
-	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
-	// https://www.desmos.com/calculator/tfvkzctlf0
-	minStrikeCount = uint64(100)
-
-	// MODIFIED by Jakub Pajek (zero size extra)
-	//ExtraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
-	ExtraVanity = 0                      // Fixed number of extra-data prefix bytes reserved for signer vanity
-	ExtraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
-
-	ExtraVoterMarker  byte = 0xff // Magic value in epoch transition block's extra-data to mark address as a voter
-	ExtraSignerMarker byte = 0xfe // Magic value in epoch transition block's extra-data to mark address as a signer
-	ExtraVoterVote    byte = 0x02 // Magic value in non-epoch transition block's extra-data to vote on adding a new voter
-	ExtraSignerVote   byte = 0x01 // Magic value in non-epoch transition block's extra-data to vote on adding a new signer
-	ExtraDropVote     byte = 0x00 // Magic value in non-epoch transition block's extra-data to vote on on removing a voter/signer
-
-	proposalVoterVote  = uint64(ExtraVoterVote)  // Magic proposal number to vote on adding a new voter
-	proposalSignerVote = uint64(ExtraSignerVote) // Magic proposal number to vote on adding a new signer
-	proposalDropVote   = uint64(ExtraDropVote)   // Magic proposal number to vote on removing a voter/signer
+	proposalVoterVote  = uint64(params.CliqueExtraVoterVote)  // Magic proposal number to vote on adding a new voter
+	proposalSignerVote = uint64(params.CliqueExtraSignerVote) // Magic proposal number to vote on adding a new signer
+	proposalDropVote   = uint64(params.CliqueExtraDropVote)   // Magic proposal number to vote on removing a voter/signer
 
 	nonceNone = hexutil.MustDecode("0x0000000000000000") // Nonce field reserved for future use
 
@@ -204,10 +166,10 @@ func ecrecover(header *types.Header, sigcache *sigLRU) (common.Address, error) {
 		return address, nil
 	}
 	// Retrieve the signature from the header extra-data
-	if len(header.Extra) < ExtraSeal {
+	if len(header.Extra) < params.CliqueExtraSeal {
 		return common.Address{}, errMissingSignature
 	}
-	signature := header.Extra[len(header.Extra)-ExtraSeal:]
+	signature := header.Extra[len(header.Extra)-params.CliqueExtraSeal:]
 
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
@@ -282,24 +244,24 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 		conf[0].MaxSealerCount = math.MaxInt
 	}
 	if conf[0].Epoch == 0 {
-		conf[0].Epoch = EpochLength
+		conf[0].Epoch = params.CliqueEpoch
 	}
 	if conf[0].BlockReward == nil {
-		conf[0].BlockReward = blockReward
+		conf[0].BlockReward = params.CliqueBlockReward
 	}
 	if conf[0].VotingRule < 1 {
-		conf[0].VotingRule = votingRule
+		conf[0].VotingRule = params.CliqueVotingRule
 	} else if conf[0].VotingRule == 1 {
 		conf[0].VotingRule = math.MaxInt
 	}
 	if conf[0].MinStallPeriod == 0 {
-		conf[0].MinStallPeriod = MinStallPeriod
+		conf[0].MinStallPeriod = params.CliqueMinStallPeriod
 	}
 	if conf[0].MinOfflineTime == 0 {
-		conf[0].MinOfflineTime = minOfflineTime
+		conf[0].MinOfflineTime = params.CliqueMinOfflineTime
 	}
 	if conf[0].MinStrikeCount == 0 {
-		conf[0].MinStrikeCount = minStrikeCount
+		conf[0].MinStrikeCount = params.CliqueMinStrikeCount
 	}
 	for i := 1; i < len(conf); i++ {
 		if conf[i].MaxSealerCount == 0 {
@@ -405,10 +367,10 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 		return consensus.ErrFutureBlock
 	}
 	// Check that the extra-data contains both the vanity and signature
-	if len(header.Extra) < ExtraVanity {
+	if len(header.Extra) < params.CliqueExtraVanity {
 		return errMissingVanity
 	}
-	if len(header.Extra) < ExtraVanity+ExtraSeal {
+	if len(header.Extra) < params.CliqueExtraVanity+params.CliqueExtraSeal {
 		return errMissingSignature
 	}
 	// Beneficiary must be zero
@@ -495,7 +457,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	}
 	// Ensure that the extra-data contains permissions list on checkpoint, optional votes list otherwise
 	checkpoint := number%currConfig.Epoch == 0
-	extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
+	extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
 	if checkpoint && extraBytes%(common.AddressLength+1) != 0 {
 		return errInvalidCheckpointPermissions
 	}
@@ -510,13 +472,13 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 			index := i * (common.AddressLength + 1)
 			copy(permissions[index:], authorizedSigners[i][:])
 			if _, ok := snap.Voters[authorizedSigners[i]]; ok {
-				permissions[index+common.AddressLength] = ExtraVoterMarker
+				permissions[index+common.AddressLength] = params.CliqueExtraVoterMarker
 			} else {
-				permissions[index+common.AddressLength] = ExtraSignerMarker
+				permissions[index+common.AddressLength] = params.CliqueExtraSignerMarker
 			}
 		}
-		extraSuffix := len(header.Extra) - ExtraSeal
-		if !bytes.Equal(header.Extra[ExtraVanity:extraSuffix], permissions) {
+		extraSuffix := len(header.Extra) - params.CliqueExtraSeal
+		if !bytes.Equal(header.Extra[params.CliqueExtraVanity:extraSuffix], permissions) {
 			return errMismatchingCheckpointPermissions
 		}
 	}
@@ -549,19 +511,19 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// at a checkpoint block without a parent (light client CHT), or we have piled
 		// up more headers than allowed to be reorged (chain reinit from a freezer),
 		// consider the checkpoint trusted and snapshot it.
-		// MODIFIED by Jakub Pajek (clique config: variable period)
+		// MEMO by Jakub Pajek (clique config: variable period)
 		// How to handle variable epoch changing with the number of sealers?
 		if number == 0 || (number%c.config[0].Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
 
-				signers := make([]common.Address, (len(checkpoint.Extra)-ExtraVanity-ExtraSeal)/(common.AddressLength+1))
+				signers := make([]common.Address, (len(checkpoint.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal)/(common.AddressLength+1))
 				voters := make([]common.Address, 0, len(signers))
 				for i := 0; i < len(signers); i++ {
-					index := ExtraVanity + i*(common.AddressLength+1)
+					index := params.CliqueExtraVanity + i*(common.AddressLength+1)
 					copy(signers[i][:], checkpoint.Extra[index:])
-					if checkpoint.Extra[index+common.AddressLength] == ExtraVoterMarker {
+					if checkpoint.Extra[index+common.AddressLength] == params.CliqueExtraVoterMarker {
 						voters = append(voters, signers[i])
 					}
 				}
@@ -725,7 +687,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 		}
 	}
 	// If any votes are cast, verify the votes
-	extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
+	extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
 	if number%currConfig.Epoch != 0 && extraBytes > 0 {
 		// Check the signer against voters
 		if _, ok := snap.Voters[signer]; !ok {
@@ -735,7 +697,7 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 		votesCast := make(map[common.Address]struct{})
 		voteCount := extraBytes / (common.AddressLength + 1)
 		for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
-			index := ExtraVanity + voteIdx*(common.AddressLength+1)
+			index := params.CliqueExtraVanity + voteIdx*(common.AddressLength+1)
 			var address common.Address
 			copy(address[:], header.Extra[index:])
 
@@ -746,14 +708,14 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 			votesCast[address] = struct{}{}
 			// Check whether the vote is valid
 			index += common.AddressLength
-			if header.Extra[index] != ExtraVoterVote &&
-				header.Extra[index] != ExtraSignerVote &&
-				header.Extra[index] != ExtraDropVote {
+			if header.Extra[index] != params.CliqueExtraVoterVote &&
+				header.Extra[index] != params.CliqueExtraSignerVote &&
+				header.Extra[index] != params.CliqueExtraDropVote {
 				return errInvalidVote
 			}
 			// If voting on dropping self, no other votes are allowed
 			if address == signer &&
-				header.Extra[index] == ExtraDropVote &&
+				header.Extra[index] == params.CliqueExtraDropVote &&
 				voteCount > 1 {
 				return errForbiddenVotes
 			}
@@ -783,10 +745,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	_, okVoter := snap.Voters[signer]
 
 	// Ensure the extra data has all its components
-	if len(header.Extra) < ExtraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, ExtraVanity-len(header.Extra))...)
+	if len(header.Extra) < params.CliqueExtraVanity {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, params.CliqueExtraVanity-len(header.Extra))...)
 	}
-	header.Extra = header.Extra[:ExtraVanity]
+	header.Extra = header.Extra[:params.CliqueExtraVanity]
 
 	// If the block is a checkpoint, include permissions list.
 	// Otherwise, if the signer is a voter, cast all valid votes.
@@ -795,9 +757,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		for i := 0; i < len(authorizedSigners); i++ {
 			header.Extra = append(header.Extra, authorizedSigners[i][:]...)
 			if _, ok := snap.Voters[authorizedSigners[i]]; ok {
-				header.Extra = append(header.Extra, ExtraVoterMarker)
+				header.Extra = append(header.Extra, params.CliqueExtraVoterMarker)
 			} else {
-				header.Extra = append(header.Extra, ExtraSignerMarker)
+				header.Extra = append(header.Extra, params.CliqueExtraSignerMarker)
 			}
 		}
 	} else if okVoter {
@@ -836,21 +798,21 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				header.Extra = append(header.Extra, addresses[i][:]...)
 				switch c.proposals[addresses[i]].Proposal {
 				case proposalVoterVote:
-					header.Extra = append(header.Extra, ExtraVoterVote)
+					header.Extra = append(header.Extra, params.CliqueExtraVoterVote)
 				case proposalSignerVote:
-					header.Extra = append(header.Extra, ExtraSignerVote)
+					header.Extra = append(header.Extra, params.CliqueExtraSignerVote)
 				case proposalDropVote:
-					header.Extra = append(header.Extra, ExtraDropVote)
+					header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 				}
 			}
 		} else {
 			header.Extra = append(header.Extra, signer[:]...)
-			header.Extra = append(header.Extra, ExtraDropVote)
+			header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 		}
 		// Write lock needed for proposal purging
 		c.lock.Unlock() //c.lock.RUnlock()
 	}
-	header.Extra = append(header.Extra, make([]byte, ExtraSeal)...)
+	header.Extra = append(header.Extra, make([]byte, params.CliqueExtraSeal)...)
 
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
@@ -1088,7 +1050,7 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	if err != nil {
 		return err
 	}
-	copy(header.Extra[len(header.Extra)-ExtraSeal:], sighash)
+	copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sighash)
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
 	go func() {

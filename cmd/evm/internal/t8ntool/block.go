@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
 )
@@ -234,19 +235,19 @@ func (i *bbInput) sealClique(block *types.Block) (*types.Block, error) {
 	// MODIFIED by Jakub Pajek BEG (clique permissions, clique multiple votes)
 	//header.Extra = make([]byte, 32+65)
 	//copy(header.Extra[0:32], i.Clique.Vanity.Bytes()[:])
-	header.Extra = make([]byte, clique.ExtraVanity)
-	copy(header.Extra[0:clique.ExtraVanity], i.Clique.Vanity.Bytes()[:])
+	header.Extra = make([]byte, params.CliqueExtraVanity)
+	copy(header.Extra[0:params.CliqueExtraVanity], i.Clique.Vanity.Bytes()[:])
 	if i.Clique.Voted != nil && i.Clique.Authorize != nil {
 		header.Extra = append(header.Extra, (*i.Clique.Voted)[:]...)
 		// MEMO by Jakub Pajek (clique multiple votes)
 		// Support authorizing for signer only, not for voter
 		if *i.Clique.Authorize {
-			header.Extra = append(header.Extra, clique.ExtraSignerVote)
+			header.Extra = append(header.Extra, params.CliqueExtraSignerVote)
 		} else {
-			header.Extra = append(header.Extra, clique.ExtraDropVote)
+			header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 		}
 	}
-	header.Extra = append(header.Extra, make([]byte, clique.ExtraSeal)...)
+	header.Extra = append(header.Extra, make([]byte, params.CliqueExtraSeal)...)
 	// MODIFIED by Jakub Pajek END (clique permissions, clique multiple votes)
 
 	// Sign the seal hash and fill in the rest of the extra data
@@ -257,7 +258,7 @@ func (i *bbInput) sealClique(block *types.Block) (*types.Block, error) {
 	}
 	// MODIFIED by Jakub Pajek (clique permissions, clique multiple votes)
 	//copy(header.Extra[32:], sighash)
-	copy(header.Extra[len(header.Extra)-clique.ExtraSeal:], sighash)
+	copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sighash)
 	block = block.WithSeal(header)
 	return block, nil
 }

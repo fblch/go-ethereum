@@ -389,7 +389,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		}
 
 		// If any votes are cast, process the votes
-		extraBytes := len(header.Extra) - ExtraVanity - ExtraSeal
+		extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
 		if number%currConfig.Epoch != 0 && extraBytes > 0 {
 			// Check the signer against voters
 			if _, ok := snap.Voters[signer]; !ok {
@@ -403,7 +403,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			// Note that the protocol forbids casting other votes when voting on dropping self.
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
-				index := ExtraVanity + voteIdx*(common.AddressLength+1)
+				index := params.CliqueExtraVanity + voteIdx*(common.AddressLength+1)
 				var address common.Address
 				copy(address[:], header.Extra[index:])
 
@@ -421,11 +421,11 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				// Tally up the new vote from the voter
 				var proposal uint64
 				switch header.Extra[index+common.AddressLength] {
-				case ExtraVoterVote:
+				case params.CliqueExtraVoterVote:
 					proposal = proposalVoterVote
-				case ExtraSignerVote:
+				case params.CliqueExtraSignerVote:
 					proposal = proposalSignerVote
-				case ExtraDropVote:
+				case params.CliqueExtraDropVote:
 					proposal = proposalDropVote
 				default:
 					return nil, errInvalidVote

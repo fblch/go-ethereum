@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -544,7 +543,7 @@ func (lc *LightChain) SyncCheckpoint(ctx context.Context, checkpoint *params.Tru
 		// How to handle variable epoch changing with the number of sealers?
 		cliqueEpoch := cliqueCfg[0].Epoch
 		if cliqueEpoch == 0 {
-			cliqueEpoch = clique.EpochLength
+			cliqueEpoch = params.CliqueEpoch
 		}
 		latest -= latest % cliqueEpoch // epoch snapshot for clique
 	}

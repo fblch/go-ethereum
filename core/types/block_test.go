@@ -312,11 +312,9 @@ func TestRlpDecodeParentHash(t *testing.T) {
 		ParentHash: want,
 		Difficulty: mainnetTd,
 		Number:     new(big.Int).SetUint64(math.MaxUint64),
-		// MODIFIED by Jakub Pajek (zero size extra)
+		// MODIFIED by Jakub Pajek (clique params)
 		//Extra:      make([]byte, 65+32),
-		// Importing clique package creates import cycles...
-		//Extra:   make([]byte, clique.ExtraSeal),
-		Extra:   make([]byte, crypto.SignatureLength),
+		Extra:   make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal),
 		BaseFee: new(big.Int).SetUint64(math.MaxUint64),
 	}); err != nil {
 		t.Fatal(err)

@@ -51,15 +51,15 @@ func TestReimportMirroredState(t *testing.T) {
 		Config: params.AllCliqueProtocolChanges,
 		// MODIFIED by Jakub Pajek (clique permissions)
 		//ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
-		ExtraData: make([]byte, ExtraVanity+common.AddressLength+1+ExtraSeal),
+		ExtraData: make([]byte, params.CliqueExtraVanity+common.AddressLength+1+params.CliqueExtraSeal),
 		Alloc: map[common.Address]core.GenesisAccount{
 			addr: {Balance: big.NewInt(10000000000000000)},
 		},
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
-	copy(genspec.ExtraData[ExtraVanity:], addr[:])
+	copy(genspec.ExtraData[params.CliqueExtraVanity:], addr[:])
 	// ADDED by Jakub Pajek (clique permissions)
-	genspec.ExtraData[ExtraVanity+common.AddressLength] = ExtraVoterMarker
+	genspec.ExtraData[params.CliqueExtraVanity+common.AddressLength] = params.CliqueExtraVoterMarker
 	// ADDED by Jakub Pajek BEG (clique static block rewards)
 	// Inject signer's address into the consensus engine so that FinalizeAndAssemble
 	// called from GenerateChain below can correctly assign static block rewards.
@@ -96,13 +96,13 @@ func TestReimportMirroredState(t *testing.T) {
 		if i > 0 {
 			header.ParentHash = blocks[i-1].Hash()
 		}
-		header.Extra = make([]byte, ExtraVanity+ExtraSeal)
+		header.Extra = make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal)
 		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//header.Difficulty = diffInTurn
 		header.Difficulty = big.NewInt(1) // single in-turn signer
 
 		sig, _ := crypto.Sign(SealHash(header).Bytes(), key)
-		copy(header.Extra[len(header.Extra)-ExtraSeal:], sig)
+		copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sig)
 		blocks[i] = block.WithSeal(header)
 	}
 	// Insert the first two blocks and make sure the chain is valid
@@ -139,7 +139,7 @@ func TestSealHash(t *testing.T) {
 	have := SealHash(&types.Header{
 		Difficulty: new(big.Int),
 		Number:     new(big.Int),
-		Extra:      make([]byte, ExtraVanity+ExtraSeal),
+		Extra:      make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal),
 		BaseFee:    new(big.Int),
 	})
 	// MODIFIED by Jakub Pajek (zero size extra)

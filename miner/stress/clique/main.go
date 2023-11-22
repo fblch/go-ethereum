@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -183,12 +182,12 @@ func makeGenesis(faucets []*ecdsa.PrivateKey, sealers []*ecdsa.PrivateKey) *core
 	}
 	// MODIFIED by Jakub Pajek BEG (clique permissions)
 	//genesis.ExtraData = make([]byte, 32+len(signers)*common.AddressLength+65)
-	genesis.ExtraData = make([]byte, clique.ExtraVanity+len(signers)*(common.AddressLength+1)+clique.ExtraSeal)
+	genesis.ExtraData = make([]byte, params.CliqueExtraVanity+len(signers)*(common.AddressLength+1)+params.CliqueExtraSeal)
 	for i, signer := range signers {
 		//copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
-		index := clique.ExtraVanity + i*(common.AddressLength+1)
+		index := params.CliqueExtraVanity + i*(common.AddressLength+1)
 		copy(genesis.ExtraData[index:], signer[:])
-		genesis.ExtraData[index+common.AddressLength] = clique.ExtraVoterMarker
+		genesis.ExtraData[index+common.AddressLength] = params.CliqueExtraVoterMarker
 	}
 	// MODIFIED by Jakub Pajek END (clique permissions)
 	// Return the genesis block for initialization

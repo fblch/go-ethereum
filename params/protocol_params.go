@@ -175,3 +175,45 @@ var (
 	MinimumDifficulty      = big.NewInt(131072) // The minimum that the difficulty may ever be.
 	DurationLimit          = big.NewInt(13)     // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
 )
+
+// ADDED by Jakub Pajek BEG (clique params)
+// Clique proof-of-authority protocol constants, which are accessed from outside the clique package.
+var (
+	// MEMO by Jakub Pajek: sealers limit
+	CliqueEpoch = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
+
+	// Default block reward in wei for successfully mining a block
+	CliqueBlockReward = big.NewInt(1e+18)
+
+	// Default voting rule, i.e. proposal approval rule during voting: 1 = Signle vote, 2 = Majority, 3 = One-third, 4 = One-fourth, etc.
+	// The value (after replacing 1 with MaxUint64) is used as a denominator when calculating the effective vote threshold.
+	// Effective vote threshold: vote_threshold = voter_count / voting_rule
+	CliqueVotingRule = int(2)
+
+	// Default min stall period: minimal time (given in multiples of the block period) that needs to pass between consecutive
+	// blocks in order for a voter node to be allowed to switch the network to the voter ring.
+	CliqueMinStallPeriod = uint64(4)
+
+	// MEMO by Jakub Pajek: sealers limit
+	// Default minimal offline time above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed offline time: offline_time = MAX(min_offline_time, min_strike_count * block_period * signer_count)
+	// https://www.desmos.com/calculator/qa5ti8owpr
+	CliqueMinOfflineTime = uint64(86400 * 31)
+
+	// MEMO by Jakub Pajek: sealers limit
+	// Default minimal strike count above which inactive (offline) signers can be removed from the authorized signers.
+	// Effective allowed strike count: strike_threshold = MAX(min_strike_count, min_offline_time / block_period / signer_count)
+	// https://www.desmos.com/calculator/tfvkzctlf0
+	CliqueMinStrikeCount = uint64(100)
+
+	CliqueExtraVanity = int(MaximumExtraDataSize) // Fixed number of extra-data prefix bytes reserved for signer vanity
+	CliqueExtraSeal   = 64 + 1                    // Fixed number of extra-data suffix bytes reserved for signer seal (64 bytes ECDSA signature + 1 byte recovery id)
+
+	CliqueExtraVoterMarker  byte = 0xff // Magic value in epoch transition block's extra-data to mark address as a voter
+	CliqueExtraSignerMarker byte = 0xfe // Magic value in epoch transition block's extra-data to mark address as a signer
+	CliqueExtraVoterVote    byte = 0x02 // Magic value in non-epoch transition block's extra-data to vote on adding a new voter
+	CliqueExtraSignerVote   byte = 0x01 // Magic value in non-epoch transition block's extra-data to vote on adding a new signer
+	CliqueExtraDropVote     byte = 0x00 // Magic value in non-epoch transition block's extra-data to vote on on removing a voter/signer
+)
+
+// ADDED by Jakub Pajek END (clique params)

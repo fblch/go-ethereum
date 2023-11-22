@@ -59,7 +59,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	}
 	sort.Sort(addressesAscending(auths))
 	for i, auth := range auths {
-		copy(header.Extra[ExtraVanity+i*common.AddressLength:], auth.Bytes())
+		copy(header.Extra[params.CliqueExtraVanity+i*common.AddressLength:], auth.Bytes())
 	}
 }
 
@@ -87,7 +87,7 @@ func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 	}
 	// Sign the header and embed the signature in extra data
 	sig, _ := crypto.Sign(SealHash(header).Bytes(), ap.accounts[signer])
-	copy(header.Extra[len(header.Extra)-ExtraSeal:], sig)
+	copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sig)
 }
 
 // testerVote represents a single block signed by a particular account, where
@@ -410,15 +410,15 @@ func (tt *cliqueTest) run(t *testing.T) {
 	genesis := &core.Genesis{
 		// MODIFIED by Jakub Pajek (clique permissions)
 		//ExtraData: make([]byte, extraVanity+common.AddressLength*len(signers)+extraSeal),
-		ExtraData: make([]byte, ExtraVanity+(common.AddressLength+1)*len(signers)+ExtraSeal),
+		ExtraData: make([]byte, params.CliqueExtraVanity+(common.AddressLength+1)*len(signers)+params.CliqueExtraSeal),
 		BaseFee:   big.NewInt(params.InitialBaseFee),
 	}
 	// MODIFIED by Jakub Pajek BEG (clique permissions)
 	for j, signer := range signers {
 		//copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
-		index := ExtraVanity + j*(common.AddressLength+1)
+		index := params.CliqueExtraVanity + j*(common.AddressLength+1)
 		copy(genesis.ExtraData[index:], signer[:])
-		genesis.ExtraData[index+common.AddressLength] = ExtraVoterMarker
+		genesis.ExtraData[index+common.AddressLength] = params.CliqueExtraVoterMarker
 	}
 	// MODIFIED by Jakub Pajek END (clique permissions)
 
@@ -437,15 +437,15 @@ func (tt *cliqueTest) run(t *testing.T) {
 			Period: 1,
 			Epoch:  tt.epoch,
 			// ADDED by Jakub Pajek (clique config: block reward)
-			BlockReward: blockReward,
+			BlockReward: params.CliqueBlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: votingRule,
+			VotingRule: params.CliqueVotingRule,
 			// ADDED by Jakub Pajek (clique config: min stall period)
-			MinStallPeriod: MinStallPeriod,
+			MinStallPeriod: params.CliqueMinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)
-			MinOfflineTime: minOfflineTime,
+			MinOfflineTime: params.CliqueMinOfflineTime,
 			// ADDED by Jakub Pajek (clique config: min strike count)
-			MinStrikeCount: minStrikeCount,
+			MinStrikeCount: params.CliqueMinStrikeCount,
 		},
 	}
 	genesis.Config = &config
@@ -472,9 +472,9 @@ func (tt *cliqueTest) run(t *testing.T) {
 		if j > 0 {
 			header.ParentHash = blocks[j-1].Hash()
 		}
-		header.Extra = make([]byte, ExtraVanity+ExtraSeal)
+		header.Extra = make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal)
 		if auths := tt.votes[j].checkpoint; auths != nil {
-			header.Extra = make([]byte, ExtraVanity+len(auths)*common.AddressLength+ExtraSeal)
+			header.Extra = make([]byte, params.CliqueExtraVanity+len(auths)*common.AddressLength+params.CliqueExtraSeal)
 			accounts.checkpoint(header, auths)
 		}
 		// TODOJAKUB just changed diffInTurn to big.NewInt(1) without checking the logic

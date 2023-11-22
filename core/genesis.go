@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -489,11 +488,9 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-	// MODIFIED by Jakub Pajek (zero size extra)
+	// MODIFIED by Jakub Pajek (clique params)
 	//if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
-	// Importing clique package creates import cycles...
-	//if config.Clique != nil && len(block.Extra()) < clique.ExtraVanity+clique.ExtraVanity {
-	if config.Clique != nil && len(block.Extra()) < 0+crypto.SignatureLength {
+	if config.Clique != nil && len(block.Extra()) < params.CliqueExtraVanity+params.CliqueExtraSeal {
 		return nil, errors.New("can't start clique chain without signers")
 	}
 	// All the checks has passed, flush the states derived from the genesis
@@ -606,11 +603,7 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 		Config: &config,
 		// MODIFIED by Jakub Pajek (clique permissions)
 		//ExtraData:  append(append(make([]byte, 32), faucet[:]...), make([]byte, crypto.SignatureLength)...),
-		// Importing clique package creates import cycles...
-		//ExtraData: append(append(append(make([]byte, clique.ExtraVanity), faucet[:]...), clique.ExtraVoterMarker), make([]byte, clique.ExtraSeal)...),
-		// MODIFIED by Jakub Pajek (zero size extra)
-		//ExtraData:  append(append(append(make([]byte, 32), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
-		ExtraData:  append(append(append(make([]byte, 0), faucet[:]...), 0xff), make([]byte, crypto.SignatureLength)...),
+		ExtraData:  append(append(append(make([]byte, params.CliqueExtraVanity), faucet[:]...), params.CliqueExtraVoterMarker), make([]byte, params.CliqueExtraSeal)...),
 		GasLimit:   gasLimit,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(1),

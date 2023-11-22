@@ -28,7 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -150,11 +150,7 @@ func (h *Header) SanityCheck() error {
 	// MEMO by Jakub Pajek: sealers limit
 	// Set the limit at 30000 for now. Increase as network grows.
 	if eMaxFields := 30000; eMaxFields > 0 {
-		// Importing clique package creates import cycles...
-		//eMaxLen := clique.ExtraVanity + maxAddressNum*(common.AddressLength+1) + clique.ExtraSeal
-		// MODIFIED by Jakub Pajek (zero size extra)
-		//eMaxLen := 32 + eMaxFields*(common.AddressLength+1) + crypto.SignatureLength
-		eMaxLen := 0 + eMaxFields*(common.AddressLength+1) + crypto.SignatureLength
+		eMaxLen := params.CliqueExtraVanity + eMaxFields*(common.AddressLength+1) + params.CliqueExtraSeal
 		if eLen := len(h.Extra); eLen > eMaxLen {
 			return fmt.Errorf("too large block extradata: size %d", eLen)
 		}

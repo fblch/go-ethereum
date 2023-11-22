@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
@@ -145,9 +146,9 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 			return nil, useEthereumV, err
 		}
 		// Add space in the extradata to put the signature
-		// MODIFIED by Jakub Pajek (clique permissions)
+		// MODIFIED by Jakub Pajek (clique params)
 		//newExtra := make([]byte, len(header.Extra)+65)
-		newExtra := make([]byte, len(header.Extra)+clique.ExtraSeal)
+		newExtra := make([]byte, len(header.Extra)+params.CliqueExtraSeal)
 		copy(newExtra, header.Extra)
 		header.Extra = newExtra
 
@@ -213,12 +214,12 @@ func SignTextValidator(validatorData apitypes.ValidatorData) (hexutil.Bytes, str
 // in clique.go panics if this is the case, thus it's been reimplemented here to avoid the panic
 // and simply return an error instead
 func cliqueHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) {
-	// MODIFIED by Jakub Pajek (clique permissions)
+	// MODIFIED by Jakub Pajek (clique params)
 	//if len(header.Extra) < 65 {
-	if len(header.Extra) < clique.ExtraSeal {
-		// MODIFIED by Jakub Pajek (clique permissions)
+	if len(header.Extra) < params.CliqueExtraSeal {
+		// MODIFIED by Jakub Pajek (clique params)
 		//err = fmt.Errorf("clique header extradata too short, %d < 65", len(header.Extra))
-		err = fmt.Errorf("clique header extradata too short, %d < %d", len(header.Extra), clique.ExtraSeal)
+		err = fmt.Errorf("clique header extradata too short, %d < %d", len(header.Extra), params.CliqueExtraSeal)
 		return
 	}
 	rlp = clique.CliqueRLP(header)
