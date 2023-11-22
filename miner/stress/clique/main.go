@@ -153,6 +153,12 @@ func makeGenesis(faucets []*ecdsa.PrivateKey, sealers []*ecdsa.PrivateKey) *core
 	genesis.GasLimit = 25000000
 
 	genesis.Config.ChainID = big.NewInt(18)
+	// ADDED by Jakub Pajek (chain config: refundable fees)
+	genesis.Config.RefundableFees = true
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	genesis.Config.PrivateHardFork1Block = big.NewInt(0)
+	genesis.Config.PrivateHardFork2Block = big.NewInt(0)
+	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//genesis.Config.Clique.Period = 1
 	genesis.Config.Clique[0].Period = 1

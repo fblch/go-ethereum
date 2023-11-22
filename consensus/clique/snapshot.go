@@ -656,10 +656,10 @@ func (s *Snapshot) nextVoterRingSignableBlockNumber(lastSignedBlockNumber uint64
 // the current signer count.
 //
 // The lower the signer count, the higher the threshold value, in order to assure that we do not
-// drop the offline signer too soon. The signer must be offline for at least minStrikeThreshold
+// drop the offline signer too soon. The signer must be offline for at least MinOfflineTime
 // seconds before it can be dropped.
 // The higher the signer count, the lower the threshold value, however the threshold value will
-// not drop below minStrikeThreshold in order to assure that enough samples are gathered before
+// not drop below MinStrikeCount in order to assure that enough samples are gathered before
 // we decide to drop the signer.
 func (s *Snapshot) calcStrikeThreshold() uint64 {
 	currConfig := s.CurrentConfig()

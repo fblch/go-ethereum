@@ -424,6 +424,12 @@ func (tt *cliqueTest) run(t *testing.T) {
 
 	// Assemble a chain of headers from the cast votes
 	config := *params.TestChainConfig
+	// ADDED by Jakub Pajek (chain config: refundable fees)
+	config.RefundableFees = true
+	// ADDED by Jakub Pajek BEG (hard fork: list)
+	config.PrivateHardFork1Block = big.NewInt(0)
+	config.PrivateHardFork2Block = big.NewInt(0)
+	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//config.Clique = &params.CliqueConfig{
 	config.Clique = []params.CliqueConfigEntry{
