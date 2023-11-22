@@ -206,7 +206,8 @@ type Clique struct {
 	lock   sync.RWMutex   // Protects the signer and proposals fields
 
 	// The fields below are for testing only
-	fakeDiff bool // Skip difficulty verifications
+	fakeDiff    bool // Skip difficulty verifications
+	fakeRewards bool // Skip accumulating the block rewards
 }
 
 // loadProposals loads existing proposals from the database.
@@ -865,15 +866,17 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 // MODIFIED by Jakub Pajek (clique config: variable period)
 // func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal) {
 func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, dummy bool) error {
-	// Resolve the authorization key
-	signer, err := ecrecover(header, c.signatures)
-	if err != nil {
-		log.Warn("Failed to retrieve block author", "number", header.Number.Uint64(), "hash", header.Hash(), "err", err)
-	}
-	// Accumulate any block rewards (excluding uncle rewards).
-	if signer != (common.Address{}) {
-		if err := c.accumulateRewards(chain, state, header, uncles, signer); err != nil {
-			return err
+	if !c.fakeRewards {
+		// Resolve the authorization key
+		signer, err := ecrecover(header, c.signatures)
+		if err != nil {
+			log.Warn("Failed to retrieve block author", "number", header.Number.Uint64(), "hash", header.Hash(), "err", err)
+		}
+		// Accumulate any block rewards (excluding uncle rewards).
+		if signer != (common.Address{}) {
+			if err := c.accumulateRewards(chain, state, header, uncles, signer); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -890,7 +893,7 @@ func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *
 
 	// Finalize block
 	//c.Finalize(chain, header, state, txs, uncles, nil)
-	{
+	if !c.fakeRewards {
 		c.lock.RLock()
 		signer := c.signer
 		c.lock.RUnlock()

@@ -14,10 +14,6 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// TODOJAKUB add support for new permission model testing (clique permissions)
-// TODOJAKUB add support for new voting model testing (clique multiple votes)
-// TODOJAKUB add support for new difficulty model testing (clique 1-n scale difficulties)
-
 package clique
 
 import (
@@ -57,9 +53,16 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	for i, signer := range signers {
 		auths[i] = ap.address(signer)
 	}
+	// MODIFIED by Jakub Pajek BEG (clique permissions)
+	//sort.Sort(signersAscending(auths))
 	sort.Sort(addressesAscending(auths))
 	for i, auth := range auths {
-		copy(header.Extra[params.CliqueExtraVanity+i*common.AddressLength:], auth.Bytes())
+		// MODIFIED by Jakub Pajek BEG (clique permissions)
+		//copy(header.Extra[extraVanity+i*common.AddressLength:], auth.Bytes())
+		index := params.CliqueExtraVanity + i*(common.AddressLength+1)
+		copy(header.Extra[index:], auth.Bytes())
+		header.Extra[index+common.AddressLength] = params.CliqueExtraVoterMarker
+		// MODIFIED by Jakub Pajek END (clique permissions)
 	}
 }
 
@@ -87,6 +90,8 @@ func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 	}
 	// Sign the header and embed the signature in extra data
 	sig, _ := crypto.Sign(SealHash(header).Bytes(), ap.accounts[signer])
+	// MODIFIED by Jakub Pajek (clique params)
+	//copy(header.Extra[len(header.Extra)-extraSeal:], sig)
 	copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sig)
 }
 
@@ -413,14 +418,14 @@ func (tt *cliqueTest) run(t *testing.T) {
 		ExtraData: make([]byte, params.CliqueExtraVanity+(common.AddressLength+1)*len(signers)+params.CliqueExtraSeal),
 		BaseFee:   big.NewInt(params.InitialBaseFee),
 	}
-	// MODIFIED by Jakub Pajek BEG (clique permissions)
 	for j, signer := range signers {
+		// MODIFIED by Jakub Pajek BEG (clique permissions)
 		//copy(genesis.ExtraData[extraVanity+j*common.AddressLength:], signer[:])
 		index := params.CliqueExtraVanity + j*(common.AddressLength+1)
 		copy(genesis.ExtraData[index:], signer[:])
 		genesis.ExtraData[index+common.AddressLength] = params.CliqueExtraVoterMarker
+		// MODIFIED by Jakub Pajek END (clique permissions)
 	}
-	// MODIFIED by Jakub Pajek END (clique permissions)
 
 	// Assemble a chain of headers from the cast votes
 	config := *params.TestChainConfig
@@ -452,18 +457,20 @@ func (tt *cliqueTest) run(t *testing.T) {
 
 	engine := New(config.Clique, rawdb.NewMemoryDatabase())
 	engine.fakeDiff = true
+	// ADDED by Jakub Pajek (clique static block rewards)
+	engine.fakeRewards = true
 
 	_, blocks, _ := core.GenerateChainWithGenesis(genesis, engine, len(tt.votes), func(j int, gen *core.BlockGen) {
-		// Cast the vote contained in this block
-		gen.SetCoinbase(accounts.address(tt.votes[j].voted))
-		if tt.votes[j].auth {
-			var nonce types.BlockNonce
-			// TODOJAKUB just changed nonceAuthVote to nonceSignerVote without checking the logic
-			//copy(nonce[:], nonceSignerVote)
-			// TODOJAKUB just changed nonceSignerVote to nonceNone without checking the logic
-			copy(nonce[:], nonceNone)
-			gen.SetNonce(nonce)
-		}
+		// COMMENTED by Jakub Pajek (clique multiple votes)
+		/*
+			// Cast the vote contained in this block
+			gen.SetCoinbase(accounts.address(tt.votes[j].voted))
+			if tt.votes[j].auth {
+				var nonce types.BlockNonce
+				copy(nonce[:], nonceAuthVote)
+				gen.SetNonce(nonce)
+			}
+		*/
 	})
 	// Iterate through the blocks and seal them individually
 	for j, block := range blocks {
@@ -472,12 +479,30 @@ func (tt *cliqueTest) run(t *testing.T) {
 		if j > 0 {
 			header.ParentHash = blocks[j-1].Hash()
 		}
-		header.Extra = make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal)
+		// MODIFIED by Jakub Pajek (clique multiple votes)
+		//header.Extra = make([]byte, extraVanity+extraSeal)
+		header.Extra = make([]byte, params.CliqueExtraVanity)
 		if auths := tt.votes[j].checkpoint; auths != nil {
-			header.Extra = make([]byte, params.CliqueExtraVanity+len(auths)*common.AddressLength+params.CliqueExtraSeal)
+			// MODIFIED by Jakub Pajek (clique permissions)
+			//header.Extra = make([]byte, extraVanity+len(auths)*common.AddressLength+extraSeal)
+			header.Extra = append(header.Extra, make([]byte, len(auths)*(common.AddressLength+1))...)
 			accounts.checkpoint(header, auths)
 		}
-		// TODOJAKUB just changed diffInTurn to big.NewInt(1) without checking the logic
+		// ADDED by Jakub Pajek BEG (clique multiple votes)
+		// Cast the vote contained in this block
+		if voted := tt.votes[j].voted; len(voted) > 0 {
+			votedAddress := accounts.address(voted)
+			header.Extra = append(header.Extra, votedAddress[:]...)
+			if tt.votes[j].auth {
+				header.Extra = append(header.Extra, params.CliqueExtraVoterVote)
+			} else {
+				header.Extra = append(header.Extra, params.CliqueExtraDropVote)
+			}
+		}
+		header.Extra = append(header.Extra, make([]byte, params.CliqueExtraSeal)...)
+		// ADDED by Jakub Pajek END (clique multiple votes)
+
+		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//header.Difficulty = diffInTurn // Ignored, we just need a valid number
 		header.Difficulty = big.NewInt(1) // Ignored, we just need a valid number
 

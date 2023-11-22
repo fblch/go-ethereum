@@ -57,6 +57,8 @@ func TestReimportMirroredState(t *testing.T) {
 		},
 		BaseFee: big.NewInt(params.InitialBaseFee),
 	}
+	// MODIFIED by Jakub Pajek (clique params)
+	//copy(genspec.ExtraData[extraVanity:], addr[:])
 	copy(genspec.ExtraData[params.CliqueExtraVanity:], addr[:])
 	// ADDED by Jakub Pajek (clique permissions)
 	genspec.ExtraData[params.CliqueExtraVanity+common.AddressLength] = params.CliqueExtraVoterMarker
@@ -96,12 +98,16 @@ func TestReimportMirroredState(t *testing.T) {
 		if i > 0 {
 			header.ParentHash = blocks[i-1].Hash()
 		}
+		// MODIFIED by Jakub Pajek (clique params)
+		//header.Extra = make([]byte, extraVanity+extraSeal)
 		header.Extra = make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal)
 		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//header.Difficulty = diffInTurn
 		header.Difficulty = big.NewInt(1) // single in-turn signer
 
 		sig, _ := crypto.Sign(SealHash(header).Bytes(), key)
+		// MODIFIED by Jakub Pajek (clique params)
+		//copy(header.Extra[len(header.Extra)-extraSeal:], sig)
 		copy(header.Extra[len(header.Extra)-params.CliqueExtraSeal:], sig)
 		blocks[i] = block.WithSeal(header)
 	}
@@ -139,8 +145,10 @@ func TestSealHash(t *testing.T) {
 	have := SealHash(&types.Header{
 		Difficulty: new(big.Int),
 		Number:     new(big.Int),
-		Extra:      make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal),
-		BaseFee:    new(big.Int),
+		// MODIFIED by Jakub Pajek (clique params)
+		//Extra:      make([]byte, 32+65),
+		Extra:   make([]byte, params.CliqueExtraVanity+params.CliqueExtraSeal),
+		BaseFee: new(big.Int),
 	})
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//want := common.HexToHash("0xbd3d1fa43fbc4c5bfcc91b179ec92e2861df3654de60468beb908ff805359e8f")
@@ -150,6 +158,7 @@ func TestSealHash(t *testing.T) {
 	}
 }
 
+// ADDED by Jakub Pajek BEG (clique 1-n scale difficulties)
 func TestCalcDifficulty(t *testing.T) {
 	addrs := []common.Address{
 		common.HexToAddress("0abcdefghijklmnopqrs"),
@@ -294,3 +303,5 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 		}
 	}
 }
+
+// ADDED by Jakub Pajek END (clique 1-n scale difficulties)
