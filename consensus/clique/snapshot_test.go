@@ -378,6 +378,8 @@ func TestClique(t *testing.T) {
 			// Recent signatures should not reset on checkpoint blocks imported in a new
 			// batch (https://github.com/ethereum/go-ethereum/issues/17593). Whilst this
 			// seems overly specific and weird, it was a Rinkeby consensus split.
+			// ADDED by Jakub Pajek (clique tests)
+			// https://github.com/ethereum/go-ethereum/pull/17620
 			epoch:   3,
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{

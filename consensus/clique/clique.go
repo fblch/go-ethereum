@@ -121,7 +121,7 @@ var (
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 
-	// errInvalidDifficulty is returned if the difficulty of a block either nil or 0.
+	// errInvalidDifficulty is returned if the difficulty of a block is nil, zero or negative.
 	errInvalidDifficulty = errors.New("invalid difficulty")
 
 	// errWrongDifficulty is returned if the difficulty of a block doesn't match the
@@ -353,7 +353,7 @@ func (c *Clique) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*typ
 	return abort, results
 }
 
-// verifyHeader checks whether a header conforms to the consensus rules.The
+// verifyHeader checks whether a header conforms to the consensus rules. The
 // caller may optionally pass in a batch of parents (ascending order) to avoid
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
@@ -407,8 +407,16 @@ func (c *Clique) verifyHeader(chain consensus.ChainHeaderReader, header *types.H
 	if chain.Config().IsShanghai(header.Time) {
 		return fmt.Errorf("clique does not support shanghai fork")
 	}
+	// Verify the non-existence of withdrawalsHash.
+	if header.WithdrawalsHash != nil {
+		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+	}
 	if chain.Config().IsCancun(header.Time) {
 		return fmt.Errorf("clique does not support cancun fork")
+	}
+	// Verify the non-existence of excessDataGas
+	if header.ExcessDataGas != nil {
+		return fmt.Errorf("invalid excessDataGas: have %d, expected nil", header.ExcessDataGas)
 	}
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents)
@@ -1190,6 +1198,9 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	}
 	if header.WithdrawalsHash != nil {
 		panic("unexpected withdrawal hash value in clique")
+	}
+	if header.ExcessDataGas != nil {
+		panic("unexpected excess data gas value in clique")
 	}
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())
