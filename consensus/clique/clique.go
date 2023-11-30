@@ -522,7 +522,34 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// consider the checkpoint trusted and snapshot it.
 		// MEMO by Jakub Pajek (clique config: variable period)
 		// How to handle variable epoch changing with the number of sealers?
-		if number == 0 || (number%c.config[0].Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
+		// MODIFIED by Jakub Pajek (clique bug: incomplete state in checkpoint)
+		//
+		// Problem:
+		// - Risk of consensus split due to incomplete snapshot state being stored in checkpoint blocks.
+		//
+		// Background:
+		// - When new state was added to the snapshot (Voter ring, Offline penalties, etc.),
+		//   required logic to save it to checkpoint blocks was omitted.
+		// - Geth can recreate a snapshot from either the genesis block or one of the checkpoint blocks.
+		// - If a snapshot is recreated from one of the checkpoint block, it will be incomplete,
+		//   thus the state will diverge eventually causing a consensus split.
+		//
+		// Solutions:
+		// - Hotfix:
+		//   - Disable the logic to recreate snapshots from checkpoint blocks.
+		//     - This will drop the light sync support (which is already corrupt due to incomplete checkpoints)
+		//     - Might also have inpact on performance when reinitializing chain from a freezer?
+		// - Bugfix:
+		//   - Fix the logic around generating checkpoint blocks (requires a hard fork to deploy)
+		//
+		// References:
+		// https://github.com/fblch/go-ethereum/commit/9f036647e4b3e7c3aa8941dc239f85326a5e5ecd
+		// https://github.com/fblch/go-ethereum/commit/bcfb7f58b93e6fb5f3da0000672adee80fd6a485
+		// https://github.com/fblch/go-ethereum/commit/536b3b416c6ff53ea11a0d29dcc351a6d7919901
+		// https://github.com/fblch/go-ethereum/commit/6eef141aef618afa6bfad885b544f25b68f77cc2
+		//
+		//if number == 0 || (number%c.config[0].Epoch == 0 && (len(headers) > params.FullImmutabilityThreshold || chain.GetHeaderByNumber(number-1) == nil)) {
+		if number == 0 {
 			checkpoint := chain.GetHeaderByNumber(number)
 			if checkpoint != nil {
 				hash := checkpoint.Hash()
