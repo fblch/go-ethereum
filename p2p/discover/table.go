@@ -462,6 +462,32 @@ func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *
 	return nodes
 }
 
+// appendLiveNodes adds nodes at the given distance to the result slice.
+func (tab *Table) appendLiveNodes(dist uint, result []*enode.Node) []*enode.Node {
+	if dist > 256 {
+		return result
+	}
+	if dist == 0 {
+		return append(result, tab.self())
+	}
+
+	tab.mutex.Lock()
+	defer tab.mutex.Unlock()
+	for _, n := range tab.bucketAtDistance(int(dist)).entries {
+		// MODIFIED by Jakub Pajek (mobile connectivity)
+		// WAN bootnodes can not correctly perform a liveness check of mobile nodes
+		// (Private addresses behind CGNAT are always unreachable from the Internet).
+		// Unless we explicitly allow unverified mobile nodes here, they will never
+		// be advertised.
+		//if n.livenessChecks >= 1 {
+		if n.livenessChecks >= 1 || netutil.IsMobileLAN(n.IP()) {
+			node := n.Node // avoid handing out pointer to struct field
+			result = append(result, &node)
+		}
+	}
+	return result
+}
+
 // len returns the number of nodes in the table.
 func (tab *Table) len() (n int) {
 	tab.mutex.Lock()
