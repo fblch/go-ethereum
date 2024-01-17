@@ -84,15 +84,24 @@ func (s addressesAscending) Less(i, j int) bool { return bytes.Compare(s[i][:], 
 func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // newGenesisSnapshot creates a new snapshot with the specified startup parameters. This
-// method does not initialize the signers most recently signed blocks, so only ever
-// use it for the genesis block.
+// method does not initialize the signers most recently signed blocks (nor other custom
+// fields added to Signer and Snapshot structs), so only ever use it for the genesis block.
 func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
+	// Set the initial config entry index based on the initial sealer count.
+	// The last entry's MaxSealerCount is always MaxInt, so the for loop will always break.
+	var configIndex int
+	for i := range config {
+		if len(signers) <= config[i].MaxSealerCount {
+			configIndex = i
+			break
+		}
+	}
 	snap := &Snapshot{
 		config:    config,
 		sigcache:  sigcache,
 		Number:    number,
 		Hash:      hash,
-		ConfigIdx: 0,
+		ConfigIdx: configIndex,
 		VoterRing: false,
 		Voters:    make(map[common.Address]uint64),
 		Signers:   make(map[common.Address]Signer),
