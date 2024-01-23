@@ -69,6 +69,7 @@ type Snapshot struct {
 	Hash      common.Hash               `json:"hash"`      // Block hash where the snapshot was created
 	ConfigIdx int                       `json:"configIdx"` // Index of the current config entry inside the config array
 	VoterRing bool                      `json:"voterRing"` // Flag to indicate the ring in which blocks are signed (the sealer ring or the voter ring)
+	Voting    bool                      `json:"voting"`    // Flag to indicate voting activity (heuristic)
 	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their most recently signed block
 	Signers   map[common.Address]Signer `json:"signers"`   // Set of authorized signers at this moment and their state
 	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their drop block number
@@ -86,7 +87,7 @@ func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newGenesisSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the signers most recently signed blocks (nor other custom
 // fields added to Signer and Snapshot structs), so only ever use it for the genesis block.
-func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uint64, hash common.Hash, voters []common.Address, signers []common.Address) *Snapshot {
+func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uint64, hash common.Hash, voters []common.Address, signers []common.Address, fakeVoterRing bool) *Snapshot {
 	// Set the initial config entry index based on the initial sealer count.
 	// The last entry's MaxSealerCount is always MaxInt, so the for loop will always break.
 	var configIndex int
@@ -102,7 +103,8 @@ func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uin
 		Number:    number,
 		Hash:      hash,
 		ConfigIdx: configIndex,
-		VoterRing: false,
+		VoterRing: fakeVoterRing,
+		Voting:    false,
 		Voters:    make(map[common.Address]uint64),
 		Signers:   make(map[common.Address]Signer),
 		Dropped:   make(map[common.Address]uint64),
@@ -154,6 +156,7 @@ func (s *Snapshot) copy() *Snapshot {
 		Hash:      s.Hash,
 		ConfigIdx: s.ConfigIdx,
 		VoterRing: s.VoterRing,
+		Voting:    s.Voting,
 		Voters:    make(map[common.Address]uint64),
 		Signers:   make(map[common.Address]Signer),
 		Dropped:   make(map[common.Address]uint64),
@@ -236,9 +239,15 @@ func (s *Snapshot) uncast(address common.Address, proposal uint64) bool {
 // apply creates a new authorization snapshot by applying the given headers to the original one.
 // For each applied header, the processing order is as follows:
 //   - If necessary, switch between the sealer and the voter ring
+//   - For post-PrivateHardFork2 blocks, update the voting activity heuristic
 //   - If in the sealer ring, apply offline penalties (drop inactive signers)
 //   - If any votes are cast, process the votes
 //   - Update the current config entry index based on the final sealer count
+//
+// Note:
+// We assume that headers passed to apply are already verified by the function caller and valid.
+// Thanks to this we do not need to repeat all the verification checks already done by Consensus.VerifyHeader,
+// in particular: header hashes, times, difficulties, sealer ring votes post-PrivateHardFork2, etc.
 func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
@@ -262,11 +271,15 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 	)
 	for i, header := range headers {
 		var (
-			currConfig = snap.CurrentConfig()
-			number     = header.Number.Uint64()
+			currConfig     = snap.CurrentConfig()
+			number         = header.Number.Uint64()
+			checkpoint     = number%currConfig.Epoch == 0
+			headerHasVotes bool
+			okVoter        bool
 		)
+
 		// Remove any votes on checkpoint blocks
-		if number%currConfig.Epoch == 0 {
+		if checkpoint {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 		}
@@ -279,10 +292,16 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			return nil, errUnauthorizedSigner
 		} else {
 			var (
-				_, okVoter = snap.Voters[signer]
 				nextNumber uint64
 				voterRing  bool
 			)
+
+			// If any votes are cast, check the signer against voters (only voters can vote)
+			headerHasVotes = !checkpoint && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0
+			_, okVoter = snap.Voters[signer]
+			if headerHasVotes && !okVoter {
+				return nil, errUnauthorizedVoter
+			}
 			// Check in which ring we are currently signing blocks in
 			if !snap.VoterRing {
 				// We are currently signing blocks in the sealer ring.
@@ -355,6 +374,13 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			snap.Signers[signer] = signed
 			// Update the ring state
 			snap.VoterRing = voterRing
+			// For post-PrivateHardFork2 blocks, update the voting activity heuristic
+			if config.IsPrivateHardFork2(header.Number) {
+				// Assume voting is active if:
+				// - current header has votes, or
+				// - previous header had votes and current header could not include votes because it is a checkpoint header.
+				snap.Voting = headerHasVotes || (snap.Voting && checkpoint)
+			}
 		}
 
 		// If in the sealer ring, apply offline penalties (drop inactive signers)
@@ -378,6 +404,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				snap.Signers[address] = signed
 				// If the strike count exceeded threshold, drop the signer from authorized signers.
 				// This does not apply to voters. Voters can only be removed thru explicit voting.
+				// Note:
+				// A constant strike threshold value should be used during a single header processing.
+				// It is ok to call the calcStrikeThreshold here (which accesses the sealer count)
+				// without caching the returend value, because we use it only once during the header
+				// processing. Even if the sealer count changes due to offline penalties or voting,
+				// a new strike threshold value will not be used.
 				if _, ok := snap.Voters[address]; !ok && signed.StrikeCount > snap.calcStrikeThreshold() {
 					// Delete the signer from authorized signers
 					delete(snap.Signers, address)
@@ -398,18 +430,14 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		}
 
 		// If any votes are cast, process the votes
-		extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
-		if number%currConfig.Epoch != 0 && extraBytes > 0 {
-			// Check the signer against voters
-			if _, ok := snap.Voters[signer]; !ok {
-				return nil, errUnauthorizedVoter
-			}
+		if headerHasVotes {
 			// Calculate the effective vote threshold at the beginning of vote processing
 			// (Voter count might change later due to passed votes)
 			// Effective vote threshold: vote_threshold = voter_count / voting_rule
 			voteThreshold := len(snap.Voters) / currConfig.VotingRule
 			// Process every vote
 			// Note that the protocol forbids casting other votes when voting on dropping self.
+			extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
 			voteCount := extraBytes / (common.AddressLength + 1)
 			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
 				index := params.CliqueExtraVanity + voteIdx*(common.AddressLength+1)
@@ -489,11 +517,6 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 					delete(snap.Tally, address)
 				}
 			}
-			// If we're taking too much time (ecrecover), notify the user once a while
-			if time.Since(logged) > 8*time.Second {
-				log.Info("Reconstructing voting history", "processed", i, "total", len(headers), "elapsed", common.PrettyDuration(time.Since(start)))
-				logged = time.Now()
-			}
 		}
 
 		// Update the current config entry index based on the final sealer count.
@@ -503,6 +526,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				snap.ConfigIdx = i
 				break
 			}
+		}
+
+		// If we're taking too much time (ecrecover), notify the user once a while
+		if time.Since(logged) > 8*time.Second {
+			log.Info("Reconstructing voting history", "processed", i, "total", len(headers), "elapsed", common.PrettyDuration(time.Since(start)))
+			logged = time.Now()
 		}
 	}
 	if time.Since(start) > 8*time.Second {

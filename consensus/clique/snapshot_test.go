@@ -53,7 +53,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	for i, signer := range signers {
 		auths[i] = ap.address(signer)
 	}
-	// MODIFIED by Jakub Pajek BEG (clique permissions)
+	// MODIFIED by Jakub Pajek (clique permissions)
 	//sort.Sort(signersAscending(auths))
 	sort.Sort(addressesAscending(auths))
 	for i, auth := range auths {
@@ -103,6 +103,8 @@ type testerVote struct {
 	auth       bool
 	checkpoint []string
 	newbatch   bool
+	// ADDED by Jakub Pajek (voter ring voting)
+	signersCount int64
 }
 
 type cliqueTest struct {
@@ -111,207 +113,213 @@ type cliqueTest struct {
 	votes   []testerVote
 	results []string
 	failure error
+	// ADDED by Jakub Pajek (clique config: voting rule)
+	votingRule int
+	// ADDED by Jakub Pajek (voter ring voting)
+	privateHardFork2Block *big.Int
 }
 
 // Tests that Clique signer voting is evaluated correctly for various simple and
 // complex scenarios, as well as that a few special corner cases fail correctly.
-func TestClique(t *testing.T) {
+func TestClique_VotingRuleMajority(t *testing.T) {
 	// Define the various voting scenarios to test
 	tests := []cliqueTest{
 		{
 			// Single signer, no votes cast
 			signers: []string{"A"},
-			votes:   []testerVote{{signer: "A"}},
+			votes: []testerVote{
+				{signer: "A", signersCount: 1},
+			},
 			results: []string{"A"},
 		}, {
 			// Single signer, voting to add two others (only accept first, second needs 2 votes)
 			signers: []string{"A"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
+				{signer: "A", voted: "B", auth: true, signersCount: 1},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Two signers, voting to add three others (only accept first two, third needs 3 votes already)
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B", voted: "C", auth: true},
-				{signer: "A", voted: "D", auth: true},
-				{signer: "B", voted: "D", auth: true},
-				{signer: "C"},
-				{signer: "A", voted: "E", auth: true},
-				{signer: "B", voted: "E", auth: true},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", voted: "C", auth: true, signersCount: 2},
+				{signer: "A", voted: "D", auth: true, signersCount: 3},
+				{signer: "B", voted: "D", auth: true, signersCount: 3},
+				{signer: "C", signersCount: 4},
+				{signer: "A", voted: "E", auth: true, signersCount: 4},
+				{signer: "B", voted: "E", auth: true, signersCount: 4},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
 			// Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
 			signers: []string{"A"},
 			votes: []testerVote{
-				{signer: "A", voted: "A", auth: false},
+				{signer: "A", voted: "A", auth: false, signersCount: 1},
 			},
 			results: []string{},
 		}, {
 			// Two signers, actually needing mutual consent to drop either of them (not fulfilled)
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Two signers, actually needing mutual consent to drop either of them (fulfilled)
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B", voted: "B", auth: false},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+				{signer: "B", voted: "B", auth: false, signersCount: 2},
 			},
 			results: []string{"A"},
 		}, {
 			// Three signers, two of them deciding to drop the third
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
+				{signer: "A", voted: "C", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Four signers, consensus of two not being enough to drop anyone
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", voted: "C", auth: false, signersCount: 4},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
 			// Four signers, consensus of three already being enough to drop someone
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
+				{signer: "A", voted: "D", auth: false, signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 4},
+				{signer: "C", voted: "D", auth: false, signersCount: 4},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
 			// Authorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "C", auth: true},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Authorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", voted: "D", auth: true},
-				{signer: "B"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: true},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: true},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "D", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", voted: "D", auth: true, signersCount: 2},
+				{signer: "A", signersCount: 3},
+				{signer: "B", voted: "C", auth: true, signersCount: 3},
 			},
 			results: []string{"A", "B", "C", "D"},
 		}, {
 			// Deauthorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B"},
-				{signer: "A", voted: "B", auth: false},
-				{signer: "B"},
-				{signer: "A", voted: "B", auth: false},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Deauthorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: false},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", voted: "D", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 4},
+				{signer: "C", voted: "D", auth: false, signersCount: 4},
+				{signer: "A", signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Votes from deauthorized signers are discarded immediately (deauth votes)
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "C", voted: "B", auth: false},
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "A", voted: "B", auth: false},
+				{signer: "C", voted: "B", auth: false, signersCount: 3},
+				{signer: "A", voted: "C", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Votes from deauthorized signers are discarded immediately (auth votes)
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "C", voted: "D", auth: true},
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "A", voted: "D", auth: true},
+				{signer: "C", voted: "D", auth: true, signersCount: 3},
+				{signer: "A", voted: "C", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
+				{signer: "A", voted: "D", auth: true, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Cascading changes are not allowed, only the account being voted on may change
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", voted: "D", auth: false, signersCount: 4},
+				{signer: "B", voted: "C", auth: false, signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 4},
+				{signer: "C", voted: "D", auth: false, signersCount: 4},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
 			// Changes reaching consensus out of bounds (via a deauth) execute on touch
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "C", voted: "C", auth: true},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", voted: "D", auth: false, signersCount: 4},
+				{signer: "B", voted: "C", auth: false, signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 4},
+				{signer: "C", voted: "D", auth: false, signersCount: 4},
+				{signer: "A", signersCount: 3},
+				{signer: "C", voted: "C", auth: true, signersCount: 3},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
 			signers: []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
-				{signer: "C"},
-				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
-				{signer: "A"},
-				{signer: "B", voted: "C", auth: true},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", voted: "D", auth: false, signersCount: 4},
+				{signer: "B", voted: "C", auth: false, signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "A", signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 4},
+				{signer: "C", voted: "D", auth: false, signersCount: 4},
+				{signer: "A", signersCount: 3},
+				{signer: "B", voted: "C", auth: true, signersCount: 3},
 			},
 			results: []string{"A", "B", "C"},
 		}, {
@@ -322,19 +330,19 @@ func TestClique(t *testing.T) {
 			// the final signer outcome.
 			signers: []string{"A", "B", "C", "D", "E"},
 			votes: []testerVote{
-				{signer: "A", voted: "F", auth: true}, // Authorize F, 3 votes needed
-				{signer: "B", voted: "F", auth: true},
-				{signer: "C", voted: "F", auth: true},
-				{signer: "D", voted: "F", auth: false}, // Deauthorize F, 4 votes needed (leave A's previous vote "unchanged")
-				{signer: "E", voted: "F", auth: false},
-				{signer: "B", voted: "F", auth: false},
-				{signer: "C", voted: "F", auth: false},
-				{signer: "D", voted: "F", auth: true}, // Almost authorize F, 2/3 votes needed
-				{signer: "E", voted: "F", auth: true},
-				{signer: "B", voted: "A", auth: false}, // Deauthorize A, 3 votes needed
-				{signer: "C", voted: "A", auth: false},
-				{signer: "D", voted: "A", auth: false},
-				{signer: "B", voted: "F", auth: true}, // Finish authorizing F, 3/3 votes needed
+				{signer: "A", voted: "F", auth: true, signersCount: 5}, // Authorize F, 3 votes needed
+				{signer: "B", voted: "F", auth: true, signersCount: 5},
+				{signer: "C", voted: "F", auth: true, signersCount: 5},
+				{signer: "D", voted: "F", auth: false, signersCount: 6}, // Deauthorize F, 4 votes needed (leave A's previous vote "unchanged")
+				{signer: "E", voted: "F", auth: false, signersCount: 6},
+				{signer: "B", voted: "F", auth: false, signersCount: 6},
+				{signer: "C", voted: "F", auth: false, signersCount: 6},
+				{signer: "D", voted: "F", auth: true, signersCount: 5}, // Almost authorize F, 2/3 votes needed
+				{signer: "E", voted: "F", auth: true, signersCount: 5},
+				{signer: "B", voted: "A", auth: false, signersCount: 5}, // Deauthorize A, 3 votes needed
+				{signer: "C", voted: "A", auth: false, signersCount: 5},
+				{signer: "D", voted: "A", auth: false, signersCount: 5},
+				{signer: "B", voted: "F", auth: true, signersCount: 4}, // Finish authorizing F, 3/3 votes needed
 			},
 			results: []string{"B", "C", "D", "E", "F"},
 		}, {
@@ -342,25 +350,25 @@ func TestClique(t *testing.T) {
 			epoch:   3,
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: true},
-				{signer: "B"},
-				{signer: "A", checkpoint: []string{"A", "B"}},
-				{signer: "B", voted: "C", auth: true},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", checkpoint: []string{"A", "B"}, signersCount: 2},
+				{signer: "B", voted: "C", auth: true, signersCount: 2},
 			},
 			results: []string{"A", "B"},
 		}, {
 			// An unauthorized signer should not be able to sign blocks
 			signers: []string{"A"},
 			votes: []testerVote{
-				{signer: "B"},
+				{signer: "B", signersCount: 1},
 			},
 			failure: errUnauthorizedSigner,
 		}, {
 			// An authorized signer that signed recently should not be able to sign again
 			signers: []string{"A", "B"},
 			votes: []testerVote{
-				{signer: "A"},
-				{signer: "A"},
+				{signer: "A", signersCount: 2},
+				{signer: "A", signersCount: 2},
 			},
 			failure: errRecentlySigned,
 		}, {
@@ -368,10 +376,10 @@ func TestClique(t *testing.T) {
 			epoch:   3,
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "A"},
-				{signer: "B"},
-				{signer: "A", checkpoint: []string{"A", "B", "C"}},
-				{signer: "A"},
+				{signer: "A", signersCount: 3},
+				{signer: "B", signersCount: 3},
+				{signer: "A", checkpoint: []string{"A", "B", "C"}, signersCount: 3},
+				{signer: "A", signersCount: 3},
 			},
 			failure: errRecentlySigned,
 		}, {
@@ -383,10 +391,10 @@ func TestClique(t *testing.T) {
 			epoch:   3,
 			signers: []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "A"},
-				{signer: "B"},
-				{signer: "A", checkpoint: []string{"A", "B", "C"}},
-				{signer: "A", newbatch: true},
+				{signer: "A", signersCount: 3},
+				{signer: "B", signersCount: 3},
+				{signer: "A", checkpoint: []string{"A", "B", "C"}, signersCount: 3},
+				{signer: "A", newbatch: true, signersCount: 3},
 			},
 			failure: errRecentlySigned,
 		},
@@ -394,7 +402,273 @@ func TestClique(t *testing.T) {
 
 	// Run through the scenarios and test them
 	for i, tt := range tests {
+		// ADDED by Jakub Pajek (clique config: voting rule)
+		tt.votingRule = 2 // Majority
 		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek BEG (voter ring voting)
+		// Run the same test post PrivateHardFork2
+		tt.privateHardFork2Block = big.NewInt(0)
+		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek END (voter ring voting)
+	}
+}
+
+// Tests that Clique signer voting is evaluated correctly for various simple and
+// complex scenarios, as well as that a few special corner cases fail correctly.
+func TestClique_VotingRuleSingle(t *testing.T) {
+	// Define the various voting scenarios to test
+	tests := []cliqueTest{
+		{
+			// Single signer, no votes cast
+			signers: []string{"A"},
+			votes: []testerVote{
+				{signer: "A", signersCount: 1},
+			},
+			results: []string{"A"},
+		}, {
+			// Single signer, voting to add two others (fulfilled)
+			signers: []string{"A"},
+			votes: []testerVote{
+				{signer: "A", voted: "B", auth: true, signersCount: 1},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+			},
+			results: []string{"A", "B", "C"},
+		}, {
+			// Two signers, voting to add three others (fulfilled)
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", voted: "C", auth: true, signersCount: 3},
+				{signer: "A", voted: "D", auth: true, signersCount: 3},
+				{signer: "C", signersCount: 4},
+				{signer: "B", voted: "D", auth: true, signersCount: 4},
+				{signer: "D", signersCount: 4},
+				{signer: "A", voted: "E", auth: true, signersCount: 4},
+				{signer: "B", voted: "E", auth: true, signersCount: 5},
+			},
+			results: []string{"A", "B", "C", "D", "E"},
+		}, {
+			// Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
+			signers: []string{"A"},
+			votes: []testerVote{
+				{signer: "A", voted: "A", auth: false, signersCount: 1},
+			},
+			results: []string{},
+		}, {
+			// Two signers, one dropping another (fulfilled)
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+			},
+			results: []string{"A"},
+		}, {
+			// Three signers, two of them deciding to drop the third (fulfilled)
+			signers: []string{"A", "B", "C"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 2},
+			},
+			results: []string{"A", "B"},
+		}, {
+			// Four signers, consensus of one already being enough to drop anyone
+			signers: []string{"A", "B", "C", "D"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", voted: "D", auth: false, signersCount: 3},
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+			},
+			results: []string{"A"},
+		}, {
+			// Authorizations are counted once per signer per target
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 3},
+				{signer: "A", voted: "C", auth: true, signersCount: 3},
+				{signer: "B", signersCount: 3},
+				{signer: "A", voted: "C", auth: true, signersCount: 3},
+			},
+			results: []string{"A", "B", "C"},
+		}, {
+			// Authorizing multiple accounts concurrently is permitted
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 3},
+				{signer: "A", voted: "D", auth: true, signersCount: 3},
+				{signer: "C", signersCount: 4},
+				{signer: "D", signersCount: 4},
+				{signer: "B", voted: "D", auth: true, signersCount: 4},
+				{signer: "A", signersCount: 4},
+				{signer: "C", signersCount: 4},
+				{signer: "B", voted: "C", auth: true, signersCount: 4},
+			},
+			results: []string{"A", "B", "C", "D"},
+		}, {
+			// Deauthorizations are counted once per signer per target
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "B", auth: false, signersCount: 2},
+				{signer: "A", voted: "B", auth: false, signersCount: 1},
+				{signer: "A", voted: "B", auth: false, signersCount: 1},
+			},
+			results: []string{"A"},
+		}, {
+			// Deauthorizing multiple accounts concurrently is permitted
+			signers: []string{"A", "B", "C", "D"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 3},
+				{signer: "D", signersCount: 3},
+				{signer: "A", voted: "D", auth: false, signersCount: 3},
+				{signer: "B", signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", voted: "D", auth: false, signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", voted: "C", auth: false, signersCount: 2},
+			},
+			results: []string{"A", "B"},
+		}, {
+			// Votes from deauthorized signers are discarded immediately (deauth votes)
+			signers: []string{"A", "B", "C"},
+			votes: []testerVote{
+				{signer: "C", voted: "B", auth: false, signersCount: 3},
+				{signer: "A", voted: "C", auth: false, signersCount: 2},
+				{signer: "A", voted: "B", auth: false, signersCount: 1},
+			},
+			results: []string{"A"},
+		}, {
+			// Votes from deauthorized signers are discarded immediately (auth votes)
+			signers: []string{"A", "B", "C"},
+			votes: []testerVote{
+				{signer: "C", voted: "D", auth: true, signersCount: 3},
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
+				{signer: "A", voted: "D", auth: true, signersCount: 3},
+			},
+			results: []string{"A", "B", "D"},
+		}, {
+			// Cascading changes are not allowed, only the account being voted on may change
+			signers: []string{"A", "B", "C", "D"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 3},
+				{signer: "D", signersCount: 3},
+				{signer: "A", voted: "D", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "D", auth: false, signersCount: 2},
+				{signer: "B", voted: "D", auth: false, signersCount: 2},
+			},
+			results: []string{"A", "B"},
+		}, {
+			// Changes reaching consensus out of bounds (via a deauth) execute on touch
+			// Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
+			signers: []string{"A", "B", "C", "D"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: false, signersCount: 4},
+				{signer: "B", signersCount: 3},
+				{signer: "D", signersCount: 3},
+				{signer: "A", voted: "D", auth: false, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", signersCount: 2},
+				{signer: "A", voted: "D", auth: false, signersCount: 2},
+				{signer: "B", voted: "D", auth: false, signersCount: 2},
+				{signer: "A", signersCount: 2},
+				{signer: "B", voted: "C", auth: true, signersCount: 2},
+			},
+			results: []string{"A", "B", "C"},
+		}, {
+			// Ensure that pending votes don't survive authorization status changes. This
+			// corner case can only appear if a signer is quickly added, removed and then
+			// re-added (or the inverse), while one of the original voters dropped. If a
+			// past vote is left cached in the system somewhere, this will interfere with
+			// the final signer outcome.
+			signers: []string{"A", "B", "C", "D", "E"},
+			votes: []testerVote{
+				{signer: "A", voted: "F", auth: true, signersCount: 5},
+				{signer: "B", voted: "F", auth: true, signersCount: 6},
+				{signer: "C", voted: "F", auth: true, signersCount: 6},
+				{signer: "D", voted: "F", auth: false, signersCount: 6},
+				{signer: "E", voted: "F", auth: false, signersCount: 5},
+				{signer: "B", voted: "F", auth: false, signersCount: 5},
+				{signer: "C", voted: "F", auth: false, signersCount: 5},
+				{signer: "D", voted: "F", auth: true, signersCount: 5},
+				{signer: "E", voted: "F", auth: true, signersCount: 6},
+				{signer: "B", voted: "A", auth: false, signersCount: 6},
+				{signer: "C", voted: "A", auth: false, signersCount: 5},
+				{signer: "D", voted: "A", auth: false, signersCount: 5},
+				{signer: "B", voted: "F", auth: true, signersCount: 5},
+			},
+			results: []string{"B", "C", "D", "E", "F"},
+		}, {
+			// Epoch transitions reset all votes to allow chain checkpointing
+			epoch:   3,
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", voted: "C", auth: true, signersCount: 2},
+				{signer: "B", signersCount: 3},
+				{signer: "A", checkpoint: []string{"A", "B", "C"}, signersCount: 3},
+				{signer: "B", voted: "C", auth: false, signersCount: 3},
+			},
+			results: []string{"A", "B"},
+		}, {
+			// An unauthorized signer should not be able to sign blocks
+			signers: []string{"A"},
+			votes: []testerVote{
+				{signer: "B", signersCount: 1},
+			},
+			failure: errUnauthorizedSigner,
+		}, {
+			// An authorized signer that signed recently should not be able to sign again
+			signers: []string{"A", "B"},
+			votes: []testerVote{
+				{signer: "A", signersCount: 2},
+				{signer: "A", signersCount: 2},
+			},
+			failure: errRecentlySigned,
+		}, {
+			// Recent signatures should not reset on checkpoint blocks imported in a batch
+			epoch:   3,
+			signers: []string{"A", "B", "C"},
+			votes: []testerVote{
+				{signer: "A", signersCount: 3},
+				{signer: "B", signersCount: 3},
+				{signer: "A", checkpoint: []string{"A", "B", "C"}, signersCount: 3},
+				{signer: "A", signersCount: 3},
+			},
+			failure: errRecentlySigned,
+		}, {
+			// Recent signatures should not reset on checkpoint blocks imported in a new
+			// batch (https://github.com/ethereum/go-ethereum/issues/17593). Whilst this
+			// seems overly specific and weird, it was a Rinkeby consensus split.
+			// ADDED by Jakub Pajek (clique tests)
+			// https://github.com/ethereum/go-ethereum/pull/17620
+			epoch:   3,
+			signers: []string{"A", "B", "C"},
+			votes: []testerVote{
+				{signer: "A", signersCount: 3},
+				{signer: "B", signersCount: 3},
+				{signer: "A", checkpoint: []string{"A", "B", "C"}, signersCount: 3},
+				{signer: "A", newbatch: true, signersCount: 3},
+			},
+			failure: errRecentlySigned,
+		},
+	}
+
+	// Run through the scenarios and test them
+	for i, tt := range tests {
+		// ADDED by Jakub Pajek (clique config: voting rule)
+		tt.votingRule = 1 // Single vote
+		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek BEG (voter ring voting)
+		// Run the same test post PrivateHardFork2
+		tt.privateHardFork2Block = big.NewInt(0)
+		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek END (voter ring voting)
 	}
 }
 
@@ -435,7 +709,7 @@ func (tt *cliqueTest) run(t *testing.T) {
 	config.RefundableFees = true
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	config.PrivateHardFork1Block = big.NewInt(0)
-	config.PrivateHardFork2Block = big.NewInt(0)
+	config.PrivateHardFork2Block = tt.privateHardFork2Block
 	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//config.Clique = &params.CliqueConfig{
@@ -446,7 +720,7 @@ func (tt *cliqueTest) run(t *testing.T) {
 			// ADDED by Jakub Pajek (clique config: block reward)
 			BlockReward: params.CliqueBlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
-			VotingRule: params.CliqueVotingRule,
+			VotingRule: tt.votingRule,
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: params.CliqueMinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)
@@ -461,6 +735,8 @@ func (tt *cliqueTest) run(t *testing.T) {
 	engine.fakeDiff = true
 	// ADDED by Jakub Pajek (clique static block rewards)
 	engine.fakeRewards = true
+	// ADDED by Jakub Pajek (voter ring voting)
+	engine.fakeVoterRing = (tt.privateHardFork2Block != nil)
 
 	_, blocks, _ := core.GenerateChainWithGenesis(genesis, engine, len(tt.votes), func(j int, gen *core.BlockGen) {
 		// COMMENTED by Jakub Pajek (clique multiple votes)
@@ -506,7 +782,23 @@ func (tt *cliqueTest) run(t *testing.T) {
 
 		// MODIFIED by Jakub Pajek (clique 1-n scale difficulties)
 		//header.Difficulty = diffInTurn // Ignored, we just need a valid number
-		header.Difficulty = big.NewInt(1) // Ignored, we just need a valid number
+		// MODIFIED by Jakub Pajek (voter ring voting)
+		//header.Difficulty = big.NewInt(1) // Ignored, we just need a valid number
+		if tt.votes[j].signersCount > 0 {
+			// If signers count for a block is set, use it to estimate the difficulty
+			// (It does not have to be exact, just within the current ring's allowed range)
+			if engine.fakeVoterRing {
+				// Set the difficulty to the maximum allowed value in the voter ring range
+				header.Difficulty = big.NewInt(tt.votes[j].signersCount * 2)
+			} else {
+				// Set the difficulty to the maximum allowed value in the sealer ring range
+				header.Difficulty = big.NewInt(tt.votes[j].signersCount)
+			}
+		} else {
+			// If signers count for a block is not set, use the lowest allowed value in the
+			// sealer ring range, which will cause all the tests in the voter ring to faild.
+			header.Difficulty = big.NewInt(1)
+		}
 
 		// Generate the signature, embed it into the header and the block
 		accounts.sign(header, tt.votes[j].signer)

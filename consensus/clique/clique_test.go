@@ -47,6 +47,10 @@ func TestReimportMirroredState(t *testing.T) {
 		engine = New(params.AllCliqueProtocolChanges.Clique, db)
 		signer = new(types.HomesteadSigner)
 	)
+	// ADDED by Jakub Pajek (clique static block rewards)
+	// In the future consider disabling block rewards, because this test tests the case when consecutive
+	// blocks have the same state root. However rewards are enabled on mainnets, so prioritize this case for now.
+	//engine.fakeRewards = true
 	genspec := &core.Genesis{
 		Config: params.AllCliqueProtocolChanges,
 		// MODIFIED by Jakub Pajek (clique permissions)
@@ -291,7 +295,7 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 		}
 		return bytes.Compare(iAddr[:], jAddr[:]) < 0
 	})
-	snap := newGenesisSnapshot(nil, nil, 0, common.Hash{}, make([]common.Address, 0), signers)
+	snap := newGenesisSnapshot(nil, nil, 0, common.Hash{}, make([]common.Address, 0), signers, false)
 	for _, signer := range signers {
 		snap.Signers[signer] = test.lastSigned[signer]
 	}

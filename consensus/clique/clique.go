@@ -93,6 +93,10 @@ var (
 	// of votes (i.e. vote on dropping self, as wel as other votes)
 	errForbiddenVotes = errors.New("forbidden votes combination in extra-data")
 
+	// errSealerRingVotes is returned if a post-PrivateHardFork2 non-checkpoint block in the sealer
+	// ring contains votes (post PrivateHardFork2, voting is allowed only in the voter ring).
+	errSealerRingVotes = errors.New("sealer ring block contains votes")
+
 	// errInvalidVote is returned if a vote marker value in extra is something else than the three
 	// allowed constants of 0x00, 0x01, 0x02.
 	errInvalidVote = errors.New("invalid vote marker in extra-data")
@@ -206,8 +210,9 @@ type Clique struct {
 	lock   sync.RWMutex   // Protects the signer and proposals fields
 
 	// The fields below are for testing only
-	fakeDiff    bool // Skip difficulty verifications
-	fakeRewards bool // Skip accumulating the block rewards
+	fakeDiff      bool // Skip difficulty verifications
+	fakeRewards   bool // Skip accumulating the block rewards
+	fakeVoterRing bool // Set the ring for the genesis block (the sealer ring or the voter ring)
 }
 
 // loadProposals loads existing proposals from the database.
@@ -432,7 +437,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if number == 0 {
 		return nil
 	}
-	// Retrieve the snapshot needed to verify this header and cache it
+	// Assemble the snapshot needed to access the current config
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
@@ -492,7 +497,7 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		}
 	}
 	// All basic checks passed, verify the seal and return
-	return c.verifySeal(snap, header, parent)
+	return c.verifySeal(chain, snap, header, parent)
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
@@ -563,7 +568,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 						voters = append(voters, signers[i])
 					}
 				}
-				snap = newGenesisSnapshot(c.config, c.signatures, number, hash, voters, signers)
+				snap = newGenesisSnapshot(c.config, c.signatures, number, hash, voters, signers, c.fakeVoterRing)
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -620,17 +625,19 @@ func (c *Clique) VerifyUncles(chain consensus.ChainReader, block *types.Block) e
 }
 
 // verifySeal checks whether the signature contained in the header satisfies the
-// consensus protocol requirements. The method accepts an optional list of parent
-// headers that aren't yet part of the local blockchain to generate the snapshots
-// from.
-func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.Header) error {
+// consensus protocol requirements.
+func (c *Clique) verifySeal(chain consensus.ChainHeaderReader, snap *Snapshot, header *types.Header, parent *types.Header) error {
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
 		return errUnknownBlock
 	}
-
-	currConfig := snap.CurrentConfig()
+	// Get the current config
+	var (
+		currConfig     = snap.CurrentConfig()
+		headerHasVotes bool
+		okVoter        bool
+	)
 
 	// Resolve the authorization key and check against signers
 	signer, err := ecrecover(header, c.signatures)
@@ -644,6 +651,13 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 			nextNumber uint64
 			nextDiff   *big.Int
 		)
+
+		// If any votes are cast, check the signer against voters (only voters can vote)
+		headerHasVotes = number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0
+		_, okVoter = snap.Voters[signer]
+		if headerHasVotes && !okVoter {
+			return errUnauthorizedVoter
+		}
 		// Check in which ring we are currently signing blocks in
 		if !snap.VoterRing {
 			// We are currently signing blocks in the sealer ring.
@@ -651,30 +665,49 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 			// in the sealer ring or switch to the voter ring.
 			if header.Difficulty.Cmp(snap.maxSealerRingDifficulty()) <= 0 {
 				// We want to stay in the sealer ring
+				// For post-PrivateHardFork2 blocks, check if no votes are cast
+				// (voting is no longer allowed in the sealer ring)
+				if chain.Config().IsPrivateHardFork2(header.Number) && headerHasVotes {
+					return errSealerRingVotes
+				}
+				// Calculate the next signable block number and difficulty for the signer
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
 				nextDiff = snap.calcSealerRingDifficulty(signer)
 			} else if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
 				// We want to switch to the voter ring
 				// Check the signer against voters (only voters can switch to the voter ring)
-				if _, ok := snap.Voters[signer]; !ok {
+				if !okVoter {
 					return errUnauthorizedVoter
 				}
-				// Check if a sufficiently long stall in block creation occurred
-				if currConfig.Period == 0 || header.Time < parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
-					return errWrongDifficultySealerRing
+				if chain.Config().IsPrivateHardFork2(header.Number) {
+					// For post-PrivateHardFork2 blocks, the switch is allowed if:
+					// - votes are cast, or
+					// - a sufficiently long stall in block creation occurred
+					if !headerHasVotes &&
+						(currConfig.Period == 0 || header.Time < parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
+						return errWrongDifficultySealerRing
+					}
+				} else {
+					// For pre-PrivateHardFork2 blocks, the switch is allowed if:
+					// - a sufficiently long stall in block creation occurred
+					if currConfig.Period == 0 || header.Time < parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
+						return errWrongDifficultySealerRing
+					}
 				}
+				// Calculate the next signable block number and difficulty for the signer
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
 				nextDiff = snap.calcVoterRingDifficulty(signer)
 			} else if header.Difficulty.Cmp(snap.maxRingBreakerDifficulty()) <= 0 {
 				// We want to preemptively prevent switching to the voter ring
 				// Check the signer against voters (only non-voters can prevent the voter ring)
-				if _, ok := snap.Voters[signer]; ok {
+				if okVoter {
 					return errUnauthorizedVoter
 				}
 				// Check if a sufficiently long stall in block creation occurred
 				if currConfig.Period == 0 || header.Time < parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
 					return errWrongDifficultySealerRing
 				}
+				// Calculate the next signable block number and difficulty for the signer
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
 				nextDiff = snap.calcRingBreakerDifficulty(signer)
 			} else {
@@ -691,17 +724,31 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 			} else if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
 				// We want to stay in the voter ring
 				// Check the signer against voters (only voters can sign blocks in the voter ring)
-				if _, ok := snap.Voters[signer]; !ok {
+				if !okVoter {
 					return errUnauthorizedVoter
 				}
+				// Calculate the next signable block number and difficulty for the signer
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
 				nextDiff = snap.calcVoterRingDifficulty(signer)
 			} else if header.Difficulty.Cmp(snap.maxRingBreakerDifficulty()) <= 0 {
 				// We want to return to the sealer ring
 				// Check the signer against voters (only non-voters can disband the voter ring)
-				if _, ok := snap.Voters[signer]; ok {
+				if okVoter {
 					return errUnauthorizedVoter
 				}
+				if chain.Config().IsPrivateHardFork2(header.Number) {
+					// For post-PrivateHardFork2 blocks, the switch is allowed if:
+					// - voting has not started, or
+					// - a sufficiently long stall in block creation occurred
+					if snap.Voting &&
+						(currConfig.Period == 0 || header.Time < parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
+						return errWrongDifficultyVoterRing
+					}
+				} else {
+					// For pre-PrivateHardFork2 blocks, the switch is allowed if:
+					// - always
+				}
+				// Calculate the next signable block number and difficulty for the signer
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
 				nextDiff = snap.calcRingBreakerDifficulty(signer)
 			} else {
@@ -723,13 +770,9 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parent *types.
 		}
 	}
 	// If any votes are cast, verify the votes
-	extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
-	if number%currConfig.Epoch != 0 && extraBytes > 0 {
-		// Check the signer against voters
-		if _, ok := snap.Voters[signer]; !ok {
-			return errUnauthorizedVoter
-		}
+	if headerHasVotes {
 		// Verify the votes list
+		extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
 		votesCast := make(map[common.Address]struct{})
 		voteCount := extraBytes / (common.AddressLength + 1)
 		for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
@@ -767,7 +810,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
-	// Assemble the voting snapshot to check which votes make sense
+	// Assemble the snapshot needed to access the current config
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
@@ -813,7 +856,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 					dropSelf = true
 				}
 				addresses = append(addresses, address)
-			} else if number > proposal.Block && number-proposal.Block > params.FullImmutabilityThreshold {
+			} else if number > proposal.Block && number-proposal.Block > params.CliqueEpoch {
 				delete(c.proposals, address)
 				purged++
 			}
@@ -822,7 +865,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		if purged > 0 {
 			log.Trace("Purged old clique proposals", "total", len(c.proposals), "purged", purged)
 			if err := c.storeProposals(); err != nil {
-				log.Warn("Failed to store clique proposals to disk", "err", err)
+				log.Error("Failed to store clique proposals to disk", "err", err)
 			} else {
 				log.Trace("Stored clique proposals disk")
 			}
@@ -866,31 +909,59 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	// Check in which ring we are currently signing blocks in
 	if !snap.VoterRing {
 		// We are currently signing blocks in the sealer ring.
-		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
-		// If there is a significant stall in block creation and we are a signer, preemptively prevent
-		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if currConfig.Period > 0 && header.Time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
-			if okVoter {
+		if okVoter {
+			// If we are a voter, switch to the voter ring if:
+			// - we are post-PrivateHardFork2 and want to cast votes, or
+			// - a sufficiently long stall in block creation occurred
+			// Continue in the sealer ring otherwise.
+			headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0
+			if (chain.Config().IsPrivateHardFork2(header.Number) && headerHasVotes) ||
+				(currConfig.Period > 0 && header.Time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
 				// Set the correct difficulty for the voter ring
 				header.Difficulty = snap.calcVoterRingDifficulty(signer)
 			} else {
-				// Set the correct difficulty for preventing switching to the voter ring
-				header.Difficulty = snap.calcRingBreakerDifficulty(signer)
+				// Set the correct difficulty for the sealer ring
+				header.Difficulty = snap.calcSealerRingDifficulty(signer)
 			}
 		} else {
-			// Set the correct difficulty for the sealer ring
-			header.Difficulty = snap.calcSealerRingDifficulty(signer)
+			// If we are not a voter, preemptively prevent switching to the voter ring if:
+			// - a sufficiently long stall in block creation occurred
+			// Continue in the sealer ring otherwise.
+			if currConfig.Period > 0 && header.Time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
+				// Set the correct difficulty for preventing switching to the voter ring
+				header.Difficulty = snap.calcRingBreakerDifficulty(signer)
+			} else {
+				// Set the correct difficulty for the sealer ring
+				header.Difficulty = snap.calcSealerRingDifficulty(signer)
+			}
 		}
 	} else {
 		// We are currently signing blocks in the voter ring.
-		// If we are not a voter, try returning to the sealer ring by disbanding
-		// the voter ring. Continue in the voter ring otherwise.
-		if !okVoter {
-			// Set the correct difficulty for disbanding the voter ring
-			header.Difficulty = snap.calcRingBreakerDifficulty(signer)
-		} else {
+		if okVoter {
+			// If we are a voter, continue in the voter ring.
 			// Set the correct difficulty for the voter ring
 			header.Difficulty = snap.calcVoterRingDifficulty(signer)
+		} else {
+			// If we are not a voter, ...
+			if chain.Config().IsPrivateHardFork2(header.Number) {
+				// For post-PrivateHardFork2 blocks, try returning to the sealer ring by disbanding the voter ring if:
+				// - voting has not started, or
+				// - a sufficiently long stall in block creation occurred
+				// Withold sealing the block otherwise.
+				if !snap.Voting ||
+					(currConfig.Period > 0 && header.Time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
+					// Set the correct difficulty for disbanding the voter ring
+					header.Difficulty = snap.calcRingBreakerDifficulty(signer)
+				} else {
+					// Set the invalid difficulty to withold sealing the block
+					header.Difficulty = diffInvalid
+				}
+			} else {
+				// For pre-PrivateHardFork2 blocks, try returning to the sealer ring by disbanding the voter ring if:
+				// - always
+				// Set the correct difficulty for disbanding the voter ring
+				header.Difficulty = snap.calcRingBreakerDifficulty(signer)
+			}
 		}
 	}
 	return nil
@@ -905,7 +976,7 @@ func (c *Clique) Finalize(chain consensus.ChainHeaderReader, header *types.Heade
 		// Resolve the authorization key
 		signer, err := ecrecover(header, c.signatures)
 		if err != nil {
-			log.Warn("Failed to retrieve block author", "number", header.Number.Uint64(), "hash", header.Hash(), "err", err)
+			return err
 		}
 		// Accumulate any block rewards (excluding uncle rewards).
 		if signer != (common.Address{}) {
@@ -955,7 +1026,7 @@ func (c *Clique) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *
 func (c *Clique) accumulateRewards(chain consensus.ChainHeaderReader, state *state.StateDB, header *types.Header, uncles []*types.Header, signer common.Address) error {
 	number := header.Number.Uint64()
 
-	// Assemble the snapshot to select the correct block reward
+	// Assemble the snapshot needed to access the current config
 	var currConfig *params.CliqueConfigEntry
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
@@ -996,7 +1067,14 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	if number == 0 {
 		return errUnknownBlock
 	}
-	// Assemble the snapshot
+	// For post-PrivateHardFork2 blocks, withold sealing blocks if the difficulty is set to an invalid value.
+	// This happens when a non-voter can't try to switch the network back to the sealer ring because:
+	// - voting has started, and
+	// - not a sufficiently long stall in block creation occurred
+	if chain.Config().IsPrivateHardFork2(header.Number) && header.Difficulty.Cmp(diffInvalid) == 0 {
+		return errors.New("sealing paused while waiting for voting to finish")
+	}
+	// Assemble the snapshot needed to access the current config
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
@@ -1034,14 +1112,18 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 			if inturnDiff = snap.maxSealerRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to stay in the sealer ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
-			} else if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
+			} else if inturnDiff = snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to switch to the voter ring
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
-				// Set in-turn difficulty value to 0, in order to treat all voters trying to switch to the voter ring
-				// as out-of-turn, thus broadcast their blocks with a delay. This will allow some of the in-turnish
-				// online signers to broadcast their blocks faster, which in consequence will allow to prevent
-				// switching to the voter ring.
-				inturnDiff = big.NewInt(0)
+				// Since, unlike mobile signers, voters are most likely to always be online,
+				// they will sign in-turn most of the time while trying to switch to the voter ring.
+				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes {
+					// Set in-turn difficulty value to 0, in order to treat all non-voting voters trying to switch
+					// to the voter ring because of a network stall as out-of-turn. This will result in their block
+					// being broadcast with a delay and will allow some of the in-turnish online signers to broadcast
+					// their blocks faster, which in consequence will allow to prevent switching to the voter ring.
+					inturnDiff = big.NewInt(0)
+				}
 			} else {
 				// We want to preemptively prevent switching to the voter ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
@@ -1051,15 +1133,18 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 			// We are currently signing blocks in the voter ring.
 			// Check the difficulty to determine if we want to stay
 			// in the voter ring or return to the sealer ring.
-			if header.Difficulty.Cmp(snap.maxVoterRingDifficulty()) <= 0 {
+			if inturnDiff = snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to stay in the voter ring
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
-				// Since, unlike mobile signers, voters are most likely to be always online, in the voter ring
-				// they will sign in-turn most of the time. Set in-turn difficulty value to 0, in order to treat
-				// all voters in the voter ring as out-of-turn, thus broadcast their blocks with a delay. This
-				// will allow some of the in-turnish online signers to broadcast their blocks faster, which in
-				// consequence will allow to disband the voter ring.
-				inturnDiff = big.NewInt(0)
+				// Since, unlike mobile signers, voters are most likely to always be online,
+				// they will sign in-turn most of the time while in the voter ring.
+				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes {
+					// Set in-turn difficulty value to 0, in order to treat all non-voting voters in the voter ring
+					// as out-of-turn, thus broadcast their blocks with a delay. This will allow some of the in-turnish
+					// online signers to broadcast their blocks faster, which in consequence will allow to disband
+					// the voter ring.
+					inturnDiff = big.NewInt(0)
+				}
 			} else {
 				// We want to return to the sealer ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
@@ -1111,13 +1196,20 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 // CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
 // that a new block should have.
 func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
-	// MEMO by Jakub Pajek (clique config: variable period)
-	// Are we running tests using a chain header reader stub? Should check?
+	number := big.NewInt(0).Add(parent.Number, big.NewInt(1))
+
+	// Assemble the snapshot needed to access the current config
 	snap, err := c.snapshot(chain, parent.Number.Uint64(), parent.Hash(), nil)
 	if err != nil {
+		// MEMO by Jakub Pajek (clique config: variable period)
+		// Are we running tests using a chain header reader stub?
+		if !chain.IsStub() {
+			log.Error("Failed to assemble the snapshot for difficulty calculation", "err", err)
+		}
 		return nil
 	}
 	currConfig := snap.CurrentConfig()
+
 	// Check if we are an authorized voter, for future use...
 	c.lock.RLock()
 	signer := c.signer
@@ -1127,31 +1219,59 @@ func (c *Clique) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, 
 	// Check in which ring we are currently signing blocks in
 	if !snap.VoterRing {
 		// We are currently signing blocks in the sealer ring.
-		// If there is a significant stall in block creation and we are a voter, switch to the voter ring.
-		// If there is a significant stall in block creation and we are a signer, preemptively prevent
-		// switching to the voter ring. Continue in the sealer ring otherwise.
-		if currConfig.Period > 0 && time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
-			if okVoter {
+		if okVoter {
+			// If we are a voter, switch to the voter ring if:
+			// - we are post-PrivateHardFork2 and want to cast votes, or
+			// - a sufficiently long stall in block creation occurred
+			// Continue in the sealer ring otherwise.
+			headerHasVotes := false
+			if (chain.Config().IsPrivateHardFork2(number) && headerHasVotes) ||
+				(currConfig.Period > 0 && time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
 				// Set the correct difficulty for the voter ring
 				return snap.calcVoterRingDifficulty(signer)
 			} else {
-				// Set the correct difficulty for preventing switching to the voter ring
-				return snap.calcRingBreakerDifficulty(signer)
+				// Set the correct difficulty for the sealer ring
+				return snap.calcSealerRingDifficulty(signer)
 			}
 		} else {
-			// Set the correct difficulty for the sealer ring
-			return snap.calcSealerRingDifficulty(signer)
+			// If we are not a voter, preemptively prevent switching to the voter ring if:
+			// - a sufficiently long stall in block creation occurred
+			// Continue in the sealer ring otherwise.
+			if currConfig.Period > 0 && time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period) {
+				// Set the correct difficulty for preventing switching to the voter ring
+				return snap.calcRingBreakerDifficulty(signer)
+			} else {
+				// Set the correct difficulty for the sealer ring
+				return snap.calcSealerRingDifficulty(signer)
+			}
 		}
 	} else {
 		// We are currently signing blocks in the voter ring.
-		// If we are not a voter, try returning to the sealer ring by disbanding
-		// the voter ring. Continue in the voter ring otherwise.
-		if !okVoter {
-			// Set the correct difficulty for disbanding the voter ring
-			return snap.calcRingBreakerDifficulty(signer)
-		} else {
+		if okVoter {
+			// If we are a voter, continue in the voter ring.
 			// Set the correct difficulty for the voter ring
 			return snap.calcVoterRingDifficulty(signer)
+		} else {
+			// If we are not a voter, ...
+			if chain.Config().IsPrivateHardFork2(number) {
+				// For post-PrivateHardFork2 blocks, try returning to the sealer ring by disbanding the voter ring if:
+				// - voting has not started, or
+				// - a sufficiently long stall in block creation occurred
+				// Withold sealing the block otherwise.
+				if !snap.Voting ||
+					(currConfig.Period > 0 && time >= parent.Time+(currConfig.MinStallPeriod*currConfig.Period)) {
+					// Set the correct difficulty for disbanding the voter ring
+					return snap.calcRingBreakerDifficulty(signer)
+				} else {
+					// Set the invalid difficulty to withold sealing the block
+					return diffInvalid
+				}
+			} else {
+				// For pre-PrivateHardFork2 blocks, try returning to the sealer ring by disbanding the voter ring if:
+				// - always
+				// Set the correct difficulty for disbanding the voter ring
+				return snap.calcRingBreakerDifficulty(signer)
+			}
 		}
 	}
 }
