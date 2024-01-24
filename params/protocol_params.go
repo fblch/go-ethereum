@@ -185,6 +185,11 @@ var (
 	// once we decide to change it. Set to 30000 for now. Increase as the network grows.
 	CliqueMaxSealerCount = 30000
 
+	// MEMO by Jakub Pajek: votes limit (hard fork: HF2)
+	// CliqueMaxVoteCount limits the number of votes that can be included by voters in a post-PrivateHardFork2 non-checkpoint
+	// blocks during voting. This limit is enforced by the consensus protocol, so changing it requires a hard fork.
+	CliqueMaxVoteCount = 100
+
 	// Default number of blocks after which to checkpoint and reset the pending votes
 	CliqueEpoch = uint64(30000)
 

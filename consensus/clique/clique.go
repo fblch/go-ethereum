@@ -89,6 +89,10 @@ var (
 	// an invalid list of votes (i.e. non divisible by 20+1 bytes).
 	errInvalidVotes = errors.New("invalid votes list in extra-data")
 
+	// errOverflowVotes is returned if a post-PrivateHardFork2 non-checkpoint block contains
+	// a too long list of votes  (i.e. the number of votes exceeds params.CliqueMaxVoteCount).
+	errOverflowVotes = errors.New("too long votes list in extra-data")
+
 	// errForbiddenVotes is returned if a votes list in extra contains a forbidden combination
 	// of votes (i.e. vote on dropping self, as wel as other votes)
 	errForbiddenVotes = errors.New("forbidden votes combination in extra-data")
@@ -485,8 +489,17 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 	if checkpoint && extraBytes%(common.AddressLength+1) != 0 {
 		return errInvalidCheckpointPermissions
 	}
-	if !checkpoint && extraBytes%(common.AddressLength+1) != 0 {
-		return errInvalidVotes
+	if !checkpoint {
+		if extraBytes%(common.AddressLength+1) != 0 {
+			return errInvalidVotes
+		}
+		if chain.Config().IsPrivateHardFork2(header.Number) {
+			// For post-PrivateHardFork2 blocks, verify that the number of votes
+			// included in the header does not exceed the maximum allowance.
+			if voteCount := extraBytes / (common.AddressLength + 1); voteCount > params.CliqueMaxVoteCount {
+				return errOverflowVotes
+			}
+		}
 	}
 	// If the block is a checkpoint block, verify the permissions list
 	if checkpoint {
@@ -859,7 +872,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// On that occasion, also purge already passed and old proposals
 		addresses, purged, dropSelf := make([]common.Address, 0, len(c.proposals)), 0, false
 		for address, proposal := range c.proposals {
-			// Vote should be valid, and cast after the signer was dropped for inactivity,
+			// Proposal should be valid, and created after the signer was dropped for inactivity,
 			// in order not to automatically vote on re-adding those dropped signers
 			if snap.validVote(address, proposal.Proposal) && snap.Dropped[address] < proposal.Block {
 				if address == signer && proposal.Proposal == proposalDropVote {
@@ -883,7 +896,18 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// If there's pending proposals, cast votes on them
 		// Note that the protocol forbids casting other votes when voting on dropping self.
 		if !dropSelf {
-			for i := range addresses {
+			// For pre-PrivateHardFork2 blocks, and post-PrivateHardFork2 blocks when the number of pending
+			// proposals does not exceed the maximum vote allowance, cast votes on all pending proposals
+			proposalCount := len(addresses)
+			if chain.Config().IsPrivateHardFork2(header.Number) && proposalCount > params.CliqueMaxVoteCount {
+				// For post-PrivateHardFork2 blocks, when the number of pending proposals exceeds the maximum vote allowance,
+				// cast the maximum allowed number of votes on proposals randomly selected from all pending proposals.
+				// Note: Since go1.20, the math/rand package automatically seeds the global random number generator
+				// with a random value, and the top-level Seed function has been deprecated: https://tip.golang.org/doc/go1.20
+				rand.Shuffle(len(addresses), func(i, j int) { addresses[i], addresses[j] = addresses[j], addresses[i] })
+				proposalCount = params.CliqueMaxVoteCount
+			}
+			for i := 0; i < proposalCount; i++ {
 				header.Extra = append(header.Extra, addresses[i][:]...)
 				switch c.proposals[addresses[i]].Proposal {
 				case proposalVoterVote:
