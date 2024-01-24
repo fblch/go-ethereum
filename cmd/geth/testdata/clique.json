@@ -13,6 +13,7 @@
       "epoch": 30000,
       "blockReward": 1000000000000000000,
       "votingRule": 2,
+      "votingRulePrivHardFork2": 2,
       "minStallPeriod": 4,
       "minOfflineTime": 2678400,
       "minStrikeCount": 100

@@ -434,7 +434,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			// Calculate the effective vote threshold at the beginning of vote processing
 			// (Voter count might change later due to passed votes)
 			// Effective vote threshold: vote_threshold = voter_count / voting_rule
-			voteThreshold := len(snap.Voters) / currConfig.VotingRule
+			var voteThreshold int
+			if config.IsPrivateHardFork2(header.Number) {
+				voteThreshold = len(snap.Voters) / currConfig.VotingRulePrivHardFork2
+			} else {
+				voteThreshold = len(snap.Voters) / currConfig.VotingRule
+			}
 			// Process every vote
 			// Note that the protocol forbids casting other votes when voting on dropping self.
 			extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal

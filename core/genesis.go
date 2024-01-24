@@ -589,6 +589,8 @@ func DeveloperGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 			BlockReward: config.Clique[0].BlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
 			VotingRule: config.Clique[0].VotingRule,
+			// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+			VotingRulePrivHardFork2: config.Clique[0].VotingRulePrivHardFork2,
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: config.Clique[0].MinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)

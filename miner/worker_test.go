@@ -98,6 +98,8 @@ func init() {
 			BlockReward: params.CliqueBlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
 			VotingRule: params.CliqueVotingRule,
+			// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+			VotingRulePrivHardFork2: params.CliqueVotingRule,
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: params.CliqueMinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)
@@ -263,6 +265,8 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 				BlockReward: params.CliqueBlockReward,
 				// ADDED by Jakub Pajek (clique config: voting rule)
 				VotingRule: params.CliqueVotingRule,
+				// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+				VotingRulePrivHardFork2: params.CliqueVotingRule,
 				// ADDED by Jakub Pajek (clique config: min stall period)
 				MinStallPeriod: params.CliqueMinStallPeriod,
 				// ADDED by Jakub Pajek (clique config: min offline time)

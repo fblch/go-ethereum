@@ -165,6 +165,8 @@ var (
 				BlockReward: big.NewInt(0),
 				// ADDED by Jakub Pajek (clique config: voting rule)
 				VotingRule: 2, // Set to "majority"
+				// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+				VotingRulePrivHardFork2: 2, // Set to "majority"
 				// ADDED by Jakub Pajek (clique config: min stall period)
 				MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 				// ADDED by Jakub Pajek (clique config: min offline time)
@@ -227,6 +229,8 @@ var (
 				BlockReward: big.NewInt(0),
 				// ADDED by Jakub Pajek (clique config: voting rule)
 				VotingRule: 2, // Set to "majority"
+				// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+				VotingRulePrivHardFork2: 2, // Set to "majority"
 				// ADDED by Jakub Pajek (clique config: min stall period)
 				MinStallPeriod: math.MaxUint64 / 2, // Set to some high value to disable
 				// ADDED by Jakub Pajek (clique config: min offline time)
@@ -336,6 +340,8 @@ var (
 				BlockReward: CliqueBlockReward,
 				// ADDED by Jakub Pajek (clique config: voting rule)
 				VotingRule: CliqueVotingRule,
+				// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+				VotingRulePrivHardFork2: CliqueVotingRule,
 				// ADDED by Jakub Pajek (clique config: min stall period)
 				MinStallPeriod: CliqueMinStallPeriod,
 				// ADDED by Jakub Pajek (clique config: min offline time)
@@ -571,6 +577,11 @@ type CliqueConfigEntry struct {
 	// The value (after replacing 1 with MaxInt) is used as a denominator when calculating the effective vote threshold.
 	// Effective vote threshold: vote_threshold = voter_count / voting_rule
 	VotingRule int `json:"votingRule"`
+
+	// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+	// A voting rule to be used post-PrivateHardFork2.
+	// The definition is the same as for the pre-PrivateHardFork2 voting rule.
+	VotingRulePrivHardFork2 int `json:"votingRulePrivHardFork2"`
 
 	// ADDED by Jakub Pajek (clique config: min stall period)
 	// Minimal time (given in multiples of the block period) that needs to pass between consecutive

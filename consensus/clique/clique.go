@@ -260,6 +260,11 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 	} else if conf[0].VotingRule == 1 {
 		conf[0].VotingRule = math.MaxInt
 	}
+	if conf[0].VotingRulePrivHardFork2 < 1 {
+		conf[0].VotingRulePrivHardFork2 = params.CliqueVotingRule
+	} else if conf[0].VotingRulePrivHardFork2 == 1 {
+		conf[0].VotingRulePrivHardFork2 = math.MaxInt
+	}
 	if conf[0].MinStallPeriod == 0 {
 		conf[0].MinStallPeriod = params.CliqueMinStallPeriod
 	}
@@ -289,6 +294,11 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 			conf[i].VotingRule = conf[i-1].VotingRule
 		} else if conf[i].VotingRule == 1 {
 			conf[i].VotingRule = math.MaxInt
+		}
+		if conf[i].VotingRulePrivHardFork2 < 1 {
+			conf[i].VotingRulePrivHardFork2 = conf[i-1].VotingRulePrivHardFork2
+		} else if conf[i].VotingRulePrivHardFork2 == 1 {
+			conf[i].VotingRulePrivHardFork2 = math.MaxInt
 		}
 		if conf[i].MinStallPeriod == 0 {
 			conf[i].MinStallPeriod = conf[i-1].MinStallPeriod

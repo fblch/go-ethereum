@@ -721,6 +721,8 @@ func (tt *cliqueTest) run(t *testing.T) {
 			BlockReward: params.CliqueBlockReward,
 			// ADDED by Jakub Pajek (clique config: voting rule)
 			VotingRule: tt.votingRule,
+			// ADDED by Jakub Pajek (hard fork: HF2: voting rule change)
+			VotingRulePrivHardFork2: tt.votingRule,
 			// ADDED by Jakub Pajek (clique config: min stall period)
 			MinStallPeriod: params.CliqueMinStallPeriod,
 			// ADDED by Jakub Pajek (clique config: min offline time)
