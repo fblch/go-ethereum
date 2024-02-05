@@ -48,6 +48,28 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'isVoterRing',
+			call: 'clique_isVoterRing',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'isVoterRingAtHash',
+			call: 'clique_isVoterRingAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'isVoting',
+			call: 'clique_isVoting',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'isVotingAtHash',
+			call: 'clique_isVotingAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'getSigners',
 			call: 'clique_getSigners',
 			params: 1,
@@ -59,15 +81,59 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getSignersCount',
+			call: 'clique_getSignersCount',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getSignersCountAtHash',
+			call: 'clique_getSignersCountAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'isSigner',
+			call: 'clique_isSigner',
+			params: 2,
+			inputFormatter: [null, web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'isSignerAtHash',
+			call: 'clique_isSignerAtHash',
+			params: 2
+		}),
+		new web3._extend.Method({
 			name: 'getVoters',
 			call: 'clique_getVoters',
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
 		}),
 		new web3._extend.Method({
-			name: 'getVoterstHash',
+			name: 'getVotersAtHash',
 			call: 'clique_getVotersAtHash',
 			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'getVotersCount',
+			call: 'clique_getVotersCount',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getVotersCountAtHash',
+			call: 'clique_getVotersCountAtHash',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'isVoter',
+			call: 'clique_isVoter',
+			params: 2,
+			inputFormatter: [null, web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'isVoterAtHash',
+			call: 'clique_isVoterAtHash',
+			params: 2
 		}),
 		new web3._extend.Method({
 			name: 'getValidProposals',

@@ -62,6 +62,74 @@ func (api *API) GetSnapshotAtHash(hash common.Hash) (*Snapshot, error) {
 	return api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 }
 
+// IsVoterRing checks if the network operates in the voter ring at the specified block.
+func (api *API) IsVoterRing(number *rpc.BlockNumber) (bool, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	return snap.VoterRing, nil
+}
+
+// IsVoterRingAtHash checks if the network operates in the voter ring at the specified block.
+func (api *API) IsVoterRingAtHash(hash common.Hash) (bool, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	return snap.VoterRing, nil
+}
+
+// IsVoting checks if the network is voting at the specified block.
+// Note that this function will always return false pre-PrivateHardFork2.
+func (api *API) IsVoting(number *rpc.BlockNumber) (bool, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	return snap.Voting, nil
+}
+
+// IsVotingAtHash checks if the network is voting at the specified block.
+// Note that this function will always return false pre-PrivateHardFork2.
+func (api *API) IsVotingAtHash(hash common.Hash) (bool, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	return snap.Voting, nil
+}
+
 // GetSigners retrieves the list of authorized signers at the specified block.
 func (api *API) GetSigners(number *rpc.BlockNumber) ([]common.Address, error) {
 	// Retrieve the requested block number (or current if none requested)
@@ -95,6 +163,74 @@ func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
 	return snap.signers(), nil
 }
 
+// GetSignersCount retrieves the number authorized signers at the specified block.
+func (api *API) GetSignersCount(number *rpc.BlockNumber) (int, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return 0, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return 0, err
+	}
+	return len(snap.Signers), nil
+}
+
+// GetSignersCountAtHash retrieves the number of authorized signers at the specified block.
+func (api *API) GetSignersCountAtHash(hash common.Hash) (int, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return 0, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return 0, err
+	}
+	return len(snap.Signers), nil
+}
+
+// IsSigner checks if the address is an authorized signers at the specified block.
+func (api *API) IsSigner(address common.Address, number *rpc.BlockNumber) (bool, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	_, okSigner := snap.Signers[address]
+	return okSigner, nil
+}
+
+// IsSignerAtHash checks if the address is an authorized signers at the specified block.
+func (api *API) IsSignerAtHash(address common.Address, hash common.Hash) (bool, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	_, okSigner := snap.Signers[address]
+	return okSigner, nil
+}
+
 // GetVoters retrieves the list of authorized voters at the specified block.
 func (api *API) GetVoters(number *rpc.BlockNumber) ([]common.Address, error) {
 	// Retrieve the requested block number (or current if none requested)
@@ -126,6 +262,74 @@ func (api *API) GetVotersAtHash(hash common.Hash) ([]common.Address, error) {
 		return nil, err
 	}
 	return snap.voters(), nil
+}
+
+// GetVotersCount retrieves the number of authorized voters at the specified block.
+func (api *API) GetVotersCount(number *rpc.BlockNumber) (int, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the voters from its snapshot
+	if header == nil {
+		return 0, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return 0, err
+	}
+	return len(snap.Voters), nil
+}
+
+// GetVotersCountAtHash retrieves the number of authorized voters at the specified block.
+func (api *API) GetVotersCountAtHash(hash common.Hash) (int, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return 0, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return 0, err
+	}
+	return len(snap.Voters), nil
+}
+
+// IsVoter checks if the address is an authorized voter at the specified block.
+func (api *API) IsVoter(address common.Address, number *rpc.BlockNumber) (bool, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	_, okVoter := snap.Voters[address]
+	return okVoter, nil
+}
+
+// IsVoterAtHash checks if the address is an authorized voter at the specified block.
+func (api *API) IsVoterAtHash(address common.Address, hash common.Hash) (bool, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return false, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return false, err
+	}
+	_, okVoter := snap.Signers[address]
+	return okVoter, nil
 }
 
 type prop struct {

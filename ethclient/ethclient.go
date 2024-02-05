@@ -676,36 +676,193 @@ func (p *rpcProgress) toSyncProgress() *ethereum.SyncProgress {
 }
 
 // ADDED by Jakub Pajek (clique permissions)
+// ADDED by Jakub Pajek (clique voter ring)
+// ADDED by Jakub Pajek (voter ring voting)
+
 // Clique
 
-// ADDED by Jakub Pajek (clique permissions)
-// CliqueIsSigner checks if a given address is a signer (has right to sign blocks)
-func (ec *Client) CliqueIsSigner(ctx context.Context, address common.Address) (bool, error) {
-	var signers []common.Address
-	err := ec.c.CallContext(ctx, &signers, "clique_getSigners", "latest")
+// ADDED by Jakub Pajek (clique voter ring)
+// CliqueIsVoterRing checks if the network operates in the voter ring at the latest known block.
+func (ec *Client) CliqueIsVoterRing(ctx context.Context) (bool, error) {
+	var voterRing bool
+	err := ec.c.CallContext(ctx, &voterRing, "clique_isVoterRing", "latest")
 	if err != nil {
 		return false, err
 	}
-	for _, signer := range signers {
-		if address == signer {
-			return true, nil
-		}
+	return voterRing, nil
+}
+
+// ADDED by Jakub Pajek (clique voter ring)
+// CliqueIsVoterRingAt checks if the network operates in the voter ring at the specified block.
+// The block number can be nil, in which case the check is performed from the latest known block.
+func (ec *Client) CliqueIsVoterRingAt(ctx context.Context, blockNumber *big.Int) (bool, error) {
+	var voterRing bool
+	err := ec.c.CallContext(ctx, &voterRing, "clique_isVoterRing", toBlockNumArg(blockNumber))
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+	return voterRing, nil
+}
+
+// ADDED by Jakub Pajek (voter ring voting)
+// CliqueIsVoting checks if the network is voting at the latest known block.
+// Note that this function will always return false pre-PrivateHardFork2.
+func (ec *Client) CliqueIsVoting(ctx context.Context) (bool, error) {
+	var voting bool
+	err := ec.c.CallContext(ctx, &voting, "clique_isVoting", "latest")
+	if err != nil {
+		return false, err
+	}
+	return voting, nil
+}
+
+// ADDED by Jakub Pajek (voter ring voting)
+// CliqueIsVotingAt checks if the network is voting at the specified block.
+// The block number can be nil, in which case the check is performed from the latest known block.
+// Note that this function will always return false pre-PrivateHardFork2.
+func (ec *Client) CliqueIsVotingAt(ctx context.Context, blockNumber *big.Int) (bool, error) {
+	var voting bool
+	err := ec.c.CallContext(ctx, &voting, "clique_isVoting", toBlockNumArg(blockNumber))
+	if err != nil {
+		return false, err
+	}
+	return voting, nil
 }
 
 // ADDED by Jakub Pajek (clique permissions)
-// CliqueIsVoter checks if a given address is a voter (has right to vote for)
-func (ec *Client) CliqueIsVoter(ctx context.Context, address common.Address) (bool, error) {
-	var voters []common.Address
-	err := ec.c.CallContext(ctx, &voters, "clique_getVoters", "latest")
+// CliqueGetSigners retrieves the list of authorized signers at the latest known block.
+func (ec *Client) CliqueGetSigners(ctx context.Context) ([]common.Address, error) {
+	var signers []common.Address
+	err := ec.c.CallContext(ctx, &signers, "clique_getSigners", "latest")
+	if err != nil {
+		return nil, err
+	}
+	return signers, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetSignersAt retrieves the list of authorized signers at the specified block.
+// The block number can be nil, in which case the list is taken from the latest known block.
+func (ec *Client) CliqueGetSignersAt(ctx context.Context, blockNumber *big.Int) ([]common.Address, error) {
+	var signers []common.Address
+	err := ec.c.CallContext(ctx, &signers, "clique_getSigners", toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return signers, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetSignersCount retrieves the number of authorized signers at the latest known block.
+func (ec *Client) CliqueGetSignersCount(ctx context.Context) (int, error) {
+	var signersCount int
+	err := ec.c.CallContext(ctx, &signersCount, "clique_getSignersCount", "latest")
+	if err != nil {
+		return 0, err
+	}
+	return signersCount, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetSignersCountAt retrieves the number of authorized signers at the specified block.
+// The block number can be nil, in which case the number is taken from the latest known block.
+func (ec *Client) CliqueGetSignersCountAt(ctx context.Context, blockNumber *big.Int) (int, error) {
+	var signersCount int
+	err := ec.c.CallContext(ctx, &signersCount, "clique_getSigners", toBlockNumArg(blockNumber))
+	if err != nil {
+		return 0, err
+	}
+	return signersCount, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsSigner checks if the address is an authorized signers at the latest known block.
+func (ec *Client) CliqueIsSigner(ctx context.Context, address common.Address) (bool, error) {
+	var okSigner bool
+	err := ec.c.CallContext(ctx, &okSigner, "clique_isSigner", address, "latest")
 	if err != nil {
 		return false, err
 	}
-	for _, signer := range voters {
-		if address == signer {
-			return true, nil
-		}
+	return okSigner, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsSignerAt checks if the address is an authorized signers at the specified block.
+// The block number can be nil, in which case the check is performed from the latest known block.
+func (ec *Client) CliqueIsSignerAt(ctx context.Context, address common.Address, blockNumber *big.Int) (bool, error) {
+	var okSigner bool
+	err := ec.c.CallContext(ctx, &okSigner, "clique_isSigner", address, toBlockNumArg(blockNumber))
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+	return okSigner, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetVoters retrieves the list of authorized voters at the latest known block.
+func (ec *Client) CliqueGetVoters(ctx context.Context) ([]common.Address, error) {
+	var voters []common.Address
+	err := ec.c.CallContext(ctx, &voters, "clique_getVoters", "latest")
+	if err != nil {
+		return nil, err
+	}
+	return voters, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetVotersAt retrieves the list of authorized voters at the specified block.
+// The block number can be nil, in which case the list is taken from the latest known block.
+func (ec *Client) CliqueGetVotersAt(ctx context.Context, blockNumber *big.Int) ([]common.Address, error) {
+	var voters []common.Address
+	err := ec.c.CallContext(ctx, &voters, "clique_getVoters", toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return voters, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetVotersCount retrieves the number of authorized voters at the latest known block.
+func (ec *Client) CliqueGetVotersCount(ctx context.Context) (int, error) {
+	var votersCount int
+	err := ec.c.CallContext(ctx, &votersCount, "clique_getVotersCount", "latest")
+	if err != nil {
+		return 0, err
+	}
+	return votersCount, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueGetVotersCountAt retrieves the number of authorized voters at the specified block.
+// The block number can be nil, in which case the number is taken from the latest known block.
+func (ec *Client) CliqueGetVotersCountAt(ctx context.Context, blockNumber *big.Int) (int, error) {
+	var votersCount int
+	err := ec.c.CallContext(ctx, &votersCount, "clique_getVotersCount", toBlockNumArg(blockNumber))
+	if err != nil {
+		return 0, err
+	}
+	return votersCount, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsVoter checks if the address is an authorized voter at the latest known block.
+func (ec *Client) CliqueIsVoter(ctx context.Context, address common.Address) (bool, error) {
+	var okVoter bool
+	err := ec.c.CallContext(ctx, &okVoter, "clique_isVoter", address, "latest")
+	if err != nil {
+		return false, err
+	}
+	return okVoter, nil
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsVoterAt checks if the address is an authorized voter at the specified block.
+// The block number can be nil, in which case the check is performed from the latest known block.
+func (ec *Client) CliqueIsVoterAt(ctx context.Context, address common.Address, blockNumber *big.Int) (bool, error) {
+	var okVoter bool
+	err := ec.c.CallContext(ctx, &okVoter, "clique_isVoter", address, toBlockNumArg(blockNumber))
+	if err != nil {
+		return false, err
+	}
+	return okVoter, nil
 }

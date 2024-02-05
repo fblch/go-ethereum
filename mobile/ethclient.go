@@ -376,16 +376,44 @@ func (ec *EthereumClient) SendTransaction(ctx *Context, tx *Transaction) error {
 }
 
 // ADDED by Jakub Pajek (clique permissions)
+// ADDED by Jakub Pajek (clique voter ring)
+// ADDED by Jakub Pajek (voter ring voting)
+
 // Clique
 
+// ADDED by Jakub Pajek (clique voter ring)
+// CliqueIsVoterRing checks if the network operates in the voter ring at the latest known block.
+func (ec *EthereumClient) CliqueIsVoterRing(ctx *Context) (bool, error) {
+	return ec.client.CliqueIsVoterRing(ctx.context)
+}
+
+// ADDED by Jakub Pajek (voter ring voting)
+// CliqueIsVoting checks if the network is voting at the latest known block.
+// Note that this function will always return false pre-PrivateHardFork2.
+func (ec *EthereumClient) CliqueIsVoting(ctx *Context) (bool, error) {
+	return ec.client.CliqueIsVoting(ctx.context)
+}
+
 // ADDED by Jakub Pajek (clique permissions)
-// CliqueIsSigner checks if a given address is a signer (has right to sign blocks)
+// CliqueGetSignersCount retrieves the number of authorized signers at the latest known block.
+func (ec *EthereumClient) CliqueGetSignersCount(ctx *Context) (int, error) {
+	return ec.client.CliqueGetSignersCount(ctx.context)
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsSigner checks if the address is an authorized signers at the latest known block.
 func (ec *EthereumClient) CliqueIsSigner(ctx *Context, address *Address) (bool, error) {
 	return ec.client.CliqueIsSigner(ctx.context, address.address)
 }
 
 // ADDED by Jakub Pajek (clique permissions)
-// CliqueIsVoter checks if a given address is a voter (has right to vote for)
+// CliqueGetVotersCount retrieves the number of authorized voters at the latest known block.
+func (ec *EthereumClient) CliqueGetVotersCount(ctx *Context) (int, error) {
+	return ec.client.CliqueGetVotersCount(ctx.context)
+}
+
+// ADDED by Jakub Pajek (clique permissions)
+// CliqueIsVoter checks if the address is an authorized voter at the latest known block.
 func (ec *EthereumClient) CliqueIsVoter(ctx *Context, address *Address) (bool, error) {
 	return ec.client.CliqueIsVoter(ctx.context, address.address)
 }
