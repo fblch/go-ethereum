@@ -239,8 +239,8 @@ func discoverUPnP(local net.IP, gateway net.IP) Interface {
 	return nil
 }
 
-// finds devices matching the given target and calls matcher for all
-// advertised services of each device. The first non-nil service found
+// discover finds devices matching the given target and calls matcher for
+// all advertised services of each device. The first non-nil service found
 // is sent into out. If no service matched, nil is sent.
 // MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 // func discover(out chan<- *upnp, target string, matcher func(goupnp.ServiceClient) *upnp) {
