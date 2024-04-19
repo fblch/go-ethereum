@@ -1172,11 +1172,18 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
 				// Since, unlike mobile signers, voters are most likely to always be online,
 				// they will sign in-turn most of the time while in the voter ring.
-				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes {
+				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes && !snap.Voting {
 					// Set in-turn difficulty value to 0, in order to treat all non-voting voters in the voter ring
 					// as out-of-turn, thus broadcast their blocks with a delay. This will allow some of the in-turnish
 					// online signers to broadcast their blocks faster, which in consequence will allow to disband
 					// the voter ring.
+					//
+					// Note, using only !headerHasVotes in the condition above will introduce out-of-turn delay for
+					// all non-voting blocks, including the block which signals to the network that voting has ended
+					// and the voter ring can be disbanded.
+					// By changing the condition to !headerHasVotes && !snap.Voting, the fist non-voting block will
+					// also be broadcasted in-turn, allowing online signers to smoothly disband the voter ring without
+					// any out-of-turn delays in block times.
 					inturnDiff = big.NewInt(0)
 				}
 			} else {
