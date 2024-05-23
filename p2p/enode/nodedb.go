@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -241,14 +242,19 @@ func (db *DB) Node(id ID) *Node {
 	return mustDecodeNode(id[:], blob)
 }
 
+// MODIFIED by Jakub Pajek
+// cannot convert id (variable of type []byte) to type ID: conversion of slices to arrays requires go1.20 or later (-lang was set to go1.19; check go.mod)
 func mustDecodeNode(id, data []byte) *Node {
-	node := new(Node)
-	if err := rlp.DecodeBytes(data, &node.r); err != nil {
+	var r enr.Record
+	if err := rlp.DecodeBytes(data, &r); err != nil {
 		panic(fmt.Errorf("p2p/enode: can't decode node %x in DB: %v", id, err))
 	}
-	// Restore node id cache.
-	copy(node.id[:], id)
-	return node
+	newId := ID{}
+	if len(id) != len(newId) {
+		panic(fmt.Errorf("invalid id length %d", len(id)))
+	}
+	copy(newId[:], id)
+	return newNodeWithID(&r, newId)
 }
 
 // UpdateNode inserts - potentially overwriting - a node into the peer database.
