@@ -218,7 +218,7 @@ func (s *LightEthereum) VfluxRequest(n *enode.Node, reqs vflux.Requests) vflux.R
 		return nil
 	}
 	reqsEnc, _ := rlp.EncodeToBytes(&reqs)
-	repliesEnc, _ := s.p2pServer.DiscV5.TalkRequest(s.serverPool.DialNode(n), "vfx", reqsEnc)
+	repliesEnc, _ := s.p2pServer.DiscoveryV5().TalkRequest(s.serverPool.DialNode(n), "vfx", reqsEnc)
 	var replies vflux.Replies
 	if len(repliesEnc) == 0 || rlp.DecodeBytes(repliesEnc, &replies) != nil {
 		return nil
@@ -234,7 +234,7 @@ func (s *LightEthereum) vfxVersion(n *enode.Node) uint {
 		if !s.udpEnabled {
 			return 0
 		}
-		if n, err = s.p2pServer.DiscV5.RequestENR(n); n != nil && err == nil && n.Seq() != 0 {
+		if n, err = s.p2pServer.DiscoveryV5().RequestENR(n); n != nil && err == nil && n.Seq() != 0 {
 			s.serverPool.Persist(n)
 		} else {
 			return 0
@@ -351,7 +351,7 @@ func (s *LightEthereum) Start() error {
 	// Regularly update shutdown marker
 	s.shutdownTracker.Start()
 
-	if s.udpEnabled && s.p2pServer.DiscV5 == nil {
+	if s.udpEnabled && s.p2pServer.DiscoveryV5() == nil {
 		s.udpEnabled = false
 		log.Error("Discovery v5 is not initialized")
 	}

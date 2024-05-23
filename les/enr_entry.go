@@ -56,7 +56,7 @@ func (eth *LightEthereum) setupDiscovery() (enode.Iterator, error) {
 
 	// Enable DHT.
 	if eth.udpEnabled {
-		it.AddSource(eth.p2pServer.DiscV5.RandomNodes())
+		it.AddSource(eth.p2pServer.DiscoveryV5().RandomNodes())
 	}
 
 	forkFilter := forkid.NewFilter(eth.blockchain)
