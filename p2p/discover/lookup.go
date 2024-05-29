@@ -29,16 +29,16 @@ import (
 // not need to be an actual node identifier.
 type lookup struct {
 	tab         *Table
-	queryfunc   func(*node) ([]*node, error)
-	replyCh     chan []*node
+	queryfunc   queryFunc
+	replyCh     chan []*enode.Node
 	cancelCh    <-chan struct{}
 	asked, seen map[enode.ID]bool
 	result      nodesByDistance
-	replyBuffer []*node
+	replyBuffer []*enode.Node
 	queries     int
 }
 
-type queryFunc func(*node) ([]*node, error)
+type queryFunc func(*enode.Node) ([]*enode.Node, error)
 
 func newLookup(ctx context.Context, tab *Table, target enode.ID, q queryFunc) *lookup {
 	it := &lookup{
@@ -47,7 +47,7 @@ func newLookup(ctx context.Context, tab *Table, target enode.ID, q queryFunc) *l
 		asked:     make(map[enode.ID]bool),
 		seen:      make(map[enode.ID]bool),
 		result:    nodesByDistance{target: target},
-		replyCh:   make(chan []*node, alpha),
+		replyCh:   make(chan []*enode.Node, alpha),
 		cancelCh:  ctx.Done(),
 		queries:   -1,
 	}
@@ -61,7 +61,7 @@ func newLookup(ctx context.Context, tab *Table, target enode.ID, q queryFunc) *l
 func (it *lookup) run() []*enode.Node {
 	for it.advance() {
 	}
-	return unwrapNodes(it.result.entries)
+	return it.result.entries
 }
 
 // advance advances the lookup until any new nodes have been found.
@@ -145,7 +145,7 @@ func (it *lookup) slowdown(d time.Duration) {
 	}
 }
 
-func (it *lookup) query(n *node, reply chan<- []*node) {
+func (it *lookup) query(n *enode.Node, reply chan<- []*enode.Node) {
 	// ADDED by Jakub Pajek (reduce disc traffic)
 	it.slowdown(1 * time.Second)
 	r, err := it.queryfunc(n)
@@ -162,7 +162,7 @@ func (it *lookup) query(n *node, reply chan<- []*node) {
 // lookupIterator performs lookup operations and iterates over all seen nodes.
 // When a lookup finishes, a new one is created through nextLookup.
 type lookupIterator struct {
-	buffer     []*node
+	buffer     []*enode.Node
 	nextLookup lookupFunc
 	ctx        context.Context
 	cancel     func()
@@ -181,7 +181,7 @@ func (it *lookupIterator) Node() *enode.Node {
 	if len(it.buffer) == 0 {
 		return nil
 	}
-	return unwrapNode(it.buffer[0])
+	return it.buffer[0]
 }
 
 // Next moves to the next node.
