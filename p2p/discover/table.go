@@ -461,7 +461,9 @@ func (tab *Table) loadSeedNodes() {
 		age := log.Lazy{Fn: func() interface{} { return time.Since(tab.db.LastPongReceived(seed.ID(), seed.IPAddr())) }}
 		addr, _ := seed.UDPEndpoint()
 		tab.log.Trace("Found seed node in database", "id", seed.ID(), "addr", addr, "age", age)
+		tab.mutex.Lock()
 		tab.handleAddNode(addNodeOp{node: seed, isInbound: false})
+		tab.mutex.Unlock()
 	}
 }
 
