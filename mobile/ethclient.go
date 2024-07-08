@@ -56,6 +56,13 @@ func (ec *EthereumClient) GetBlockByNumber(ctx *Context, number int64) (block *B
 	return &Block{rawBlock}, err
 }
 
+// ADDED by Jakub Pajek
+// GetBlockNumber returns the most recent block number
+func (ec *EthereumClient) GetBlockNumber(ctx *Context) (number int64, _ error) {
+	rawNumber, err := ec.client.BlockNumber(ctx.context)
+	return int64(rawNumber), err
+}
+
 // GetHeaderByHash returns the block header with the given hash.
 func (ec *EthereumClient) GetHeaderByHash(ctx *Context, hash *Hash) (header *Header, _ error) {
 	rawHeader, err := ec.client.HeaderByHash(ctx.context, hash.hash)
