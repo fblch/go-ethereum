@@ -16,6 +16,8 @@
 
 package les
 
+/* COMMENTED by Jakub Pajek (p2p/simulations: remove packages)
+
 import (
 	"context"
 	crand "crypto/rand"
@@ -428,11 +430,11 @@ func NewAdapter(adapterType string, services adapters.LifecycleConstructors) (ad
 		}
 		teardown = func() { os.RemoveAll(baseDir) }
 		adapter = adapters.NewExecAdapter(baseDir)
-	/*case "docker":
-	adapter, err = adapters.NewDockerAdapter()
-	if err != nil {
-		return nil, teardown, err
-	}*/
+	// case "docker":
+	// 	adapter, err = adapters.NewDockerAdapter()
+	// 	if err != nil {
+	// 		return nil, teardown, err
+	// 	}
 	default:
 		return nil, teardown, errors.New("adapter needs to be one of sim, socket, exec, docker")
 	}
@@ -514,3 +516,4 @@ func newLesServerService(ctx *adapters.ServiceContext, stack *node.Node) (node.L
 	}
 	return ethereum, nil
 }
+*/
