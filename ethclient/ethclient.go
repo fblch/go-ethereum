@@ -768,7 +768,7 @@ func (ec *Client) CliqueGetSignersCount(ctx context.Context) (int, error) {
 // The block number can be nil, in which case the number is taken from the latest known block.
 func (ec *Client) CliqueGetSignersCountAt(ctx context.Context, blockNumber *big.Int) (int, error) {
 	var signersCount int
-	err := ec.c.CallContext(ctx, &signersCount, "clique_getSigners", toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &signersCount, "clique_getSignersCount", toBlockNumArg(blockNumber))
 	if err != nil {
 		return 0, err
 	}
