@@ -387,7 +387,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		if !snap.VoterRing {
 			// Select the next signer in turn based on the current block number, and check it's activity
 			address := snap.signers()[number%uint64(len(snap.Signers))]
-			if signed, _ := snap.Signers[address]; signed.SignedCount > 0 {
+			if signed := snap.Signers[address]; signed.SignedCount > 0 {
 				// The signer signed at least one new block since the last check.
 				// Decrease the strike count, zero out the signed block count, save the state.
 				if !config.IsPrivateHardFork1(header.Number) && signed.StrikeCount > signed.SignedCount {
