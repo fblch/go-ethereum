@@ -213,7 +213,12 @@ type Clique struct {
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
-	lock   sync.RWMutex   // Protects the signer and proposals fields
+
+	lock        sync.RWMutex   // Protects the signer and proposals fields
+	proposalsCh chan struct{}  // Channel for signaling to the worker that the list of proposals has been modified and needs to be saved to disk
+	exitCh      chan struct{}  // Channel for signaling to the worker that it should exit
+	closer      sync.Once      // Sync object to ensure we only ever close once
+	pend        sync.WaitGroup // Wait group for waiting for the worker to exit
 
 	// The fields below are for testing only
 	fakeDiff      bool // Skip difficulty verifications
@@ -242,6 +247,26 @@ func (c *Clique) storeProposals() error {
 		return err
 	}
 	return c.db.Put(rawdb.CliqueProposalsKey, blob)
+}
+
+// worker implements the worker logic executed in a background thread.
+func (c *Clique) worker() {
+	defer c.pend.Done()
+	for {
+		select {
+		case <-c.proposalsCh:
+			c.lock.RLock()
+			if err := c.storeProposals(); err != nil {
+				log.Error("Failed to store clique proposals to disk", "err", err)
+			} else {
+				log.Trace("Stored clique proposals disk")
+			}
+			c.lock.RUnlock()
+
+		case <-c.exitCh:
+			return
+		}
+	}
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
@@ -333,13 +358,21 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 		log.Trace("Loaded clique proposals from disk")
 	}
 
-	return &Clique{
-		config:     conf,
-		db:         db,
-		recents:    recents,
-		signatures: signatures,
-		proposals:  proposals,
+	c := &Clique{
+		config:      conf,
+		db:          db,
+		recents:     recents,
+		signatures:  signatures,
+		proposals:   proposals,
+		proposalsCh: make(chan struct{}, 1),
+		exitCh:      make(chan struct{}),
 	}
+
+	// Start the background worker
+	c.pend.Add(1)
+	go c.worker()
+
+	return c
 }
 
 // Author implements consensus.Engine, returning the Ethereum address recovered
@@ -899,10 +932,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// If there are any purged proposals, save to disk
 		if purged > 0 {
 			log.Trace("Purged old clique proposals", "total", len(c.proposals), "purged", purged)
-			if err := c.storeProposals(); err != nil {
-				log.Error("Failed to store clique proposals to disk", "err", err)
-			} else {
-				log.Trace("Stored clique proposals disk")
+			// Asynchronously save proposals to disk (non-blocking send)
+			select {
+			case c.proposalsCh <- struct{}{}:
+			default:
 			}
 		}
 		// If there's pending and not-yet-voted-on proposals, cast votes on them
@@ -1335,8 +1368,14 @@ func (c *Clique) SealHash(header *types.Header) common.Hash {
 	return SealHash(header)
 }
 
-// Close implements consensus.Engine. It's a noop for clique as there are no background threads.
+// Close implements consensus.Engine, stopping the background worker and waiting
+// for it to terminate before returning.
 func (c *Clique) Close() error {
+	c.closer.Do(func() {
+		// Signal termination and wait for all goroutines to tear down
+		close(c.exitCh)
+		c.pend.Wait()
+	})
 	return nil
 }
 

@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -498,11 +497,10 @@ func (api *API) Propose(address common.Address, proposal string) error {
 		return fmt.Errorf("invalid proposal %s", proposal)
 	}
 
-	// Save proposals to disk
-	if err := api.clique.storeProposals(); err != nil {
-		log.Error("Failed to store clique proposals to disk", "err", err)
-	} else {
-		log.Trace("Stored clique proposals disk")
+	// Asynchronously save proposals to disk (non-blocking send)
+	select {
+	case api.clique.proposalsCh <- struct{}{}:
+	default:
 	}
 
 	return nil
@@ -517,11 +515,10 @@ func (api *API) Discard(address common.Address) {
 	if _, ok := api.clique.proposals[address]; ok {
 		delete(api.clique.proposals, address)
 
-		// Save proposals to disk
-		if err := api.clique.storeProposals(); err != nil {
-			log.Error("Failed to store clique proposals to disk", "err", err)
-		} else {
-			log.Trace("Stored clique proposals disk")
+		// Asynchronously save proposals to disk (non-blocking send)
+		select {
+		case api.clique.proposalsCh <- struct{}{}:
+		default:
 		}
 	}
 }
