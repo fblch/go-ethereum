@@ -440,7 +440,9 @@ func (api *API) GetValidProposalsAtHash(hash common.Hash) (map[common.Address]pr
 
 	proposals := make(map[common.Address]prop)
 	for address, proposal := range api.clique.proposals {
-		if !snap.validVote(address, proposal.Proposal) {
+		// Vote should be valid, and cast after the signer was dropped for inactivity,
+		// in order not to automatically vote on re-adding those dropped signers
+		if !snap.validVote(address, proposal.Proposal) || snap.Dropped[address] >= proposal.Block {
 			continue
 		}
 		switch proposal.Proposal {
@@ -498,7 +500,7 @@ func (api *API) Propose(address common.Address, proposal string) error {
 
 	// Save proposals to disk
 	if err := api.clique.storeProposals(); err != nil {
-		log.Warn("Failed to store clique proposals to disk", "err", err)
+		log.Error("Failed to store clique proposals to disk", "err", err)
 	} else {
 		log.Trace("Stored clique proposals disk")
 	}
@@ -517,7 +519,7 @@ func (api *API) Discard(address common.Address) {
 
 		// Save proposals to disk
 		if err := api.clique.storeProposals(); err != nil {
-			log.Warn("Failed to store clique proposals to disk", "err", err)
+			log.Error("Failed to store clique proposals to disk", "err", err)
 		} else {
 			log.Trace("Stored clique proposals disk")
 		}

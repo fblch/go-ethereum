@@ -922,6 +922,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 			header.Extra = append(header.Extra, signer[:]...)
 			header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 		}
+
 		// Write lock needed for proposal purging
 		c.lock.Unlock() //c.lock.RUnlock()
 	}
