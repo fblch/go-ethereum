@@ -1045,7 +1045,17 @@ func doAndroidArchive(cmdline []string) {
 	}
 
 	// Build gomobile.
-	install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest")
+	// MODIFIED by Jakub Pajek (mobile make fails)
+	// Mobile make fails with the following error when using gomobile@latest (v0.0.0-20240909163608-642950227fb3):
+	//	env GO111MODULE=on go run build/ci.go aar --local
+	//	>>> /opt/local/lib/go/bin/go install -mod=readonly golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+	//	go: golang.org/x/mobile/cmd/gomobile@latest (in golang.org/x/mobile@v0.0.0-20240909163608-642950227fb3): go.mod:3: invalid go version '1.22.0': must match format 1.23
+	//	util.go:48: exit status 1
+	//	exit status 1
+	//	make: *** [android] Error 1
+	// As a temporary fix, build with the previous gomobile version v0.0.0-20240806205939-81131f6468ab
+	//install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest")
+	install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab")
 	install.Env = append(install.Env)
 	build.MustRun(install)
 
@@ -1179,7 +1189,17 @@ func doXCodeFramework(cmdline []string) {
 	tc := new(build.GoToolchain)
 
 	// Build gomobile.
-	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
+	// MODIFIED by Jakub Pajek (mobile make fails)
+	// Mobile make fails with the following error when using gomobile@latest (v0.0.0-20240909163608-642950227fb3):
+	//	env GO111MODULE=on go run build/ci.go xcode --local
+	//	>>> /opt/local/lib/go/bin/go install -mod=readonly golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+	//	go: golang.org/x/mobile/cmd/gomobile@latest (in golang.org/x/mobile@v0.0.0-20240909163608-642950227fb3): go.mod:3: invalid go version '1.22.0': must match format 1.23
+	//	util.go:48: exit status 1
+	//	exit status 1
+	//	make: *** [ios] Error 1
+	// As a temporary fix, build with the previous gomobile version v0.0.0-20240806205939-81131f6468ab
+	//build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
+	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab"))
 
 	// Build the iOS XCode framework
 	bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
