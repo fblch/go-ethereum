@@ -53,6 +53,18 @@ func NewHashFromHex(hex string) (hash *Hash, _ error) {
 }
 
 // ADDED by Jakub Pajek (mobile)
+// CalcNewHashFromBytes calculates a hash value for the given slice of bytes.
+func CalcNewHashFromBytes(binary []byte) (hash *Hash, _ error) {
+	h := new(Hash)
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(binary)
+	if err := h.SetBytes(hasher.Sum(nil)); err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+// ADDED by Jakub Pajek (mobile)
 // CalcNewHashFromString calculates a hash value for the given string.
 func CalcNewHashFromString(str string) (hash *Hash, _ error) {
 	h := new(Hash)
