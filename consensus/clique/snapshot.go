@@ -194,6 +194,17 @@ func (s *Snapshot) validVote(address common.Address, proposal uint64) bool {
 	}
 }
 
+// alreadyVoted returns whether a given voter has already cast a vote on the specified
+// proposal in the given snapshot context (e.g. don't cast the same vote multiple times).
+func (s *Snapshot) alreadyVoted(voter common.Address, address common.Address, proposal uint64) bool {
+	for _, vote := range s.Votes {
+		if vote.Voter == voter && vote.Address == address && vote.Proposal == proposal {
+			return true
+		}
+	}
+	return false
+}
+
 // cast adds a new vote into the tally.
 func (s *Snapshot) cast(address common.Address, proposal uint64) bool {
 	// Ensure the vote is meaningful

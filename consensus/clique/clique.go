@@ -26,6 +26,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -878,7 +879,13 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				if address == signer && proposal.Proposal == proposalDropVote {
 					dropSelf = true
 				}
-				addresses = append(addresses, address)
+				// Do not cast the same vote multiple times. This has several advantages:
+				//  - reduces the header size,
+				//  - leaves space for votes on on-yet-voted-on proposals,
+				//  - lets the network break the voter ring in case of a proposal witout majority
+				if !snap.alreadyVoted(signer, address, proposal.Proposal) {
+					addresses = append(addresses, address)
+				}
 			} else if number > proposal.Block && number-proposal.Block > params.CliqueEpoch {
 				delete(c.proposals, address)
 				purged++
@@ -893,18 +900,18 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				log.Trace("Stored clique proposals disk")
 			}
 		}
-		// If there's pending proposals, cast votes on them
+		// If there's pending and not-yet-voted-on proposals, cast votes on them
 		// Note that the protocol forbids casting other votes when voting on dropping self.
-		if !dropSelf {
+		if proposalCount := len(addresses); !dropSelf && proposalCount > 0 {
 			// For pre-PrivateHardFork2 blocks, and post-PrivateHardFork2 blocks when the number of pending
 			// proposals does not exceed the maximum vote allowance, cast votes on all pending proposals
-			proposalCount := len(addresses)
 			if chain.Config().IsPrivateHardFork2(header.Number) && proposalCount > params.CliqueMaxVoteCount {
-				// For post-PrivateHardFork2 blocks, when the number of pending proposals exceeds the maximum vote allowance,
-				// cast the maximum allowed number of votes on proposals randomly selected from all pending proposals.
-				// Note: Since go1.20, the math/rand package automatically seeds the global random number generator
-				// with a random value, and the top-level Seed function has been deprecated: https://tip.golang.org/doc/go1.20
-				rand.Shuffle(len(addresses), func(i, j int) { addresses[i], addresses[j] = addresses[j], addresses[i] })
+				// For post-PrivateHardFork2 blocks, when the number of pending and not-yet-voted-on proposals exceeds
+				// the maximum vote allowance, cast the maximum allowed number of votes on proposals selected from all
+				// pending and not-yet-voted-on proposals.
+				// Iterating the proposals map using the range statement above causes the addresses slice to be
+				// in a pseudo-random order. Sort it to speed up voting.
+				sort.Sort(addressesAscending(addresses))
 				proposalCount = params.CliqueMaxVoteCount
 			}
 			for i := 0; i < proposalCount; i++ {
@@ -918,7 +925,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 					header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 				}
 			}
-		} else {
+		} else if proposalCount > 0 {
 			header.Extra = append(header.Extra, signer[:]...)
 			header.Extra = append(header.Extra, params.CliqueExtraDropVote)
 		}
