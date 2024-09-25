@@ -287,6 +287,7 @@ var (
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		PrivateHardFork1Block: nil,
 		PrivateHardFork2Block: nil,
+		PrivateHardFork3Block: nil,
 		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -322,6 +323,7 @@ var (
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		PrivateHardFork1Block: big.NewInt(0),
 		PrivateHardFork2Block: big.NewInt(0),
+		PrivateHardFork3Block: big.NewInt(0),
 		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -377,6 +379,7 @@ var (
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		PrivateHardFork1Block: nil,
 		PrivateHardFork2Block: nil,
+		PrivateHardFork3Block: nil,
 		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -412,6 +415,7 @@ var (
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		PrivateHardFork1Block: nil,
 		PrivateHardFork2Block: nil,
+		PrivateHardFork3Block: nil,
 		// ADDED by Jakub Pajek END (hard fork: list)
 		ShanghaiTime:                  nil,
 		CancunTime:                    nil,
@@ -523,6 +527,7 @@ type ChainConfig struct {
 	// Private pre-merge hard forks
 	PrivateHardFork1Block *big.Int `json:"privateHardFork1Block,omitempty"` // Private hard fork #1 switch block (nil = no fork, 0 = already on HF1)
 	PrivateHardFork2Block *big.Int `json:"privateHardFork2Block,omitempty"` // Private hard fork #2 switch block (nil = no fork, 0 = already on HF2)
+	PrivateHardFork3Block *big.Int `json:"privateHardFork3Block,omitempty"` // Private hard fork #3 switch block (nil = no fork, 0 = already on HF3)
 	// ADDED by Jakub Pajek END (hard fork: list)
 
 	// Fork scheduling was switched from blocks to timestamps here
@@ -674,6 +679,9 @@ func (c *ChainConfig) Description() string {
 	if c.PrivateHardFork2Block != nil {
 		banner += fmt.Sprintf(" - Hard Fork 2:                 %-8v (https://github.com/fblch/Documentation/blob/main/NetworkUpgrades/Private_Hard_Fork_02.pdf)\n", c.PrivateHardFork2Block)
 	}
+	if c.PrivateHardFork3Block != nil {
+		banner += fmt.Sprintf(" - Hard Fork 3:                 %-8v (https://github.com/fblch/Documentation/blob/main/NetworkUpgrades/Private_Hard_Fork_03.pdf)\n", c.PrivateHardFork3Block)
+	}
 	banner += "\n"
 	// ADDED by Jakub Pajek END (hard fork: list)
 
@@ -790,6 +798,12 @@ func (c *ChainConfig) IsPrivateHardFork2(num *big.Int) bool {
 	return isBlockForked(c.PrivateHardFork2Block, num)
 }
 
+// ADDED by Jakub Pajek (hard fork: HF3)
+// IsPrivateHardFork3 returns whether num is either equal to the HF3 fork block or greater.
+func (c *ChainConfig) IsPrivateHardFork3(num *big.Int) bool {
+	return isBlockForked(c.PrivateHardFork3Block, num)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
@@ -846,8 +860,12 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		block     *big.Int // forks up to - and including the merge - were defined with block numbers
 		timestamp *uint64  // forks after the merge are scheduled using timestamps
 		optional  bool     // if true, the fork may be nil and next fork is still allowed
+		// ADDED by Jakub Pajek (hard fork: list)
+		privRequired bool // if false, the private fork may be nil and next private fork is still allowed
 	}
 	var lastFork fork
+	// ADDED by Jakub Pajek (hard fork: list)
+	var lastPrivRequiredFork fork
 	for _, cur := range []fork{
 		{name: "homesteadBlock", block: c.HomesteadBlock},
 		{name: "daoForkBlock", block: c.DAOForkBlock, optional: true},
@@ -864,8 +882,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
 		// ADDED by Jakub Pajek BEG (hard fork: list)
-		{name: "privateHardFork1Block", block: c.PrivateHardFork1Block, optional: true},
-		{name: "privateHardFork2Block", block: c.PrivateHardFork2Block, optional: true},
+		{name: "privateHardFork1Block", block: c.PrivateHardFork1Block, optional: true, privRequired: true},
+		{name: "privateHardFork2Block", block: c.PrivateHardFork2Block, optional: true, privRequired: true},
+		{name: "privateHardFork3Block", block: c.PrivateHardFork3Block, optional: true, privRequired: true},
 		// ADDED by Jakub Pajek END (hard fork: list)
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
@@ -905,6 +924,26 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		if !cur.optional || (cur.block != nil || cur.timestamp != nil) {
 			lastFork = cur
 		}
+		// ADDED by Jakub Pajek BEG (hard fork: list)
+		if lastPrivRequiredFork.name != "" {
+			switch {
+			// Non-optional private forks must all be present in the chain config up to the last defined private fork
+			case lastPrivRequiredFork.block == nil && lastPrivRequiredFork.timestamp == nil &&
+				cur.privRequired && (cur.block != nil || cur.timestamp != nil):
+				if cur.block != nil {
+					return fmt.Errorf("unsupported private fork ordering: %v not enabled, but %v enabled at block %v",
+						lastPrivRequiredFork.name, cur.name, cur.block)
+				} else {
+					return fmt.Errorf("unsupported private fork ordering: %v not enabled, but %v enabled at timestamp %v",
+						lastPrivRequiredFork.name, cur.name, cur.timestamp)
+				}
+			}
+		}
+		// If it was not required, then ignore it
+		if cur.privRequired {
+			lastPrivRequiredFork = cur
+		}
+		// ADDED by Jakub Pajek END (hard fork: list)
 	}
 	return nil
 }
@@ -968,6 +1007,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	}
 	if isForkBlockIncompatible(c.PrivateHardFork2Block, newcfg.PrivateHardFork2Block, headNumber) {
 		return newBlockCompatError("Private HF2 fork block", c.PrivateHardFork2Block, newcfg.PrivateHardFork2Block)
+	}
+	if isForkBlockIncompatible(c.PrivateHardFork3Block, newcfg.PrivateHardFork3Block, headNumber) {
+		return newBlockCompatError("Private HF3 fork block", c.PrivateHardFork3Block, newcfg.PrivateHardFork3Block)
 	}
 	// ADDED by Jakub Pajek END (hard fork: list)
 	if isForkBlockIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, headNumber) {
@@ -1127,8 +1169,8 @@ type Rules struct {
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
 	// ADDED by Jakub Pajek (hard fork: list)
-	IsPrivateHardFork1, IsPrivateHardFork2  bool
-	IsMerge, IsShanghai, IsCancun, IsPrague bool
+	IsPrivateHardFork1, IsPrivateHardFork2, IsPrivateHardFork3 bool
+	IsMerge, IsShanghai, IsCancun, IsPrague                    bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1152,6 +1194,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		IsPrivateHardFork1: c.IsPrivateHardFork1(num),
 		IsPrivateHardFork2: c.IsPrivateHardFork2(num),
+		IsPrivateHardFork3: c.IsPrivateHardFork3(num),
 		// ADDED by Jakub Pajek END (hard fork: list)
 		IsMerge:    isMerge,
 		IsShanghai: c.IsShanghai(timestamp),

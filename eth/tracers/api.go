@@ -1040,6 +1040,10 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.PrivateHardFork2Block = block
 		canon = false
 	}
+	if block := override.PrivateHardFork3Block; block != nil {
+		copy.PrivateHardFork3Block = block
+		canon = false
+	}
 	// ADDED by Jakub Pajek END (hard fork: list)
 	if timestamp := override.ShanghaiTime; timestamp != nil {
 		copy.ShanghaiTime = timestamp

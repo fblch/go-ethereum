@@ -86,6 +86,7 @@ func init() {
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	cliqueChainConfig.PrivateHardFork1Block = big.NewInt(0)
 	cliqueChainConfig.PrivateHardFork2Block = big.NewInt(0)
+	cliqueChainConfig.PrivateHardFork3Block = big.NewInt(0)
 	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//cliqueChainConfig.Clique = &params.CliqueConfig{

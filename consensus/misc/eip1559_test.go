@@ -48,6 +48,7 @@ func copyConfig(original *params.ChainConfig) *params.ChainConfig {
 		// ADDED by Jakub Pajek BEG (hard fork: list)
 		PrivateHardFork1Block: original.PrivateHardFork1Block,
 		PrivateHardFork2Block: original.PrivateHardFork2Block,
+		PrivateHardFork3Block: original.PrivateHardFork3Block,
 		// ADDED by Jakub Pajek END (hard fork: list)
 		TerminalTotalDifficulty: original.TerminalTotalDifficulty,
 		Ethash:                  original.Ethash,

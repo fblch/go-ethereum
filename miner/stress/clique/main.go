@@ -157,6 +157,7 @@ func makeGenesis(faucets []*ecdsa.PrivateKey, sealers []*ecdsa.PrivateKey) *core
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	genesis.Config.PrivateHardFork1Block = big.NewInt(0)
 	genesis.Config.PrivateHardFork2Block = big.NewInt(0)
+	genesis.Config.PrivateHardFork3Block = big.NewInt(0)
 	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//genesis.Config.Clique.Period = 1

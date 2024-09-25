@@ -710,6 +710,7 @@ func (tt *cliqueTest) run(t *testing.T) {
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	config.PrivateHardFork1Block = big.NewInt(0)
 	config.PrivateHardFork2Block = tt.privateHardFork2Block
+	config.PrivateHardFork3Block = nil
 	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//config.Clique = &params.CliqueConfig{
