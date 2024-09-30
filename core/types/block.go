@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -157,7 +158,9 @@ func (h *Header) SanityCheck(config *params.ChainConfig) error {
 	if eMaxFields > 0 {
 		eMaxLen := params.CliqueExtraVanity + eMaxFields*(common.AddressLength+1) + params.CliqueExtraSeal
 		if eLen := len(h.Extra); eLen > eMaxLen {
-			return fmt.Errorf("too large block extradata: size %d", eLen)
+			err := fmt.Errorf("too large block extradata: size %d", eLen)
+			log.Error("JAKUB SanityCheck FAILED!", "err", err)
+			return err
 		}
 	}
 	// MODIFIED by Jakub Pajek END (clique permissions, clique multiple votes)

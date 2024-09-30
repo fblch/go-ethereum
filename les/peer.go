@@ -37,6 +37,7 @@ import (
 	vfc "github.com/ethereum/go-ethereum/les/vflux/client"
 	vfs "github.com/ethereum/go-ethereum/les/vflux/server"
 	"github.com/ethereum/go-ethereum/light"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
@@ -227,7 +228,9 @@ func (p *peerCommons) sendReceiveHandshake(sendList keyValueList) (keyValueList,
 			return
 		}
 		if msg.Size > ProtocolMaxMsgSize {
-			errc <- errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+			err := errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+			log.Error("JAKUB les/sendReceiveHandshake FAILED!", "err", err)
+			errc <- err
 			return
 		}
 		// Decode the handshake
