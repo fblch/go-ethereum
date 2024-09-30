@@ -180,9 +180,9 @@ var (
 // Clique proof-of-authority protocol constants, which are accessed from outside the clique package.
 var (
 	// MEMO by Jakub Pajek: sealers limit
-	// CliqueMaxSealerCount limits the the number of sealers that can be included in extra-data of checkpoint blocks.
-	// This limit is only enforced by the network protocol, not by the consensus protocol, in order not having to hard fork
-	// once we decide to change it. Set to 30000 for now. Increase as the network grows.
+	// CliqueMaxSealerCount limits the the number of sealers that can be included in extra-data of pre-PrivateHardFork3
+	// checkpoint blocks. This limit is only enforced by the network protocol, not by the consensus protocol, in order
+	// not having to hard fork once we decide to change it. Set to 30000 for now. Increase as the network grows.
 	CliqueMaxSealerCount = 30000
 
 	// MEMO by Jakub Pajek: votes limit (hard fork: HF2)

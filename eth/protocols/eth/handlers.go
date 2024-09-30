@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -331,7 +332,13 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 	if err := msg.Decode(ann); err != nil {
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
-	if err := ann.sanityCheck(); err != nil {
+	// MODIFIED by Jakub Pajek (empty checkpoints)
+	//if err := ann.sanityCheck(); err != nil {
+	var config *params.ChainConfig
+	if chain := backend.Chain(); chain != nil {
+		config = chain.Config()
+	}
+	if err := ann.sanityCheck(config); err != nil {
 		return err
 	}
 	if hash := types.CalcUncleHash(ann.Block.Uncles()); hash != ann.Block.UncleHash() {

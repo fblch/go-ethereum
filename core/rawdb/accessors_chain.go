@@ -337,7 +337,8 @@ func ReadHeaderRange(db ethdb.Reader, number uint64, count uint64) []rlp.RawValu
 	// Increase the max bytes limit when reading headers from ancients in order to handle big headers with multiple votes.
 	// Newer version of geth can set the max bytes limit to 0 in order to disable it.
 	// MEMO by Jakub Pajek: sealers limit
-	// This limit should be either disabled or take into account the checkpoint blocks with up to CliqueMaxSealerCount of sealer data.
+	// This limit should be either disabled or take into account the pre-PrivateHardFork3 checkpoint blocks with up to
+	// CliqueMaxSealerCount of sealer data.
 	//max := count * 700
 	max := count * 10 * 1024
 	data, err := db.AncientRange(ChainFreezerHeaderTable, i+1-count, count, max)
