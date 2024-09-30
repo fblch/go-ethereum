@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
@@ -85,7 +86,9 @@ func (p *Peer) readStatus(network uint64, status *StatusPacket, genesis common.H
 		return fmt.Errorf("%w: first msg has code %x (!= %x)", errNoStatusMsg, msg.Code, StatusMsg)
 	}
 	if msg.Size > maxMessageSize {
-		return fmt.Errorf("%w: %v > %v", errMsgTooLarge, msg.Size, maxMessageSize)
+		err := fmt.Errorf("%w: %v > %v", errMsgTooLarge, msg.Size, maxMessageSize)
+		log.Error("JAKUB eth/readStatus FAILED!", "err", err)
+		return err
 	}
 	// Decode the handshake and make sure everything matches
 	if err := msg.Decode(&status); err != nil {

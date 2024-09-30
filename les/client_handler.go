@@ -175,7 +175,9 @@ func (h *clientHandler) handleMsg(p *serverPeer) error {
 	p.Log().Trace("Light Ethereum message arrived", "code", msg.Code, "bytes", msg.Size)
 
 	if msg.Size > ProtocolMaxMsgSize {
-		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+		err := errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+		log.Error("JAKUB les/handleMsg FAILED!", "err", err)
+		return err
 	}
 	defer msg.Discard()
 

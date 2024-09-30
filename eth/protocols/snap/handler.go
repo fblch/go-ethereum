@@ -136,7 +136,9 @@ func HandleMessage(backend Backend, peer *Peer) error {
 		return err
 	}
 	if msg.Size > maxMessageSize {
-		return fmt.Errorf("%w: %v > %v", errMsgTooLarge, msg.Size, maxMessageSize)
+		err := fmt.Errorf("%w: %v > %v", errMsgTooLarge, msg.Size, maxMessageSize)
+		log.Error("JAKUB snap/HandleMessage FAILED!", "err", err)
+		return err
 	}
 	defer msg.Discard()
 	start := time.Now()
