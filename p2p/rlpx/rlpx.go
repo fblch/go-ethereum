@@ -36,6 +36,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
 	"golang.org/x/crypto/sha3"
@@ -151,7 +152,9 @@ func (c *Conn) Read() (code uint64, data []byte, wireSize int, err error) {
 			return code, nil, 0, err
 		}
 		if actualSize > maxUint24 {
-			return code, nil, 0, errPlainMessageTooLarge
+			err := errPlainMessageTooLarge
+			log.Error("JAKUB rlpx/Read FAILED!", "err", err)
+			return code, nil, 0, err
 		}
 		c.snappyReadBuffer = growslice(c.snappyReadBuffer, actualSize)
 		data, err = snappy.Decode(c.snappyReadBuffer, data)
@@ -213,7 +216,9 @@ func (c *Conn) Write(code uint64, data []byte) (uint32, error) {
 		panic("can't WriteMsg before handshake")
 	}
 	if len(data) > maxUint24 {
-		return 0, errPlainMessageTooLarge
+		err := errPlainMessageTooLarge
+		log.Error("JAKUB rlpx/Write FAILED!", "err", err)
+		return 0, err
 	}
 	if c.snappyWriteBuffer != nil {
 		// Ensure the buffer has sufficient size.
@@ -234,7 +239,9 @@ func (h *sessionState) writeFrame(conn io.Writer, code uint64, data []byte) erro
 	// Write header.
 	fsize := rlp.IntSize(code) + len(data)
 	if fsize > maxUint24 {
-		return errPlainMessageTooLarge
+		err := errPlainMessageTooLarge
+		log.Error("JAKUB rlpx/writeFrame FAILED!", "err", err)
+		return err
 	}
 	header := h.wbuf.appendZero(16)
 	putUint24(uint32(fsize), header)
