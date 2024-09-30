@@ -887,7 +887,11 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				if !snap.alreadyVoted(signer, address, proposal.Proposal) {
 					addresses = append(addresses, address)
 				}
-			} else if number > proposal.Block && number-proposal.Block > params.CliqueEpoch {
+			} else
+			// Purge already passed proposals that are older than the light immutability threshold
+			// (we can not purge proposals immediately after they are passed because they can
+			// become valid again due to reorgs)
+			if number > proposal.Block && number-proposal.Block > params.LightImmutabilityThreshold {
 				delete(c.proposals, address)
 				purged++
 			}
