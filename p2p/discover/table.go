@@ -273,9 +273,9 @@ func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *
 	return nodes
 }
 
-// appendLiveNodes adds nodes at the given distance to the result slice.
+// appendBucketNodes adds nodes at the given distance to the result slice.
 // This is used by the FINDNODE/v5 handler.
-func (tab *Table) appendLiveNodes(dist uint, result []*enode.Node) []*enode.Node {
+func (tab *Table) appendBucketNodes(dist uint, result []*enode.Node, checkLive bool) []*enode.Node {
 	if dist > 256 {
 		return result
 	}
@@ -290,8 +290,8 @@ func (tab *Table) appendLiveNodes(dist uint, result []*enode.Node) []*enode.Node
 		// (Private addresses behind CGNAT are always unreachable from the Internet).
 		// Unless we explicitly allow unverified mobile nodes here, they will never
 		// be advertised.
-		//if n.isValidatedLive {
-		if n.isValidatedLive || netutil.IsMobileLAN(n.IP()) {
+		//if !checkLive || n.isValidatedLive {
+		if !checkLive || (n.isValidatedLive || netutil.IsMobileLAN(n.IP())) {
 			result = append(result, n.Node)
 		}
 	}
