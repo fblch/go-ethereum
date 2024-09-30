@@ -401,10 +401,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			if signed := snap.Signers[address]; signed.SignedCount > 0 {
 				// The signer signed at least one new block since the last check.
 				// Decrease the strike count, zero out the signed block count, save the state.
-				if !config.IsPrivateHardFork1(header.Number) && signed.StrikeCount > signed.SignedCount {
-					signed.StrikeCount -= signed.SignedCount
-				} else {
+				if config.IsPrivateHardFork1(header.Number) || signed.StrikeCount <= signed.SignedCount {
+					// For post-PrivateHardFork1 blocks, zero out the strike count
 					signed.StrikeCount = 0
+				} else {
+					// For pre-PrivateHardFork1 blocks, decrease the strike count by the signed block count
+					signed.StrikeCount -= signed.SignedCount
 				}
 				signed.SignedCount = 0
 				snap.Signers[address] = signed
