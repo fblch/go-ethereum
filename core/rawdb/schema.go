@@ -120,6 +120,8 @@ var (
 	BloomTrieIndexPrefix = []byte("bltIndex-")
 
 	CliqueSnapshotPrefix = []byte("clique-")
+	// ADDED by Jakub Pajek (persistent clique proposals)
+	CliqueProposalsKey = []byte("clique-proposals")
 
 	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)

@@ -36,6 +36,7 @@ import (
 	lru "github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -222,7 +223,7 @@ type Clique struct {
 
 // loadProposals loads existing proposals from the database.
 func loadProposals(db ethdb.Database) (map[common.Address]Proposal, error) {
-	blob, err := db.Get([]byte("clique-proposals"))
+	blob, err := db.Get(rawdb.CliqueProposalsKey)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +241,7 @@ func (c *Clique) storeProposals() error {
 	if err != nil {
 		return err
 	}
-	return c.db.Put([]byte("clique-proposals"), blob)
+	return c.db.Put(rawdb.CliqueProposalsKey, blob)
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
