@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -194,8 +195,10 @@ type NewBlockPacket struct {
 }
 
 // sanityCheck verifies that the values are reasonable, as a DoS protection
-func (request *NewBlockPacket) sanityCheck() error {
-	if err := request.Block.SanityCheck(); err != nil {
+// MODIFIED by Jakub Pajek (empty checkpoints)
+// func (request *NewBlockPacket) sanityCheck() error {
+func (request *NewBlockPacket) sanityCheck(config *params.ChainConfig) error {
+	if err := request.Block.SanityCheck(config); err != nil {
 		return err
 	}
 	//TD at mainnet block #7753254 is 76 bits. If it becomes 100 million times

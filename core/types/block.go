@@ -130,7 +130,9 @@ func (h *Header) Size() common.StorageSize {
 // any 'sane' production values should hold, and can mainly be used to prevent
 // that the unbounded fields are stuffed with junk data to add processing
 // overhead
-func (h *Header) SanityCheck() error {
+// MODIFIED by Jakub Pajek (empty checkpoints)
+// func (h *Header) SanityCheck() error {
+func (h *Header) SanityCheck(config *params.ChainConfig) error {
 	if h.Number != nil && !h.Number.IsUint64() {
 		return fmt.Errorf("too large block number: bitlen %d", h.Number.BitLen())
 	}
@@ -139,16 +141,20 @@ func (h *Header) SanityCheck() error {
 			return fmt.Errorf("too large block difficulty: bitlen %d", diffLen)
 		}
 	}
-	// MODIFIED by Jakub Pajek BEG (clique permissions, clique multiple votes)
+	// MODIFIED by Jakub Pajek BEG (clique permissions, clique multiple votes, empty checkpoints)
 	/*
 		if eLen := len(h.Extra); eLen > 100*1024 {
 			return fmt.Errorf("too large block extradata: size %d", eLen)
 		}
 	*/
 	// If set to a value greater than 0, eMaxFields will effectively limit:
-	//  * the number of votes that can be included in extra-data of non-checkpoint blocks,
-	//  * the number of sealers that can be included in extra-data of checkpoint blocks.
-	if eMaxFields := params.CliqueMaxSealerCount; eMaxFields > 0 {
+	//  * the number of sealers that can be included in extra-data of pre-PrivateHardFork3 checkpoint blocks,
+	//  * the number of votes that can be included in extra-data of non-checkpoint blocks.
+	eMaxFields := params.CliqueMaxSealerCount
+	if config != nil && config.IsPrivateHardFork3(h.Number) {
+		eMaxFields = params.CliqueMaxVoteCount
+	}
+	if eMaxFields > 0 {
 		eMaxLen := params.CliqueExtraVanity + eMaxFields*(common.AddressLength+1) + params.CliqueExtraSeal
 		if eLen := len(h.Extra); eLen > eMaxLen {
 			return fmt.Errorf("too large block extradata: size %d", eLen)
@@ -386,8 +392,10 @@ func (b *Block) Size() uint64 {
 
 // SanityCheck can be used to prevent that unbounded fields are
 // stuffed with junk data to add processing overhead
-func (b *Block) SanityCheck() error {
-	return b.header.SanityCheck()
+// MODIFIED by Jakub Pajek (empty checkpoints)
+// func (b *Block) SanityCheck() error {
+func (b *Block) SanityCheck(config *params.ChainConfig) error {
+	return b.header.SanityCheck(config)
 }
 
 type writeCounter uint64

@@ -635,13 +635,24 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 		// Verify the header's EIP-1559 attributes.
 		return err
 	}
-	// Ensure that the extra-data contains permissions list on checkpoint, optional votes list otherwise
+	// Ensure that the extra-data size is correct
 	checkpoint := number%currConfig.Epoch == 0
 	extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
-	if checkpoint && extraBytes%(common.AddressLength+1) != 0 {
-		return errInvalidCheckpointPermissions
+	if checkpoint {
+		// For post-PrivateHardFork3 checkpoint blocks, extra-data should be empty
+		if chain.Config().IsPrivateHardFork3(header.Number) {
+			if extraBytes != 0 {
+				return errInvalidCheckpointPermissions
+			}
+		} else
+		// For pre-PrivateHardFork3 checkpoint blocks, extra-data should contain permissions list
+		if extraBytes%(common.AddressLength+1) != 0 {
+			return errInvalidCheckpointPermissions
+
+		}
 	}
 	if !checkpoint {
+		// On non-checkpoint blocks, extra-data can contain optional votes list
 		if extraBytes%(common.AddressLength+1) != 0 {
 			return errInvalidVotes
 		}
@@ -653,8 +664,8 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainHeaderReader, header
 			}
 		}
 	}
-	// If the block is a checkpoint block, verify the permissions list
-	if checkpoint {
+	// For pre-PrivateHardFork3 checkpoint blocks, verify the permissions list
+	if !chain.Config().IsPrivateHardFork3(header.Number) && checkpoint {
 		permissions := make([]byte, len(snap.Signers)*(common.AddressLength+1))
 		authorizedSigners := snap.signers()
 		for i := 0; i < len(authorizedSigners); i++ {
@@ -717,7 +728,8 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// Solutions:
 		// - Hotfix:
 		//   - Disable the logic to recreate snapshots from checkpoint blocks.
-		//     - This will drop the light sync support (which is already corrupt due to incomplete checkpoints)
+		//     - This will drop the light client's CHT sync support
+		//		 (which is already corrupt due to incomplete checkpoints)
 		//     - Might also have inpact on performance when reinitializing chain from a freezer?
 		// - Bugfix:
 		//   - Fix the logic around generating checkpoint blocks (requires a hard fork to deploy)
@@ -1005,19 +1017,21 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	}
 	header.Extra = header.Extra[:params.CliqueExtraVanity]
 
-	// If the block is a checkpoint, include permissions list.
+	// If the block is a pre-PrivateHardFork3 checkpoint block, include permissions list.
 	if number%currConfig.Epoch == 0 {
-		authorizedSigners := snap.signers()
-		for i := 0; i < len(authorizedSigners); i++ {
-			header.Extra = append(header.Extra, authorizedSigners[i][:]...)
-			if _, ok := snap.Voters[authorizedSigners[i]]; ok {
-				header.Extra = append(header.Extra, params.CliqueExtraVoterMarker)
-			} else {
-				header.Extra = append(header.Extra, params.CliqueExtraSignerMarker)
+		if !chain.Config().IsPrivateHardFork3(header.Number) {
+			authorizedSigners := snap.signers()
+			for i := 0; i < len(authorizedSigners); i++ {
+				header.Extra = append(header.Extra, authorizedSigners[i][:]...)
+				if _, ok := snap.Voters[authorizedSigners[i]]; ok {
+					header.Extra = append(header.Extra, params.CliqueExtraVoterMarker)
+				} else {
+					header.Extra = append(header.Extra, params.CliqueExtraSignerMarker)
+				}
 			}
 		}
 	} else
-	// Otherwise, if the signer is a voter and voter mode is enabled, cast all valid votes.
+	// For non-checkpoint blocks, if the signer is a voter and voter mode is enabled, cast all valid votes.
 	if okVoter && c.options.VoterMode {
 		// Write lock needed for proposal purging
 		c.lock.Lock() //c.lock.RLock()
@@ -1099,7 +1113,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		// Write lock needed for proposal purging
 		c.lock.Unlock() //c.lock.RUnlock()
 	} else
-	// Otherwise, if the signer is a voter and voter mode is disabled, signal error.
+	// For non-checkpoint blocks, if the signer is a voter and voter mode is disabled, signal error.
 	if okVoter && !c.options.VoterMode {
 		log.Error("Voter with disabled voter mode!")
 	}

@@ -117,6 +117,8 @@ type cliqueTest struct {
 	votingRule int
 	// ADDED by Jakub Pajek (voter ring voting)
 	privateHardFork2Block *big.Int
+	// ADDED by Jakub Pajek (empty checkpoints)
+	privateHardFork3Block *big.Int
 }
 
 // Tests that Clique signer voting is evaluated correctly for various simple and
@@ -406,10 +408,16 @@ func TestClique_VotingRuleMajority(t *testing.T) {
 		tt.votingRule = 2 // Majority
 		t.Run(fmt.Sprint(i), tt.run)
 		// ADDED by Jakub Pajek BEG (voter ring voting)
-		// Run the same test post PrivateHardFork2
+		// Run the same test post-PrivateHardFork2
 		tt.privateHardFork2Block = big.NewInt(0)
 		t.Run(fmt.Sprint(i), tt.run)
 		// ADDED by Jakub Pajek END (voter ring voting)
+		// ADDED by Jakub Pajek BEG (empty checkpoints)
+		// Run the same test post-PrivateHardFork3
+		tt.privateHardFork2Block = big.NewInt(0)
+		tt.privateHardFork3Block = big.NewInt(0)
+		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek END (empty checkpoints)
 	}
 }
 
@@ -665,10 +673,16 @@ func TestClique_VotingRuleSingle(t *testing.T) {
 		tt.votingRule = 1 // Single vote
 		t.Run(fmt.Sprint(i), tt.run)
 		// ADDED by Jakub Pajek BEG (voter ring voting)
-		// Run the same test post PrivateHardFork2
+		// Run the same test post-PrivateHardFork2
 		tt.privateHardFork2Block = big.NewInt(0)
 		t.Run(fmt.Sprint(i), tt.run)
 		// ADDED by Jakub Pajek END (voter ring voting)
+		// ADDED by Jakub Pajek BEG (empty checkpoints)
+		// Run the same test post-PrivateHardFork3
+		tt.privateHardFork2Block = big.NewInt(0)
+		tt.privateHardFork3Block = big.NewInt(0)
+		t.Run(fmt.Sprint(i), tt.run)
+		// ADDED by Jakub Pajek END (empty checkpoints)
 	}
 }
 
@@ -710,7 +724,7 @@ func (tt *cliqueTest) run(t *testing.T) {
 	// ADDED by Jakub Pajek BEG (hard fork: list)
 	config.PrivateHardFork1Block = big.NewInt(0)
 	config.PrivateHardFork2Block = tt.privateHardFork2Block
-	config.PrivateHardFork3Block = nil
+	config.PrivateHardFork3Block = tt.privateHardFork3Block
 	// ADDED by Jakub Pajek END (hard fork: list)
 	// MODIFIED by Jakub Pajek (clique config: variable period)
 	//config.Clique = &params.CliqueConfig{
@@ -767,9 +781,14 @@ func (tt *cliqueTest) run(t *testing.T) {
 		header.Extra = make([]byte, params.CliqueExtraVanity)
 		if auths := tt.votes[j].checkpoint; auths != nil {
 			// MODIFIED by Jakub Pajek (clique permissions)
+			// MODIFIED by Jakub Pajek (empty checkpoints)
 			//header.Extra = make([]byte, extraVanity+len(auths)*common.AddressLength+extraSeal)
-			header.Extra = append(header.Extra, make([]byte, len(auths)*(common.AddressLength+1))...)
-			accounts.checkpoint(header, auths)
+			// For pre-PrivateHardFork3 checkpoint blocks, extra-data should contain permissions list
+			// For post-PrivateHardFork3 checkpoint blocks, extra-data should be empty
+			if !config.IsPrivateHardFork3(big.NewInt(int64(j))) {
+				header.Extra = append(header.Extra, make([]byte, len(auths)*(common.AddressLength+1))...)
+				accounts.checkpoint(header, auths)
+			}
 		}
 		// ADDED by Jakub Pajek BEG (clique multiple votes)
 		// Cast the vote contained in this block
