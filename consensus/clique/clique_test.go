@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // This test case is a repro of an annoying bug that took us forever to catch.
@@ -309,3 +310,150 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 }
 
 // ADDED by Jakub Pajek END (clique 1-n scale difficulties)
+
+// ADDED by Jakub Pajek BEG (rlp encoded proposals)
+func TestProposalsRlpEncoding(t *testing.T) {
+	for _, test := range []testProposalsRlpEncoding{
+		{
+			name:      "proposals/empty",
+			proposals: Proposals{},
+		},
+		{
+			name: "proposals/singleSigner",
+			proposals: Proposals{
+				common.HexToAddress("0xf5efffa5D659E773872E61Ac355b9D1972dd93E1"): Proposal{Block: 359083, Proposal: proposalSignerVote},
+			},
+		},
+		{
+			name: "proposals/singleVoter",
+			proposals: Proposals{
+				common.HexToAddress("0x7BD44224c1a1d311A2F7c7C530b5e64F84Bd4d5c"): Proposal{Block: 181414, Proposal: proposalVoterVote},
+			},
+		},
+		{
+			name: "proposals/singleDrop",
+			proposals: Proposals{
+				common.HexToAddress("0xb2F6eab262b56f08De43AA0E990bd33D30D20936"): Proposal{Block: 867387, Proposal: proposalDropVote},
+			},
+		},
+		{
+			name: "proposals/multipleSigner",
+			proposals: Proposals{
+				common.HexToAddress("0xAFa3569CdB9916F8130dA29Bd8e70F16403e1DDb"): Proposal{Block: 567995, Proposal: proposalSignerVote},
+				common.HexToAddress("0xF466F5886e3753d3aB6AeF9Eabb1D8E7BdE24cd6"): Proposal{Block: 710886, Proposal: proposalSignerVote},
+				common.HexToAddress("0xFC9C3a46EE1eC56536847aAb7cc0969A592B8143"): Proposal{Block: 176676, Proposal: proposalSignerVote},
+				common.HexToAddress("0xD27A54423C9723F8E5a2685A33C9caA0a8355101"): Proposal{Block: 909229, Proposal: proposalSignerVote},
+				common.HexToAddress("0x4f4CBC36a0B0d834C29AADC9F7b1E304779beF62"): Proposal{Block: 131303, Proposal: proposalSignerVote},
+				common.HexToAddress("0x20b20eAE302c821b53018037B0f3c1eC90c0af5B"): Proposal{Block: 644475, Proposal: proposalSignerVote},
+				common.HexToAddress("0x4c9AF439b1A6761B8E549D8d226A468a6b2803A8"): Proposal{Block: 762002, Proposal: proposalSignerVote},
+				common.HexToAddress("0xD6B7d52E15678B9195F12F3a6D6cb79dcDcCb690"): Proposal{Block: 759492, Proposal: proposalSignerVote},
+				common.HexToAddress("0xaf1b5F42AC0E105F754368b43C012D199478bc07"): Proposal{Block: 706185, Proposal: proposalSignerVote},
+				common.HexToAddress("0x6CaA34d5E113468251CD6219e3567093523E568E"): Proposal{Block: 983215, Proposal: proposalSignerVote},
+			},
+		},
+		{
+			name: "proposals/multipleVoter",
+			proposals: Proposals{
+				common.HexToAddress("0xDE2F4F3617Fd02EB0a7bD4d7043021ce515bf82A"): Proposal{Block: 96163, Proposal: proposalVoterVote},
+				common.HexToAddress("0xfAeCD9790D80587e92F076e899e3dB1b775caB96"): Proposal{Block: 965056, Proposal: proposalVoterVote},
+				common.HexToAddress("0x12755Fd8705c2c1aD3F6D363FDe68D2202b68F97"): Proposal{Block: 215348, Proposal: proposalVoterVote},
+				common.HexToAddress("0x73590e408FDE745846cF4B90f9CD445A00dd63B7"): Proposal{Block: 491908, Proposal: proposalVoterVote},
+				common.HexToAddress("0x7359852f47d7917986E804E92a44255AD7dD63B7"): Proposal{Block: 810100, Proposal: proposalVoterVote},
+				common.HexToAddress("0x8ab426EB95A1C47681B80826eB9446208aAC898f"): Proposal{Block: 461654, Proposal: proposalVoterVote},
+				common.HexToAddress("0x022A333F28e9fa47B13D0AdFF812F9230e4Beee9"): Proposal{Block: 477760, Proposal: proposalVoterVote},
+				common.HexToAddress("0xdEF8BAF79424fc63744dD3f99b33c16a01CE7235"): Proposal{Block: 481067, Proposal: proposalVoterVote},
+				common.HexToAddress("0xfcFFE190Ed10b001a91441fB1482ae446dE2B619"): Proposal{Block: 568934, Proposal: proposalVoterVote},
+				common.HexToAddress("0x0d9f01809436c68FFd490821D2ECf723dd7Bf73d"): Proposal{Block: 649533, Proposal: proposalVoterVote},
+			},
+		},
+		{
+			name: "proposals/multipleDrop",
+			proposals: Proposals{
+				common.HexToAddress("0xe9AB8337CAf429E244d8bfa0E97f92d12c39FAd2"): Proposal{Block: 591100, Proposal: proposalDropVote},
+				common.HexToAddress("0x43a800f0fadc6aC1Dfc17986edBD4A1e4808Bb31"): Proposal{Block: 689443, Proposal: proposalDropVote},
+				common.HexToAddress("0x267B30a636A4bAf53b0E788C8C4fF5C2FD4FfdC0"): Proposal{Block: 176033, Proposal: proposalDropVote},
+				common.HexToAddress("0x3d3F20583c80582B5DB10724B8513e7fbc28B718"): Proposal{Block: 224695, Proposal: proposalDropVote},
+				common.HexToAddress("0x65Ec775Cd4B535d517b8B1D36199BF83480672aa"): Proposal{Block: 900909, Proposal: proposalDropVote},
+				common.HexToAddress("0x958Ef6947b4A17dFE31cDF421463C9342159b198"): Proposal{Block: 188197, Proposal: proposalDropVote},
+				common.HexToAddress("0x8ABDcEF84A78497416d476d3424d930D65B453Bf"): Proposal{Block: 846133, Proposal: proposalDropVote},
+				common.HexToAddress("0x5F515F6C524B18cA30f7783Fb58Dd4bE2e9904EC"): Proposal{Block: 32504, Proposal: proposalDropVote},
+				common.HexToAddress("0xeC8c7F9f3D7427fBB2487a579993Ac46933Bb532"): Proposal{Block: 731578, Proposal: proposalDropVote},
+				common.HexToAddress("0xE556bd254ee9a4417eDFa77822D1c43A47C895FA"): Proposal{Block: 777302, Proposal: proposalDropVote},
+			},
+		},
+		{
+			name: "proposals/multipleMixed",
+			proposals: Proposals{
+				common.HexToAddress("0x73590e408FDE745846cF4B90f9CD445A00dd63B7"): Proposal{Block: 491908, Proposal: proposalVoterVote},
+				common.HexToAddress("0x4f4CBC36a0B0d834C29AADC9F7b1E304779beF62"): Proposal{Block: 131303, Proposal: proposalSignerVote},
+				common.HexToAddress("0x3d3F20583c80582B5DB10724B8513e7fbc28B718"): Proposal{Block: 224695, Proposal: proposalDropVote},
+				common.HexToAddress("0x6CaA34d5E113468251CD6219e3567093523E568E"): Proposal{Block: 983215, Proposal: proposalSignerVote},
+				common.HexToAddress("0xDE2F4F3617Fd02EB0a7bD4d7043021ce515bf82A"): Proposal{Block: 96163, Proposal: proposalVoterVote},
+				common.HexToAddress("0x4c9AF439b1A6761B8E549D8d226A468a6b2803A8"): Proposal{Block: 762002, Proposal: proposalSignerVote},
+				common.HexToAddress("0xD6B7d52E15678B9195F12F3a6D6cb79dcDcCb690"): Proposal{Block: 759492, Proposal: proposalSignerVote},
+				common.HexToAddress("0xE556bd254ee9a4417eDFa77822D1c43A47C895FA"): Proposal{Block: 777302, Proposal: proposalDropVote},
+				common.HexToAddress("0xFC9C3a46EE1eC56536847aAb7cc0969A592B8143"): Proposal{Block: 176676, Proposal: proposalSignerVote},
+				common.HexToAddress("0xF466F5886e3753d3aB6AeF9Eabb1D8E7BdE24cd6"): Proposal{Block: 710886, Proposal: proposalSignerVote},
+				common.HexToAddress("0xdEF8BAF79424fc63744dD3f99b33c16a01CE7235"): Proposal{Block: 481067, Proposal: proposalVoterVote},
+				common.HexToAddress("0x20b20eAE302c821b53018037B0f3c1eC90c0af5B"): Proposal{Block: 644475, Proposal: proposalSignerVote},
+				common.HexToAddress("0x12755Fd8705c2c1aD3F6D363FDe68D2202b68F97"): Proposal{Block: 215348, Proposal: proposalVoterVote},
+				common.HexToAddress("0x8ABDcEF84A78497416d476d3424d930D65B453Bf"): Proposal{Block: 846133, Proposal: proposalDropVote},
+				common.HexToAddress("0x43a800f0fadc6aC1Dfc17986edBD4A1e4808Bb31"): Proposal{Block: 689443, Proposal: proposalDropVote},
+				common.HexToAddress("0xeC8c7F9f3D7427fBB2487a579993Ac46933Bb532"): Proposal{Block: 731578, Proposal: proposalDropVote},
+				common.HexToAddress("0xD27A54423C9723F8E5a2685A33C9caA0a8355101"): Proposal{Block: 909229, Proposal: proposalSignerVote},
+				common.HexToAddress("0x958Ef6947b4A17dFE31cDF421463C9342159b198"): Proposal{Block: 188197, Proposal: proposalDropVote},
+				common.HexToAddress("0x8ab426EB95A1C47681B80826eB9446208aAC898f"): Proposal{Block: 461654, Proposal: proposalVoterVote},
+				common.HexToAddress("0x022A333F28e9fa47B13D0AdFF812F9230e4Beee9"): Proposal{Block: 477760, Proposal: proposalVoterVote},
+				common.HexToAddress("0xfcFFE190Ed10b001a91441fB1482ae446dE2B619"): Proposal{Block: 568934, Proposal: proposalVoterVote},
+				common.HexToAddress("0x267B30a636A4bAf53b0E788C8C4fF5C2FD4FfdC0"): Proposal{Block: 176033, Proposal: proposalDropVote},
+				common.HexToAddress("0xe9AB8337CAf429E244d8bfa0E97f92d12c39FAd2"): Proposal{Block: 591100, Proposal: proposalDropVote},
+				common.HexToAddress("0xaf1b5F42AC0E105F754368b43C012D199478bc07"): Proposal{Block: 706185, Proposal: proposalSignerVote},
+				common.HexToAddress("0xAFa3569CdB9916F8130dA29Bd8e70F16403e1DDb"): Proposal{Block: 567995, Proposal: proposalSignerVote},
+				common.HexToAddress("0x5F515F6C524B18cA30f7783Fb58Dd4bE2e9904EC"): Proposal{Block: 32504, Proposal: proposalDropVote},
+				common.HexToAddress("0xfAeCD9790D80587e92F076e899e3dB1b775caB96"): Proposal{Block: 965056, Proposal: proposalVoterVote},
+				common.HexToAddress("0x0d9f01809436c68FFd490821D2ECf723dd7Bf73d"): Proposal{Block: 649533, Proposal: proposalVoterVote},
+				common.HexToAddress("0x65Ec775Cd4B535d517b8B1D36199BF83480672aa"): Proposal{Block: 900909, Proposal: proposalDropVote},
+				common.HexToAddress("0x7359852f47d7917986E804E92a44255AD7dD63B7"): Proposal{Block: 810100, Proposal: proposalVoterVote},
+			},
+		},
+	} {
+		t.Run(test.name, test.run)
+	}
+}
+
+func (a Proposals) equals(b Proposals) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if w, ok := b[k]; !ok || v.Block != w.Block || v.Proposal != w.Proposal {
+			return false
+		}
+	}
+	return true
+}
+
+type testProposalsRlpEncoding struct {
+	name      string
+	proposals Proposals
+}
+
+func (test *testProposalsRlpEncoding) run(t *testing.T) {
+	// RLP encode
+	buf := new(bytes.Buffer)
+	if err := rlp.Encode(buf, test.proposals); err != nil {
+		t.Fatal("failed to RLP encode proposals", err)
+	}
+	encoded := buf.Bytes()
+	// RLP decode
+	proposals := make(Proposals)
+	if err := rlp.Decode(bytes.NewReader(encoded), &proposals); err != nil {
+		t.Fatal("failed to RLP decode proposals", err)
+	}
+	// Compare
+	if !test.proposals.equals(proposals) {
+		t.Fatal("failed to RLP encode/decode proposals")
+	}
+}
+
+// ADDED by Jakub Pajek END (rlp encoded proposals)

@@ -200,6 +200,49 @@ type Proposal struct {
 	Proposal uint64 `json:"proposal"` // Whether to authorize or deauthorize the voted account
 }
 
+// Proposals represents a mapping of addresses to its proposals.
+type Proposals map[common.Address]Proposal
+
+// EncodeRLP implements rlp.Encoder.
+func (p Proposals) EncodeRLP(w io.Writer) error {
+	version := uint64(1)
+	if err := rlp.Encode(w, version); err != nil {
+		return err
+	}
+	for address := range p {
+		if err := rlp.Encode(w, address); err != nil {
+			return err
+		}
+		if err := rlp.Encode(w, p[address]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DecodeRLP implements rlp.Decoder.
+func (p Proposals) DecodeRLP(s *rlp.Stream) error {
+	var version uint64
+	if err := s.Decode(&version); err != nil {
+		return err
+	}
+	for {
+		var address common.Address
+		if err := s.Decode(&address); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		var proposal Proposal
+		if err := s.Decode(&proposal); err != nil {
+			return err
+		}
+		p[address] = proposal
+	}
+	return nil
+}
+
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
@@ -209,7 +252,7 @@ type Clique struct {
 	recents    *lru.Cache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
 	signatures *sigLRU                            // Signatures of recent blocks to speed up mining
 
-	proposals map[common.Address]Proposal // Current list of proposals we are pushing
+	proposals Proposals // Current list of proposals we are pushing
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
@@ -227,26 +270,87 @@ type Clique struct {
 }
 
 // loadProposals loads existing proposals from the database.
-func loadProposals(db ethdb.Database) (map[common.Address]Proposal, error) {
+func loadProposals(db ethdb.Database) (Proposals, error) {
+	// Migrate from JSON encoded proposals to RLP encoded proposals
+	has, err := db.Has(rawdb.CliqueProposalsKey)
+	if err != nil {
+		return nil, err
+	}
+	// Proposals are RLP encoded
+	if !has {
+		return loadProposalsRlp(db)
+	} else
+	// Proposals are JSON encoded
+	{
+		// Load JSON encoded proposals
+		proposals, err := loadProposalsJson(db)
+		if err != nil {
+			return nil, err
+		}
+		// Migrate to RLP encoded proposals
+		buf := new(bytes.Buffer)
+		if err := rlp.Encode(buf, proposals); err != nil {
+			return nil, err
+		}
+		if err := db.Put(rawdb.CliqueProposalsRlpKey, buf.Bytes()); err != nil {
+			return nil, err
+		}
+		// Remove JSON encoded proposals
+		if err := db.Delete(rawdb.CliqueProposalsKey); err != nil {
+			return nil, err
+		}
+		return proposals, nil
+	}
+}
+
+// loadProposalsJson loads existing proposals from the database
+// and decodes them using JSON encoding.
+func loadProposalsJson(db ethdb.Database) (Proposals, error) {
 	blob, err := db.Get(rawdb.CliqueProposalsKey)
 	if err != nil {
 		return nil, err
 	}
-	var proposals map[common.Address]Proposal
+	var proposals Proposals
 	if err := json.Unmarshal(blob, &proposals); err != nil {
 		return nil, err
 	}
 	return proposals, nil
 }
 
-// storeProposals inserts existing proposals into the database.
+// storeProposalsJson encodes existing proposals using JSON encoding
+// and inserts the encoded proposals into the database.
 // (assumes that the lock mutex is locked!)
-func (c *Clique) storeProposals() error {
+func (c *Clique) storeProposalsJson() error {
 	blob, err := json.Marshal(c.proposals)
 	if err != nil {
 		return err
 	}
 	return c.db.Put(rawdb.CliqueProposalsKey, blob)
+}
+
+// loadProposalsRlp loads existing proposals from the database
+// and decodes them using RLP encoding.
+func loadProposalsRlp(db ethdb.Database) (Proposals, error) {
+	blob, err := db.Get(rawdb.CliqueProposalsRlpKey)
+	if err != nil {
+		return nil, err
+	}
+	proposals := make(Proposals)
+	if err := rlp.Decode(bytes.NewReader(blob), &proposals); err != nil {
+		return nil, err
+	}
+	return proposals, nil
+}
+
+// storeProposalsRlp encodes existing proposals using RLP encoding
+// and inserts the encoded proposals into the database.
+// (assumes that the lock mutex is locked!)
+func (c *Clique) storeProposalsRlp() error {
+	buf := new(bytes.Buffer)
+	if err := rlp.Encode(buf, c.proposals); err != nil {
+		return err
+	}
+	return c.db.Put(rawdb.CliqueProposalsRlpKey, buf.Bytes())
 }
 
 // worker implements the worker logic executed in a background thread.
@@ -256,7 +360,7 @@ func (c *Clique) worker() {
 		select {
 		case <-c.proposalsCh:
 			c.lock.RLock()
-			if err := c.storeProposals(); err != nil {
+			if err := c.storeProposalsRlp(); err != nil {
 				log.Error("Failed to store clique proposals to disk", "err", err)
 			} else {
 				log.Trace("Stored clique proposals disk")
@@ -353,7 +457,7 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 	proposals, err := loadProposals(db)
 	if err != nil {
 		log.Warn("Failed to load clique proposals from disk", "err", err)
-		proposals = make(map[common.Address]Proposal)
+		proposals = make(Proposals)
 	} else {
 		log.Trace("Loaded clique proposals from disk")
 	}
