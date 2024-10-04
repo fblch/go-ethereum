@@ -518,7 +518,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		case bytes.HasPrefix(key, CliqueSnapshotPrefix) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
 			// ADDED by Jakub Pajek BEG (persistent clique proposals)
-		case bytes.Equal(key, CliqueProposalsKey):
+		case bytes.Equal(key, CliqueProposalsKey) || bytes.Equal(key, CliqueProposalsRlpKey):
 			cliqueProposals.Add(size)
 		// ADDED by Jakub Pajek END (persistent clique proposals)
 		case bytes.HasPrefix(key, ChtTablePrefix) ||

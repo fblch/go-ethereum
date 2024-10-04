@@ -121,7 +121,8 @@ var (
 
 	CliqueSnapshotPrefix = []byte("clique-")
 	// ADDED by Jakub Pajek (persistent clique proposals)
-	CliqueProposalsKey = []byte("clique-proposals")
+	CliqueProposalsKey    = []byte("clique-proposals")
+	CliqueProposalsRlpKey = []byte("clique-proposals-rlp")
 
 	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
