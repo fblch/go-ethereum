@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"math/big"
 	"sort"
@@ -32,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Vote represents a single vote that an authorized voter made to modify the
@@ -47,7 +49,7 @@ type Vote struct {
 // go against the proposal aren't counted since it's equivalent to not voting.
 type Tally struct {
 	Proposal uint64 `json:"proposal"` // Whether the vote is about authorizing or kicking someone
-	Votes    int    `json:"votes"`    // Number of votes until now wanting to pass the proposal
+	Votes    uint64 `json:"votes"`    // Number of votes until now wanting to pass the proposal
 }
 
 type sigLRU = lru.Cache[common.Hash, common.Address]
@@ -67,7 +69,7 @@ type Snapshot struct {
 
 	Number    uint64                    `json:"number"`    // Block number where the snapshot was created
 	Hash      common.Hash               `json:"hash"`      // Block hash where the snapshot was created
-	ConfigIdx int                       `json:"configIdx"` // Index of the current config entry inside the config array
+	ConfigIdx uint64                    `json:"configIdx"` // Index of the current config entry inside the config array
 	VoterRing bool                      `json:"voterRing"` // Flag to indicate the ring in which blocks are signed (the sealer ring or the voter ring)
 	Voting    bool                      `json:"voting"`    // Flag to indicate voting activity (heuristic)
 	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their most recently signed block
@@ -75,6 +77,175 @@ type Snapshot struct {
 	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their drop block number
 	Votes     []*Vote                   `json:"votes"`     // List of votes cast in chronological order
 	Tally     map[common.Address]Tally  `json:"tally"`     // Current vote tally to avoid recalculating
+}
+
+// EncodeRLP implements rlp.Encoder.
+func (s *Snapshot) EncodeRLP(w io.Writer) error {
+	version := uint64(1)
+	if err := rlp.Encode(w, version); err != nil {
+		return err
+	}
+	if err := rlp.Encode(w, s.Number); err != nil {
+		return err
+	}
+	if err := rlp.Encode(w, s.Hash); err != nil {
+		return err
+	}
+	if err := rlp.Encode(w, s.ConfigIdx); err != nil {
+		return err
+	}
+	if err := rlp.Encode(w, s.VoterRing); err != nil {
+		return err
+	}
+	if err := rlp.Encode(w, s.Voting); err != nil {
+		return err
+	}
+	// Voters
+	if err := rlp.Encode(w, uint64(len(s.Voters))); err != nil {
+		return err
+	}
+	for address := range s.Voters {
+		if err := rlp.Encode(w, address); err != nil {
+			return err
+		}
+		if err := rlp.Encode(w, s.Voters[address]); err != nil {
+			return err
+		}
+	}
+	// Signers
+	if err := rlp.Encode(w, uint64(len(s.Signers))); err != nil {
+		return err
+	}
+	for address := range s.Signers {
+		if err := rlp.Encode(w, address); err != nil {
+			return err
+		}
+		if err := rlp.Encode(w, s.Signers[address]); err != nil {
+			return err
+		}
+	}
+	// Dropped
+	if err := rlp.Encode(w, uint64(len(s.Dropped))); err != nil {
+		return err
+	}
+	for address := range s.Dropped {
+		if err := rlp.Encode(w, address); err != nil {
+			return err
+		}
+		if err := rlp.Encode(w, s.Dropped[address]); err != nil {
+			return err
+		}
+	}
+	// Votes
+	if err := rlp.Encode(w, s.Votes); err != nil {
+		return err
+	}
+	// Tally
+	if err := rlp.Encode(w, uint64(len(s.Tally))); err != nil {
+		return err
+	}
+	for address := range s.Tally {
+		if err := rlp.Encode(w, address); err != nil {
+			return err
+		}
+		if err := rlp.Encode(w, s.Tally[address]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DecodeRLP implements rlp.Decoder.
+func (s *Snapshot) DecodeRLP(stream *rlp.Stream) error {
+	var version uint64
+	if err := stream.Decode(&version); err != nil {
+		return err
+	}
+	if err := stream.Decode(&s.Number); err != nil {
+		return err
+	}
+	if err := stream.Decode(&s.Hash); err != nil {
+		return err
+	}
+	if err := stream.Decode(&s.ConfigIdx); err != nil {
+		return err
+	}
+	if err := stream.Decode(&s.VoterRing); err != nil {
+		return err
+	}
+	if err := stream.Decode(&s.Voting); err != nil {
+		return err
+	}
+	// Voters
+	var len uint64
+	if err := stream.Decode(&len); err != nil {
+		return err
+	}
+	s.Voters = make(map[common.Address]uint64, len)
+	for i := uint64(0); i < len; i++ {
+		var address common.Address
+		if err := stream.Decode(&address); err != nil {
+			return err
+		}
+		var voter uint64
+		if err := stream.Decode(&voter); err != nil {
+			return err
+		}
+		s.Voters[address] = voter
+	}
+	// Signers
+	if err := stream.Decode(&len); err != nil {
+		return err
+	}
+	s.Signers = make(map[common.Address]Signer, len)
+	for i := uint64(0); i < len; i++ {
+		var address common.Address
+		if err := stream.Decode(&address); err != nil {
+			return err
+		}
+		var signer Signer
+		if err := stream.Decode(&signer); err != nil {
+			return err
+		}
+		s.Signers[address] = signer
+	}
+	// Dropped
+	if err := stream.Decode(&len); err != nil {
+		return err
+	}
+	s.Dropped = make(map[common.Address]uint64, len)
+	for i := uint64(0); i < len; i++ {
+		var address common.Address
+		if err := stream.Decode(&address); err != nil {
+			return err
+		}
+		var dropped uint64
+		if err := stream.Decode(&dropped); err != nil {
+			return err
+		}
+		s.Dropped[address] = dropped
+	}
+	// Votes
+	if err := stream.Decode(&s.Votes); err != nil {
+		return err
+	}
+	// Tally
+	if err := stream.Decode(&len); err != nil {
+		return err
+	}
+	s.Tally = make(map[common.Address]Tally, len)
+	for i := uint64(0); i < len; i++ {
+		var address common.Address
+		if err := stream.Decode(&address); err != nil {
+			return err
+		}
+		var tally Tally
+		if err := stream.Decode(&tally); err != nil {
+			return err
+		}
+		s.Tally[address] = tally
+	}
+	return nil
 }
 
 // addressesAscending implements the sort interface to allow sorting a list of addresses
@@ -90,10 +261,10 @@ func (s addressesAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uint64, hash common.Hash, voters []common.Address, signers []common.Address, fakeVoterRing bool) *Snapshot {
 	// Set the initial config entry index based on the initial sealer count.
 	// The last entry's MaxSealerCount is always MaxInt, so the for loop will always break.
-	var configIndex int
+	var configIndex uint64
 	for i := range config {
 		if len(signers) <= config[i].MaxSealerCount {
-			configIndex = i
+			configIndex = uint64(i)
 			break
 		}
 	}
@@ -121,7 +292,42 @@ func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uin
 
 // loadSnapshot loads an existing snapshot from the database.
 func loadSnapshot(config params.CliqueConfig, sigcache *sigLRU, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
-	blob, err := db.Get(append(rawdb.CliqueSnapshotPrefix, hash[:]...))
+	// Migrate from JSON encoded snapshot to RLP encoded snapshot
+	has, err := db.Has(append(rawdb.CliqueSnapshotJsonPrefix, hash[:]...))
+	if err != nil {
+		return nil, err
+	}
+	// Snapshot is RLP encoded
+	if !has {
+		return loadSnapshotRlp(config, sigcache, db, hash)
+	} else
+	// Snapshot is JSON encoded
+	{
+		// Load JSON encoded snapshot
+		snap, err := loadSnapshotJson(config, sigcache, db, hash)
+		if err != nil {
+			return nil, err
+		}
+		// Migrate to RLP encoded snapshot
+		buf := new(bytes.Buffer)
+		if err := rlp.Encode(buf, snap); err != nil {
+			return nil, err
+		}
+		if err := db.Put(append(rawdb.CliqueSnapshotRlpPrefix, hash[:]...), buf.Bytes()); err != nil {
+			return nil, err
+		}
+		// Remove JSON encoded snapshot
+		if err := db.Delete(append(rawdb.CliqueSnapshotJsonPrefix, hash[:]...)); err != nil {
+			return nil, err
+		}
+		return snap, nil
+	}
+}
+
+// loadSnapshotJson loads an existing snapshot from the database
+// and decodes it using JSON encoding.
+func loadSnapshotJson(config params.CliqueConfig, sigcache *sigLRU, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
+	blob, err := db.Get(append(rawdb.CliqueSnapshotJsonPrefix, hash[:]...))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +335,7 @@ func loadSnapshot(config params.CliqueConfig, sigcache *sigLRU, db ethdb.Databas
 	if err := json.Unmarshal(blob, snap); err != nil {
 		return nil, err
 	}
-	if snap.ConfigIdx >= len(config) {
+	if snap.ConfigIdx >= uint64(len(config)) {
 		return nil, errors.New("config index out of range")
 	}
 	snap.config = config
@@ -138,13 +344,34 @@ func loadSnapshot(config params.CliqueConfig, sigcache *sigLRU, db ethdb.Databas
 	return snap, nil
 }
 
-// store inserts the snapshot into the database.
-func (s *Snapshot) store(db ethdb.Database) error {
-	blob, err := json.Marshal(s)
+// loadSnapshotRlp loads an existing snapshot from the database
+// and decodes it using RLP encoding.
+func loadSnapshotRlp(config params.CliqueConfig, sigcache *sigLRU, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
+	blob, err := db.Get(append(rawdb.CliqueSnapshotRlpPrefix, hash[:]...))
 	if err != nil {
+		return nil, err
+	}
+	snap := new(Snapshot)
+	if err := rlp.Decode(bytes.NewReader(blob), snap); err != nil {
+		return nil, err
+	}
+	if snap.ConfigIdx >= uint64(len(config)) {
+		return nil, errors.New("config index out of range")
+	}
+	snap.config = config
+	snap.sigcache = sigcache
+
+	return snap, nil
+}
+
+// store encodes the snapshot using RLP encoding
+// and inserts the encoded snapshot into the database.
+func (s *Snapshot) store(db ethdb.Database) error {
+	buf := new(bytes.Buffer)
+	if err := rlp.Encode(buf, s); err != nil {
 		return err
 	}
-	return db.Put(append(rawdb.CliqueSnapshotPrefix, s.Hash[:]...), blob)
+	return db.Put(append(rawdb.CliqueSnapshotRlpPrefix, s.Hash[:]...), buf.Bytes())
 }
 
 // copy creates a deep copy of the snapshot, though not the config nor the individual votes.
@@ -447,11 +674,11 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			// Calculate the effective vote threshold at the beginning of vote processing
 			// (Voter count might change later due to passed votes)
 			// Effective vote threshold: vote_threshold = voter_count / voting_rule
-			var voteThreshold int
+			var voteThreshold uint64
 			if config.IsPrivateHardFork2(header.Number) {
-				voteThreshold = len(snap.Voters) / currConfig.VotingRulePrivHardFork2
+				voteThreshold = uint64(len(snap.Voters) / currConfig.VotingRulePrivHardFork2)
 			} else {
-				voteThreshold = len(snap.Voters) / currConfig.VotingRule
+				voteThreshold = uint64(len(snap.Voters) / currConfig.VotingRule)
 			}
 			// Process every vote
 			// Note that the protocol forbids casting other votes when voting on dropping self.
@@ -541,7 +768,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		// The last entry's MaxSealerCount is always MaxInt, so the for loop will always break.
 		for i := range snap.config {
 			if len(snap.Signers) <= snap.config[i].MaxSealerCount {
-				snap.ConfigIdx = i
+				snap.ConfigIdx = uint64(i)
 				break
 			}
 		}

@@ -119,10 +119,13 @@ var (
 	BloomTrieTablePrefix = []byte("blt-")
 	BloomTrieIndexPrefix = []byte("bltIndex-")
 
-	CliqueSnapshotPrefix = []byte("clique-")
-	// ADDED by Jakub Pajek (persistent clique proposals)
-	CliqueProposalsKey    = []byte("clique-proposals")
-	CliqueProposalsRlpKey = []byte("clique-proposals-rlp")
+	// MODIFIED by Jakub Pajek BEG (persistent clique proposals, rlp encoded snapshots)
+	//CliqueSnapshotPrefix    = []byte("clique-")
+	CliqueSnapshotJsonPrefix = []byte("clique-")
+	CliqueSnapshotRlpPrefix  = []byte("clique-rlp")
+	CliqueProposalsJsonKey   = []byte("clique-proposals")
+	CliqueProposalsRlpKey    = []byte("clique-proposals-rlp")
+	// MODIFIED by Jakub Pajek END (persistent clique proposals, rlp encoded snapshots)
 
 	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)

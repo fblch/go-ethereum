@@ -515,10 +515,13 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, skeletonHeaderPrefix) && len(key) == (len(skeletonHeaderPrefix)+8):
 			beaconHeaders.Add(size)
-		case bytes.HasPrefix(key, CliqueSnapshotPrefix) && len(key) == 7+common.HashLength:
+			// MODIFIED by Jakub Pajek BEG (rlp encoded shapshots)
+		//case bytes.HasPrefix(key, CliqueSnapshotPrefix) && len(key) == 7+common.HashLength:
+		case (bytes.HasPrefix(key, CliqueSnapshotJsonPrefix) && len(key) == len(CliqueSnapshotJsonPrefix)+common.HashLength) ||
+			(bytes.HasPrefix(key, CliqueSnapshotRlpPrefix) && len(key) == len(CliqueSnapshotRlpPrefix)+common.HashLength):
 			cliqueSnaps.Add(size)
 			// ADDED by Jakub Pajek BEG (persistent clique proposals)
-		case bytes.Equal(key, CliqueProposalsKey) || bytes.Equal(key, CliqueProposalsRlpKey):
+		case bytes.Equal(key, CliqueProposalsJsonKey) || bytes.Equal(key, CliqueProposalsRlpKey):
 			cliqueProposals.Add(size)
 		// ADDED by Jakub Pajek END (persistent clique proposals)
 		case bytes.HasPrefix(key, ChtTablePrefix) ||
