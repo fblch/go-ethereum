@@ -272,7 +272,7 @@ type Clique struct {
 // loadProposals loads existing proposals from the database.
 func loadProposals(db ethdb.Database) (Proposals, error) {
 	// Migrate from JSON encoded proposals to RLP encoded proposals
-	has, err := db.Has(rawdb.CliqueProposalsKey)
+	has, err := db.Has(rawdb.CliqueProposalsJsonKey)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func loadProposals(db ethdb.Database) (Proposals, error) {
 			return nil, err
 		}
 		// Remove JSON encoded proposals
-		if err := db.Delete(rawdb.CliqueProposalsKey); err != nil {
+		if err := db.Delete(rawdb.CliqueProposalsJsonKey); err != nil {
 			return nil, err
 		}
 		return proposals, nil
@@ -306,7 +306,7 @@ func loadProposals(db ethdb.Database) (Proposals, error) {
 // loadProposalsJson loads existing proposals from the database
 // and decodes them using JSON encoding.
 func loadProposalsJson(db ethdb.Database) (Proposals, error) {
-	blob, err := db.Get(rawdb.CliqueProposalsKey)
+	blob, err := db.Get(rawdb.CliqueProposalsJsonKey)
 	if err != nil {
 		return nil, err
 	}
@@ -315,17 +315,6 @@ func loadProposalsJson(db ethdb.Database) (Proposals, error) {
 		return nil, err
 	}
 	return proposals, nil
-}
-
-// storeProposalsJson encodes existing proposals using JSON encoding
-// and inserts the encoded proposals into the database.
-// (assumes that the lock mutex is locked!)
-func (c *Clique) storeProposalsJson() error {
-	blob, err := json.Marshal(c.proposals)
-	if err != nil {
-		return err
-	}
-	return c.db.Put(rawdb.CliqueProposalsKey, blob)
 }
 
 // loadProposalsRlp loads existing proposals from the database
@@ -342,10 +331,10 @@ func loadProposalsRlp(db ethdb.Database) (Proposals, error) {
 	return proposals, nil
 }
 
-// storeProposalsRlp encodes existing proposals using RLP encoding
+// storeProposals encodes existing proposals using RLP encoding
 // and inserts the encoded proposals into the database.
 // (assumes that the lock mutex is locked!)
-func (c *Clique) storeProposalsRlp() error {
+func (c *Clique) storeProposals() error {
 	buf := new(bytes.Buffer)
 	if err := rlp.Encode(buf, c.proposals); err != nil {
 		return err
@@ -360,7 +349,7 @@ func (c *Clique) worker() {
 		select {
 		case <-c.proposalsCh:
 			c.lock.RLock()
-			if err := c.storeProposalsRlp(); err != nil {
+			if err := c.storeProposals(); err != nil {
 				log.Error("Failed to store clique proposals to disk", "err", err)
 			} else {
 				log.Trace("Stored clique proposals disk")
