@@ -1473,12 +1473,18 @@ func (c *Clique) Close() error {
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow
-// controlling the signer voting.
+// controlling the signer and the voter.
 func (c *Clique) APIs(chain consensus.ChainHeaderReader) []rpc.API {
-	return []rpc.API{{
-		Namespace: "clique",
-		Service:   &API{chain: chain, clique: c},
-	}}
+	return []rpc.API{
+		{
+			Namespace: "clique",
+			Service:   &API{chain: chain, clique: c},
+		},
+		{
+			Namespace: "clique",
+			Service:   &VoterAPI{chain: chain, clique: c},
+		},
+	}
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
