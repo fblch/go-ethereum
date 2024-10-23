@@ -129,6 +129,8 @@ var (
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNoVerifyFlag,
 		utils.MinerNewPayloadTimeout,
+		// ADDED by Jakub Pajek (voter cmd line flag)
+		utils.MinerVoterFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,

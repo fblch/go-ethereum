@@ -57,6 +57,9 @@ type Config struct {
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
 
+	// ADDED by Jakub Pajek (voter cmd line flag)
+	VoterMode bool // Flag specifying whether the miner node is runnung in voter mode
+
 	NewPayloadTimeout time.Duration // The maximum time allowance for creating a new payload
 }
 

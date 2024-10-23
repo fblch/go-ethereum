@@ -252,16 +252,18 @@ type Clique struct {
 	recents    *lru.Cache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
 	signatures *sigLRU                            // Signatures of recent blocks to speed up mining
 
-	proposals Proposals // Current list of proposals we are pushing
-
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
 
-	lock        sync.RWMutex   // Protects the signer and proposals fields
-	proposalsCh chan struct{}  // Channel for signaling to the worker that the list of proposals has been modified and needs to be saved to disk
-	exitCh      chan struct{}  // Channel for signaling to the worker that it should exit
-	closer      sync.Once      // Sync object to ensure we only ever close once
-	pend        sync.WaitGroup // Wait group for waiting for the worker to exit
+	// The fields below are for voter nodes only
+	voterMode   bool          // Flag specifying whether clique should run in a voter mode (i.e. enable additional logic for proposals)
+	proposals   Proposals     // Current list of proposals the voter is pushing
+	proposalsCh chan struct{} // Channel for signaling to the worker that the list of proposals has been modified and needs to be saved to disk
+	exitCh      chan struct{} // Channel for signaling to the worker that it should exit
+
+	lock   sync.RWMutex   // Protects the signer and proposals fields
+	closer sync.Once      // Sync object to ensure we only ever close once
+	pend   sync.WaitGroup // Wait group for waiting for the worker to exit
 
 	// The fields below are for testing only
 	fakeDiff      bool // Skip difficulty verifications
@@ -364,7 +366,7 @@ func (c *Clique) worker() {
 
 // New creates a Clique proof-of-authority consensus engine with the initial
 // permissions set to the ones provided by the user.
-func New(config params.CliqueConfig, db ethdb.Database) *Clique {
+func New(config params.CliqueConfig, db ethdb.Database, voterMode bool) *Clique {
 	if len(config) <= 0 {
 		panic("empty clique config")
 	}
@@ -442,28 +444,35 @@ func New(config params.CliqueConfig, db ethdb.Database) *Clique {
 	recents := lru.NewCache[common.Hash, *Snapshot](inmemorySnapshots)
 	signatures := lru.NewCache[common.Hash, common.Address](inmemorySignatures)
 
-	// If an on-disk proposals can be found, use that
-	proposals, err := loadProposals(db)
-	if err != nil {
-		log.Warn("Failed to load clique proposals from disk", "err", err)
-		proposals = make(Proposals)
-	} else {
-		log.Trace("Loaded clique proposals from disk")
-	}
-
 	c := &Clique{
-		config:      conf,
-		db:          db,
-		recents:     recents,
-		signatures:  signatures,
-		proposals:   proposals,
-		proposalsCh: make(chan struct{}, 1),
-		exitCh:      make(chan struct{}),
+		config:     conf,
+		db:         db,
+		recents:    recents,
+		signatures: signatures,
+		voterMode:  voterMode,
 	}
 
-	// Start the background worker
-	c.pend.Add(1)
-	go c.worker()
+	// Additional initialization for the voter mode
+	if c.voterMode {
+		log.Warn("Voter mode enabled")
+
+		// If an on-disk proposals can be found, use that
+		proposals, err := loadProposals(db)
+		if err != nil {
+			log.Warn("Failed to load clique proposals from disk", "err", err)
+			proposals = make(Proposals)
+		} else {
+			log.Trace("Loaded clique proposals from disk")
+		}
+
+		c.proposals = proposals
+		c.proposalsCh = make(chan struct{}, 1)
+		c.exitCh = make(chan struct{})
+
+		// Start the background worker
+		c.pend.Add(1)
+		go c.worker()
+	}
 
 	return c
 }
@@ -981,7 +990,6 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 	header.Extra = header.Extra[:params.CliqueExtraVanity]
 
 	// If the block is a checkpoint, include permissions list.
-	// Otherwise, if the signer is a voter, cast all valid votes.
 	if number%currConfig.Epoch == 0 {
 		authorizedSigners := snap.signers()
 		for i := 0; i < len(authorizedSigners); i++ {
@@ -992,7 +1000,9 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				header.Extra = append(header.Extra, params.CliqueExtraSignerMarker)
 			}
 		}
-	} else if okVoter {
+	} else
+	// Otherwise, if the signer is a voter and voter mode is enabled, cast all valid votes.
+	if okVoter && c.voterMode {
 		// Write lock needed for proposal purging
 		c.lock.Lock() //c.lock.RLock()
 
@@ -1063,6 +1073,10 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 		// Write lock needed for proposal purging
 		c.lock.Unlock() //c.lock.RUnlock()
+	} else
+	// Otherwise, if the signer is a voter and voter mode is disabled, signal error.
+	if okVoter && !c.voterMode {
+		log.Error("Voter with disabled voter mode!")
 	}
 	header.Extra = append(header.Extra, make([]byte, params.CliqueExtraSeal)...)
 
@@ -1464,27 +1478,30 @@ func (c *Clique) SealHash(header *types.Header) common.Hash {
 // Close implements consensus.Engine, stopping the background worker and waiting
 // for it to terminate before returning.
 func (c *Clique) Close() error {
-	c.closer.Do(func() {
-		// Signal termination and wait for all goroutines to tear down
-		close(c.exitCh)
-		c.pend.Wait()
-	})
+	if c.voterMode {
+		c.closer.Do(func() {
+			// Signal termination and wait for all goroutines to tear down
+			close(c.exitCh)
+			c.pend.Wait()
+		})
+	}
 	return nil
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow
 // controlling the signer and the voter.
 func (c *Clique) APIs(chain consensus.ChainHeaderReader) []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: "clique",
-			Service:   &API{chain: chain, clique: c},
-		},
-		{
+	apis := []rpc.API{{
+		Namespace: "clique",
+		Service:   &API{chain: chain, clique: c},
+	}}
+	if c.voterMode {
+		apis = append(apis, rpc.API{
 			Namespace: "clique",
 			Service:   &VoterAPI{chain: chain, clique: c},
-		},
+		})
 	}
+	return apis
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

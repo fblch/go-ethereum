@@ -211,12 +211,13 @@ type Config struct {
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
 // MODIFIED by Jakub Pajek (clique config: variable period)
-//func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig *params.CliqueConfig, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
-func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig params.CliqueConfig, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
+// MODIFIED by Jakub Pajek (voter cmd line flag)
+// func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig *params.CliqueConfig, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
+func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig params.CliqueConfig, notify []string, noverify, voterMode bool, db ethdb.Database) consensus.Engine {
 	// If proof-of-authority is requested, set it up
 	var engine consensus.Engine
 	if cliqueConfig != nil {
-		engine = clique.New(cliqueConfig, db)
+		engine = clique.New(cliqueConfig, db, voterMode)
 	} else {
 		switch ethashConfig.PowMode {
 		case ethash.ModeFake:
