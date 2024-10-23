@@ -570,6 +570,12 @@ var (
 		Value:    ethconfig.Defaults.Miner.NewPayloadTimeout,
 		Category: flags.MinerCategory,
 	}
+	// ADDED by Jakub Pajek (voter cmd line flag)
+	MinerVoterFlag = &cli.BoolFlag{
+		Name:     "miner.voter",
+		Usage:    "Enable voter mode (required for voter nodes)",
+		Category: flags.MinerCategory,
+	}
 
 	// Account settings
 	UnlockedAccountFlag = &cli.StringFlag{
@@ -1688,6 +1694,14 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.IsSet(MinerNewPayloadTimeout.Name) {
 		cfg.NewPayloadTimeout = ctx.Duration(MinerNewPayloadTimeout.Name)
 	}
+	// ADDED by Jakub Pajek (voter cmd line flag)
+	if ctx.IsSet(MinerVoterFlag.Name) {
+		cfg.VoterMode = ctx.Bool(MinerVoterFlag.Name)
+		// Voter mode only makes sense if mining is enabled
+		if cfg.VoterMode && !ctx.Bool(MiningEnabledFlag.Name) {
+			Fatalf("Voter mode requires mining to be enabled")
+		}
+	}
 }
 
 func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2282,7 +2296,9 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	if ctx.Bool(FakePoWFlag.Name) {
 		ethashConfig.PowMode = ethash.ModeFake
 	}
-	engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, nil, false, chainDb)
+	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	//engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, nil, false, chainDb)
+	engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, nil, false, false, chainDb)
 	if gcmode := ctx.String(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
 	}
