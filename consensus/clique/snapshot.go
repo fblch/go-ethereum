@@ -23,6 +23,7 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"reflect"
 	"sort"
 	"time"
 
@@ -77,6 +78,26 @@ type Snapshot struct {
 	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their drop block number
 	Votes     []*Vote                   `json:"votes"`     // List of votes cast in chronological order
 	Tally     map[common.Address]Tally  `json:"tally"`     // Current vote tally to avoid recalculating
+}
+
+var (
+	uint64Size         = int(reflect.TypeOf(uint64(0)).Size())
+	mapKeyHashSize     = int(8) // Map key's hash value size, 8 bytes
+	signerStructSize   = int(reflect.TypeOf(Signer{}).Size())
+	votePtrSize        = int(reflect.TypeOf(&Vote{}).Size())
+	tallyStructSize    = int(reflect.TypeOf(Tally{}).Size())
+	snapshotStructSize = int(reflect.TypeOf(Snapshot{}).Size())
+)
+
+// Size implements lru.SizeType, returning the approximate memory used by all internal contents
+// of the snapshot. It is used to approximate and limit the memory consumption of snapshot cache.
+func (s *Snapshot) Size() int {
+	return snapshotStructSize +
+		(len(s.Voters) * (mapKeyHashSize + common.AddressLength + uint64Size)) + // s.Voters
+		(len(s.Signers) * (mapKeyHashSize + common.AddressLength + signerStructSize)) + // s.Signers
+		(len(s.Dropped) * (mapKeyHashSize + common.AddressLength + uint64Size)) + // s.Dropped
+		(cap(s.Votes) * votePtrSize) + // s.Votes
+		(len(s.Tally) * (mapKeyHashSize + common.AddressLength + tallyStructSize)) // s.Tally
 }
 
 // EncodeRLP implements rlp.Encoder.
