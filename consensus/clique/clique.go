@@ -50,9 +50,10 @@ import (
 )
 
 const (
-	checkpointInterval = 1024 // Number of blocks after which to save the vote snapshot to the database
-	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
-	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
+	checkpointInterval     = 1024               // Number of blocks after which to save the vote snapshot to the database
+	inmemorySnapshotsSize  = 1024 * 1024 * 1024 // Size of recent vote snapshots to keep in memory (max 1GB)
+	inmemorySnapshotsCount = 128                // Number of recent vote snapshots to keep in memory
+	inmemorySignatures     = 4096               // Number of recent block signatures to keep in memory
 
 	wiggleTime = 500 * time.Millisecond // Random delay (per signer) to allow concurrent signers
 )
@@ -249,8 +250,8 @@ type Clique struct {
 	config params.CliqueConfig // Consensus engine configuration parameters
 	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
-	recents    *lru.Cache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
-	signatures *sigLRU                            // Signatures of recent blocks to speed up mining
+	recents    *lru.SizeCountConstrainedCache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
+	signatures *sigLRU                                                // Signatures of recent blocks to speed up mining
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
@@ -441,7 +442,7 @@ func New(config params.CliqueConfig, db ethdb.Database, voterMode bool) *Clique 
 	}
 
 	// Allocate the snapshot caches and create the engine
-	recents := lru.NewCache[common.Hash, *Snapshot](inmemorySnapshots)
+	recents := lru.NewSizeCountConstrainedCache[common.Hash, *Snapshot](inmemorySnapshotsSize, inmemorySnapshotsCount)
 	signatures := lru.NewCache[common.Hash, common.Address](inmemorySignatures)
 
 	c := &Clique{
@@ -764,6 +765,7 @@ func (c *Clique) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		return nil, err
 	}
 	c.recents.Add(snap.Hash, snap)
+	log.Trace("Added voting snapshot to cache", "size", c.recents.Size(), "count", c.recents.Len(), "number", snap.Number, "hash", snap.Hash)
 
 	// If we've generated a new checkpoint snapshot, save to disk
 	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
