@@ -72,6 +72,13 @@ var Defaults = Config{
 		DatasetsOnDisk:   2,
 		DatasetsLockMmap: false,
 	},
+	// ADDED by Jakub Pajek BEG (clique options config)
+	Clique: clique.Config{
+		VoterMode:          false,
+		SnapshotCacheSize:  params.CliqueSnapshotCacheSize,
+		SnapshotCacheCount: params.CliqueSnapshotCacheCount,
+	},
+	// ADDED by Jakub Pajek END (clique options config)
 	NetworkId:               1,
 	TxLookupLimit:           2350000,
 	LightPeers:              100,
@@ -177,6 +184,10 @@ type Config struct {
 	// Ethash options
 	Ethash ethash.Config
 
+	// ADDED by Jakub Pajek (clique options config)
+	// Clique options
+	Clique clique.Config
+
 	// Transaction pool options
 	TxPool txpool.Config
 
@@ -211,13 +222,15 @@ type Config struct {
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
 // MODIFIED by Jakub Pajek (clique config: variable period)
-// MODIFIED by Jakub Pajek (voter cmd line flag)
+// MODIFIED by Jakub Pajek (clique options config)
 // func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig *params.CliqueConfig, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
-func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig params.CliqueConfig, notify []string, noverify, voterMode bool, db ethdb.Database) consensus.Engine {
+func CreateConsensusEngine(stack *node.Node, ethashConfig *ethash.Config, cliqueConfig params.CliqueConfig, cliqueOptions *clique.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
 	// If proof-of-authority is requested, set it up
 	var engine consensus.Engine
 	if cliqueConfig != nil {
-		engine = clique.New(cliqueConfig, db, voterMode)
+		// MODIFIED by Jakub Pajek (clique options config)
+		//engine = clique.New(cliqueConfig, db)
+		engine = clique.New(cliqueConfig, *cliqueOptions, db)
 	} else {
 		switch ethashConfig.PowMode {
 		case ethash.ModeFake:

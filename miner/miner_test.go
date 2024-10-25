@@ -288,9 +288,9 @@ func createMiner(t *testing.T) (*Miner, *event.TypeMux, func(skipMiner bool)) {
 		t.Fatalf("can't create new chain config: %v", err)
 	}
 	// Create consensus engine
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//engine := clique.New(chainConfig.Clique, chainDB)
-	engine := clique.New(chainConfig.Clique, chainDB, true)
+	engine := clique.New(chainConfig.Clique, clique.Config{VoterMode: true}, chainDB)
 	// Create Ethereum backend
 	// MODIFIED by Jakub Pajek (deterministic fork choice rules)
 	//bc, err := core.NewBlockChain(chainDB, nil, genesis, nil, engine, vm.Config{}, nil, nil)

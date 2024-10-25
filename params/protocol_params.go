@@ -226,3 +226,12 @@ var (
 )
 
 // ADDED by Jakub Pajek END (clique params)
+
+// ADDED by Jakub Pajek BEG (clique options config)
+// Additional consensus unrelated Clique constants, which are accessed from outside the clique package.
+const (
+	CliqueSnapshotCacheSize  = 1024 // Default maximal size of memory in megabytes allowed for snapshot cache (1GB)
+	CliqueSnapshotCacheCount = 128  // Default maximal number of recent snapshots to keep in snapshot cache
+)
+
+// ADDED by Jakub Pajek END (clique options config)

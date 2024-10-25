@@ -50,10 +50,8 @@ import (
 )
 
 const (
-	checkpointInterval     = 1024               // Number of blocks after which to save the vote snapshot to the database
-	inmemorySnapshotsSize  = 1024 * 1024 * 1024 // Size of recent vote snapshots to keep in memory (max 1GB)
-	inmemorySnapshotsCount = 128                // Number of recent vote snapshots to keep in memory
-	inmemorySignatures     = 4096               // Number of recent block signatures to keep in memory
+	checkpointInterval = 1024 // Number of blocks after which to save the vote snapshot to the database
+	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
 
 	wiggleTime = 500 * time.Millisecond // Random delay (per signer) to allow concurrent signers
 )
@@ -244,11 +242,20 @@ func (p Proposals) DecodeRLP(s *rlp.Stream) error {
 	return nil
 }
 
+// Config are the consensus unrelated configuration parameters of Clique.
+type Config struct {
+	VoterMode bool // Flag specifying whether the engine should run in a voter mode (i.e. enable additional logic for proposals)
+
+	SnapshotCacheSize  int // Maximal size of memory in megabytes allowed for snapshot cache
+	SnapshotCacheCount int // Maximal number of recent snapshots to keep in snapshot cache
+}
+
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
-	config params.CliqueConfig // Consensus engine configuration parameters
-	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
+	config  params.CliqueConfig // Consensus protocol configuration parameters
+	options Config              // Consensus protocol unrelated configuration parameters
+	db      ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
 	recents    *lru.SizeCountConstrainedCache[common.Hash, *Snapshot] // Snapshots for recent block to speed up reorgs
 	signatures *sigLRU                                                // Signatures of recent blocks to speed up mining
@@ -257,7 +264,6 @@ type Clique struct {
 	signFn SignerFn       // Signer function to authorize hashes with
 
 	// The fields below are for voter nodes only
-	voterMode   bool          // Flag specifying whether clique should run in a voter mode (i.e. enable additional logic for proposals)
 	proposals   Proposals     // Current list of proposals the voter is pushing
 	proposalsCh chan struct{} // Channel for signaling to the worker that the list of proposals has been modified and needs to be saved to disk
 	exitCh      chan struct{} // Channel for signaling to the worker that it should exit
@@ -367,7 +373,7 @@ func (c *Clique) worker() {
 
 // New creates a Clique proof-of-authority consensus engine with the initial
 // permissions set to the ones provided by the user.
-func New(config params.CliqueConfig, db ethdb.Database, voterMode bool) *Clique {
+func New(config params.CliqueConfig, options Config, db ethdb.Database) *Clique {
 	if len(config) <= 0 {
 		panic("empty clique config")
 	}
@@ -440,21 +446,29 @@ func New(config params.CliqueConfig, db ethdb.Database, voterMode bool) *Clique 
 	if conf[len(conf)-1].MaxSealerCount != math.MaxInt {
 		panic("last clique config entry's MaxSealerCount must be set to MaxInt")
 	}
+	// Set any missing consensus unrelated parameters to their defaults
+	if options.SnapshotCacheSize <= 0 {
+		options.SnapshotCacheSize = params.CliqueSnapshotCacheSize
+	}
+	if options.SnapshotCacheCount <= 0 {
+		options.SnapshotCacheCount = params.CliqueSnapshotCacheCount
+	}
 
 	// Allocate the snapshot caches and create the engine
-	recents := lru.NewSizeCountConstrainedCache[common.Hash, *Snapshot](inmemorySnapshotsSize, inmemorySnapshotsCount)
+	snapshotCacheSize := uint64(options.SnapshotCacheSize) * 1024 * 1024
+	recents := lru.NewSizeCountConstrainedCache[common.Hash, *Snapshot](snapshotCacheSize, options.SnapshotCacheCount)
 	signatures := lru.NewCache[common.Hash, common.Address](inmemorySignatures)
 
 	c := &Clique{
 		config:     conf,
+		options:    options,
 		db:         db,
 		recents:    recents,
 		signatures: signatures,
-		voterMode:  voterMode,
 	}
 
 	// Additional initialization for the voter mode
-	if c.voterMode {
+	if c.options.VoterMode {
 		log.Warn("Voter mode enabled")
 
 		// If an on-disk proposals can be found, use that
@@ -1004,7 +1018,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		}
 	} else
 	// Otherwise, if the signer is a voter and voter mode is enabled, cast all valid votes.
-	if okVoter && c.voterMode {
+	if okVoter && c.options.VoterMode {
 		// Write lock needed for proposal purging
 		c.lock.Lock() //c.lock.RLock()
 
@@ -1077,7 +1091,7 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 		c.lock.Unlock() //c.lock.RUnlock()
 	} else
 	// Otherwise, if the signer is a voter and voter mode is disabled, signal error.
-	if okVoter && !c.voterMode {
+	if okVoter && !c.options.VoterMode {
 		log.Error("Voter with disabled voter mode!")
 	}
 	header.Extra = append(header.Extra, make([]byte, params.CliqueExtraSeal)...)
@@ -1480,7 +1494,7 @@ func (c *Clique) SealHash(header *types.Header) common.Hash {
 // Close implements consensus.Engine, stopping the background worker and waiting
 // for it to terminate before returning.
 func (c *Clique) Close() error {
-	if c.voterMode {
+	if c.options.VoterMode {
 		c.closer.Do(func() {
 			// Signal termination and wait for all goroutines to tear down
 			close(c.exitCh)
@@ -1497,7 +1511,7 @@ func (c *Clique) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 		Namespace: "clique",
 		Service:   &API{chain: chain, clique: c},
 	}}
-	if c.voterMode {
+	if c.options.VoterMode {
 		apis = append(apis, rpc.API{
 			Namespace: "clique",
 			Service:   &VoterAPI{chain: chain, clique: c},

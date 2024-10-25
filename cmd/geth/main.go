@@ -74,6 +74,11 @@ var (
 		utils.EthashDatasetsInMemoryFlag,
 		utils.EthashDatasetsOnDiskFlag,
 		utils.EthashDatasetsLockMmapFlag,
+		// ADDED by Jakub Pajek BEG (clique options config)
+		utils.CliqueVoterFlag,
+		utils.CliqueSnapshotCacheSizeFlag,
+		utils.CliqueSnapshotCacheCountFlag,
+		// ADDED by Jakub Pajek END (clique options config)
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
@@ -129,8 +134,6 @@ var (
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNoVerifyFlag,
 		utils.MinerNewPayloadTimeout,
-		// ADDED by Jakub Pajek (voter cmd line flag)
-		utils.MinerVoterFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,

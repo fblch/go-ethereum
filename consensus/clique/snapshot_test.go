@@ -734,9 +734,9 @@ func (tt *cliqueTest) run(t *testing.T) {
 	}
 	genesis.Config = &config
 
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//engine := New(config.Clique, rawdb.NewMemoryDatabase())
-	engine := New(config.Clique, rawdb.NewMemoryDatabase(), true)
+	engine := New(config.Clique, Config{VoterMode: true}, rawdb.NewMemoryDatabase())
 	engine.fakeDiff = true
 	// ADDED by Jakub Pajek (clique static block rewards)
 	engine.fakeRewards = true
