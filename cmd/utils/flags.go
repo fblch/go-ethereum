@@ -372,6 +372,27 @@ var (
 		Category: flags.EthashCategory,
 	}
 
+	// ADDED by Jakub Pajek BEG (clique options config)
+	// Clique settings
+	CliqueVoterFlag = &cli.BoolFlag{
+		Name:     "clique.voter",
+		Usage:    "Enable voter mode (required for voter nodes)",
+		Category: flags.CliqueCategory,
+	}
+	CliqueSnapshotCacheSizeFlag = &cli.IntFlag{
+		Name:     "clique.cache.size",
+		Usage:    "Maximal size of memory in megabytes allowed for clique snapshot caching (default = 1024)",
+		Value:    ethconfig.Defaults.Clique.SnapshotCacheSize,
+		Category: flags.CliqueCategory,
+	}
+	CliqueSnapshotCacheCountFlag = &cli.IntFlag{
+		Name:     "clique.cache.count",
+		Usage:    "Maximal number of recent snapshots to keep in clique snapshot cache (default = 128)",
+		Value:    ethconfig.Defaults.Clique.SnapshotCacheCount,
+		Category: flags.CliqueCategory,
+	}
+	// ADDED by Jakub Pajek END (clique options config)
+
 	// Transaction pool settings
 	TxPoolLocalsFlag = &cli.StringFlag{
 		Name:     "txpool.locals",
@@ -568,12 +589,6 @@ var (
 		Name:     "miner.newpayload-timeout",
 		Usage:    "Specify the maximum time allowance for creating a new payload",
 		Value:    ethconfig.Defaults.Miner.NewPayloadTimeout,
-		Category: flags.MinerCategory,
-	}
-	// ADDED by Jakub Pajek (voter cmd line flag)
-	MinerVoterFlag = &cli.BoolFlag{
-		Name:     "miner.voter",
-		Usage:    "Enable voter mode (required for voter nodes)",
 		Category: flags.MinerCategory,
 	}
 
@@ -1669,6 +1684,23 @@ func setEthash(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+// ADDED by Jakub Pajek (clique options config)
+func setClique(ctx *cli.Context, cfg *ethconfig.Config) {
+	if ctx.IsSet(CliqueVoterFlag.Name) {
+		cfg.Clique.VoterMode = ctx.Bool(CliqueVoterFlag.Name)
+		// Voter mode only makes sense if mining is enabled
+		if cfg.Clique.VoterMode && !ctx.Bool(MiningEnabledFlag.Name) {
+			Fatalf("Voter mode requires mining to be enabled")
+		}
+	}
+	if ctx.IsSet(CliqueSnapshotCacheSizeFlag.Name) {
+		cfg.Clique.SnapshotCacheSize = ctx.Int(CliqueSnapshotCacheSizeFlag.Name)
+	}
+	if ctx.IsSet(CliqueSnapshotCacheCountFlag.Name) {
+		cfg.Clique.SnapshotCacheCount = ctx.Int(CliqueSnapshotCacheCountFlag.Name)
+	}
+}
+
 func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	if ctx.IsSet(MinerNotifyFlag.Name) {
 		cfg.Notify = strings.Split(ctx.String(MinerNotifyFlag.Name), ",")
@@ -1693,14 +1725,6 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.IsSet(MinerNewPayloadTimeout.Name) {
 		cfg.NewPayloadTimeout = ctx.Duration(MinerNewPayloadTimeout.Name)
-	}
-	// ADDED by Jakub Pajek (voter cmd line flag)
-	if ctx.IsSet(MinerVoterFlag.Name) {
-		cfg.VoterMode = ctx.Bool(MinerVoterFlag.Name)
-		// Voter mode only makes sense if mining is enabled
-		if cfg.VoterMode && !ctx.Bool(MiningEnabledFlag.Name) {
-			Fatalf("Voter mode requires mining to be enabled")
-		}
 	}
 }
 
@@ -1797,6 +1821,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	setGPO(ctx, &cfg.GPO, ctx.String(SyncModeFlag.Name) == "light")
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)
+	// ADDED by Jakub Pajek (clique options config)
+	setClique(ctx, cfg)
 	setMiner(ctx, &cfg.Miner)
 	setRequiredBlocks(ctx, cfg)
 	setLes(ctx, cfg)
@@ -2292,13 +2318,22 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	if err != nil {
 		Fatalf("%v", err)
 	}
+	// ADDED by Jakub Pajek BEG (clique options config)
+	cliqueOptions := ethconfig.Defaults.Clique
+	if ctx.IsSet(CliqueSnapshotCacheSizeFlag.Name) {
+		cliqueOptions.SnapshotCacheSize = ctx.Int(CliqueSnapshotCacheSizeFlag.Name)
+	}
+	if ctx.IsSet(CliqueSnapshotCacheCountFlag.Name) {
+		cliqueOptions.SnapshotCacheCount = ctx.Int(CliqueSnapshotCacheCountFlag.Name)
+	}
+	// ADDED by Jakub Pajek BEG (clique options config)
 	ethashConfig := ethconfig.Defaults.Ethash
 	if ctx.Bool(FakePoWFlag.Name) {
 		ethashConfig.PowMode = ethash.ModeFake
 	}
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, nil, false, chainDb)
-	engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, nil, false, false, chainDb)
+	engine := ethconfig.CreateConsensusEngine(stack, &ethashConfig, cliqueConfig, &cliqueOptions, nil, false, chainDb)
 	if gcmode := ctx.String(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
 	}

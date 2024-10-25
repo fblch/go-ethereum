@@ -101,9 +101,9 @@ func testHeaderVerificationForMerging(t *testing.T, isClique bool) {
 			addr   = crypto.PubkeyToAddress(key.PublicKey)
 			config = *params.AllCliqueProtocolChanges
 		)
-		// MODIFIED by Jakub Pajek (voter cmd line flag)
+		// MODIFIED by Jakub Pajek (clique options config)
 		//engine = beacon.New(clique.New(params.AllCliqueProtocolChanges.Clique, rawdb.NewMemoryDatabase()))
-		engine = beacon.New(clique.New(params.AllCliqueProtocolChanges.Clique, rawdb.NewMemoryDatabase(), true))
+		engine = beacon.New(clique.New(params.AllCliqueProtocolChanges.Clique, clique.Config{VoterMode: true}, rawdb.NewMemoryDatabase()))
 		gspec = &Genesis{
 			Config: &config,
 			// MODIFIED by Jakub Pajek (clique permissions)

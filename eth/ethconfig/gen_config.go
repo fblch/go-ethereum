@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
@@ -51,6 +52,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		FilterLogCacheSize      int
 		Miner                   miner.Config
 		Ethash                  ethash.Config
+		// ADDED by Jakub Pajek (clique options config)
+		Clique					clique.Config
 		TxPool                  txpool.Config
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
@@ -96,6 +99,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.FilterLogCacheSize = c.FilterLogCacheSize
 	enc.Miner = c.Miner
 	enc.Ethash = c.Ethash
+	// ADDED by Jakub Pajek (clique options config)
+	enc.Clique = c.Clique
 	enc.TxPool = c.TxPool
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
@@ -145,6 +150,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		FilterLogCacheSize      *int
 		Miner                   *miner.Config
 		Ethash                  *ethash.Config
+		// ADDED by Jakub Pajek (clique options config)
+		Clique					*clique.Config
 		TxPool                  *txpool.Config
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
@@ -259,6 +266,11 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.Ethash != nil {
 		c.Ethash = *dec.Ethash
 	}
+	// ADDED by Jakub Pajek BEG (clique options config)
+	if dec.Clique != nil {
+		c.Clique = *dec.Clique
+	}
+	// ADDED by Jakub Pajek END (clique options config)
 	if dec.TxPool != nil {
 		c.TxPool = *dec.TxPool
 	}

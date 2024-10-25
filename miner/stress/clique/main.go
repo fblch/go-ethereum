@@ -223,6 +223,8 @@ func makeSealer(genesis *core.Genesis) (*node.Node, *eth.Ethereum, error) {
 		DatabaseHandles: 256,
 		TxPool:          txpool.DefaultConfig,
 		GPO:             ethconfig.Defaults.GPO,
+		// ADDED by Jakub Pajek BEG (clique options config)
+		Clique: ethconfig.Defaults.Clique,
 		Miner: miner.Config{
 			GasCeil:  genesis.GasLimit * 11 / 10,
 			GasPrice: big.NewInt(1),

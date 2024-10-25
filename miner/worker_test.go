@@ -276,9 +276,9 @@ func testGenerateBlockAndImport(t *testing.T, isClique bool) {
 				MinStrikeCount: params.CliqueMinStrikeCount,
 			},
 		}
-		// MODIFIED by Jakub Pajek (voter cmd line flag)
+		// MODIFIED by Jakub Pajek (clique options config)
 		//engine = clique.New(chainConfig.Clique, db)
-		engine = clique.New(chainConfig.Clique, db, true)
+		engine = clique.New(chainConfig.Clique, clique.Config{VoterMode: true}, db)
 	} else {
 		chainConfig = *params.AllEthashProtocolChanges
 		engine = ethash.NewFaker()
@@ -326,9 +326,9 @@ func TestEmptyWorkEthash(t *testing.T) {
 	testEmptyWork(t, ethashChainConfig, ethash.NewFaker())
 }
 func TestEmptyWorkClique(t *testing.T) {
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//testEmptyWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase()))
-	testEmptyWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase(), true))
+	testEmptyWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, clique.Config{VoterMode: true}, rawdb.NewMemoryDatabase()))
 }
 
 func testEmptyWork(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine) {
@@ -432,9 +432,9 @@ func TestRegenerateMiningBlockEthash(t *testing.T) {
 }
 
 func TestRegenerateMiningBlockClique(t *testing.T) {
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//testRegenerateMiningBlock(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase()))
-	testRegenerateMiningBlock(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase(), true))
+	testRegenerateMiningBlock(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, clique.Config{VoterMode: true}, rawdb.NewMemoryDatabase()))
 }
 
 func testRegenerateMiningBlock(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine) {
@@ -494,9 +494,9 @@ func TestAdjustIntervalEthash(t *testing.T) {
 }
 
 func TestAdjustIntervalClique(t *testing.T) {
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//testAdjustInterval(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase()))
-	testAdjustInterval(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase(), true))
+	testAdjustInterval(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, clique.Config{VoterMode: true}, rawdb.NewMemoryDatabase()))
 }
 
 func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine) {
@@ -590,9 +590,9 @@ func TestGetSealingWorkEthash(t *testing.T) {
 }
 
 func TestGetSealingWorkClique(t *testing.T) {
-	// MODIFIED by Jakub Pajek (voter cmd line flag)
+	// MODIFIED by Jakub Pajek (clique options config)
 	//testGetSealingWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase()))
-	testGetSealingWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, rawdb.NewMemoryDatabase(), true))
+	testGetSealingWork(t, cliqueChainConfig, clique.New(cliqueChainConfig.Clique, clique.Config{VoterMode: true}, rawdb.NewMemoryDatabase()))
 }
 
 func TestGetSealingWorkPostMerge(t *testing.T) {
