@@ -490,8 +490,10 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block
 	}
 	// MODIFIED by Jakub Pajek (clique params)
 	//if config.Clique != nil && len(block.Extra()) < 32+crypto.SignatureLength {
-	if config.Clique != nil && len(block.Extra()) < params.CliqueExtraVanity+params.CliqueExtraSeal {
-		return nil, errors.New("can't start clique chain without signers")
+	if config.Clique != nil {
+		if signersCount := (len(block.Extra()) - params.CliqueExtraVanity - params.CliqueExtraSeal) / (common.AddressLength + 1); signersCount <= 0 {
+			return nil, errors.New("can't start clique chain without signers")
+		}
 	}
 	// All the checks has passed, flush the states derived from the genesis
 	// specification as well as the specification itself into the provided
