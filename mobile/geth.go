@@ -92,9 +92,24 @@ type NodeConfig struct {
 	// empty genesis state is equivalent to using the mainnet's state.
 	EthereumGenesis string
 
-	// EthereumDatabaseCache is the system memory in MB to allocate for database caching.
-	// A minimum of 16MB is always reserved.
+	// EthereumDatabaseCache is the system memory in MB to allocate
+	// for database caching (default: 16MB).
 	EthereumDatabaseCache int
+
+	// ADDED by Jakub Pajek
+	// EthereumTrieCleanCache is the system memory in MB to allocate
+	// for trie caching (default: 16MB).
+	EthereumTrieCleanCache int
+
+	// ADDED by Jakub Pajek
+	// EthereumTrieDirtyCache is the system memory in MB to allocate
+	// for trie pruning (default: 16MB).
+	EthereumTrieDirtyCache int
+
+	// ADDED by Jakub Pajek
+	// EthereumSnapshotCache is the system memory in MB to allocate
+	// for snapshot caching (default: 16MB).
+	EthereumSnapshotCache int
 
 	// EthereumNetStats is a netstats connection string to use to report various
 	// chain, transaction and node stats to a monitoring server.
@@ -158,6 +173,16 @@ type NodeConfig struct {
 	// Maximum size is 32 bytes.
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//MinerExtraData string
+
+	// ADDED by Jakub Pajek
+	// CliqueSnapshotCacheSize is the maximal system memory in MB to allocate
+	// for clique snapshot caching (default: 128MB).
+	CliqueSnapshotCacheSize int
+
+	// ADDED by Jakub Pajek
+	// CliqueSnapshotCacheCount is the maximal number of recent snapshots
+	// to keep in clique snapshot cache (default: 128).
+	CliqueSnapshotCacheCount int
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -169,18 +194,23 @@ var defaultNodeConfig = &NodeConfig{
 	EthereumNetworkID:     1,
 	EthereumDatabaseCache: 16,
 	// ADDED by Jakub Pajek BEG
-	UserIdent:         "",
-	SyncMode:          int64(downloader.LightSync),
-	ListenAddr:        ":0",
-	NAT:               "any",
-	NoDiscovery:       true,
-	DiscoveryV5:       true,
-	UseLightweightKDF: false,
-	MinerGasLimit:     int64(ethconfig.Defaults.Miner.GasCeil),
-	MinerGasPrice:     NewBigInt(ethconfig.Defaults.Miner.GasPrice.Int64()),
-	MinerRecommit:     int64(ethconfig.Defaults.Miner.Recommit),
+	EthereumTrieCleanCache: 16,
+	EthereumTrieDirtyCache: 16,
+	EthereumSnapshotCache:  16,
+	UserIdent:              "",
+	SyncMode:               int64(downloader.LightSync),
+	ListenAddr:             ":0",
+	NAT:                    "any",
+	NoDiscovery:            true,
+	DiscoveryV5:            true,
+	UseLightweightKDF:      false,
+	MinerGasLimit:          int64(ethconfig.Defaults.Miner.GasCeil),
+	MinerGasPrice:          NewBigInt(ethconfig.Defaults.Miner.GasPrice.Int64()),
+	MinerRecommit:          int64(ethconfig.Defaults.Miner.Recommit),
 	// MODIFIED by Jakub Pajek (zero size extra)
 	//MinerExtraData:    "",
+	CliqueSnapshotCacheSize:  128,
+	CliqueSnapshotCacheCount: 128,
 	// ADDED by Jakub Pajek END
 }
 
@@ -343,11 +373,16 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		ethConf.NetworkId = uint64(config.EthereumNetworkID)
 		ethConf.DatabaseCache = config.EthereumDatabaseCache
 		// ADDED by Jakub Pajek BEG
+		ethConf.TrieCleanCache = config.EthereumTrieCleanCache
+		ethConf.TrieDirtyCache = config.EthereumTrieDirtyCache
+		ethConf.SnapshotCache = config.EthereumSnapshotCache
 		ethConf.Miner.GasCeil = uint64(config.MinerGasLimit)
 		ethConf.Miner.GasPrice = new(big.Int).SetBytes(config.MinerGasPrice.GetBytes())
 		ethConf.Miner.Recommit = time.Duration(config.MinerRecommit)
 		// MODIFIED by Jakub Pajek (zero size extra)
 		//ethConf.Miner.ExtraData = []byte(config.MinerExtraData)
+		ethConf.Clique.SnapshotCacheSize = config.CliqueSnapshotCacheSize
+		ethConf.Clique.SnapshotCacheCount = config.CliqueSnapshotCacheCount
 		// ADDED by Jakub Pajek END
 		// MODIFIED by Jakub Pajek BEG
 		/*

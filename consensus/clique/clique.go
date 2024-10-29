@@ -361,7 +361,7 @@ func (c *Clique) worker() {
 			if err := c.storeProposals(); err != nil {
 				log.Error("Failed to store clique proposals to disk", "err", err)
 			} else {
-				log.Trace("Stored clique proposals disk")
+				log.Trace("Stored clique proposals disk", "count", len(c.proposals))
 			}
 			c.lock.RUnlock()
 
@@ -454,8 +454,10 @@ func New(config params.CliqueConfig, options Config, db ethdb.Database) *Clique 
 		options.SnapshotCacheCount = params.CliqueSnapshotCacheCount
 	}
 
-	// Allocate the snapshot caches and create the engine
 	snapshotCacheSize := uint64(options.SnapshotCacheSize) * 1024 * 1024
+	log.Info("Starting Clique engine", "votermode", options.VoterMode, "cachesize", snapshotCacheSize, "cachecount", options.SnapshotCacheCount)
+
+	// Allocate the snapshot caches and create the engine
 	recents := lru.NewSizeCountConstrainedCache[common.Hash, *Snapshot](snapshotCacheSize, options.SnapshotCacheCount)
 	signatures := lru.NewCache[common.Hash, common.Address](inmemorySignatures)
 
@@ -469,15 +471,13 @@ func New(config params.CliqueConfig, options Config, db ethdb.Database) *Clique 
 
 	// Additional initialization for the voter mode
 	if c.options.VoterMode {
-		log.Warn("Voter mode enabled")
-
 		// If an on-disk proposals can be found, use that
 		proposals, err := loadProposals(db)
 		if err != nil {
 			log.Warn("Failed to load clique proposals from disk", "err", err)
 			proposals = make(Proposals)
 		} else {
-			log.Trace("Loaded clique proposals from disk")
+			log.Trace("Loaded clique proposals from disk", "count", len(proposals))
 		}
 
 		c.proposals = proposals
