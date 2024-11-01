@@ -949,8 +949,8 @@ func (c *Clique) verifySeal(chain consensus.ChainHeaderReader, snap *Snapshot, h
 	if headerHasVotes {
 		// Verify the votes list
 		extraBytes := len(header.Extra) - params.CliqueExtraVanity - params.CliqueExtraSeal
-		votesCast := make(map[common.Address]struct{})
 		voteCount := extraBytes / (common.AddressLength + 1)
+		votesCast := make(map[common.Address]struct{}, voteCount)
 		for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
 			index := params.CliqueExtraVanity + voteIdx*(common.AddressLength+1)
 			var address common.Address

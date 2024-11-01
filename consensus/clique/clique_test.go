@@ -436,10 +436,10 @@ func newRandomSnapshot(votersCount, signersCount, droppedCount, votesCount, tall
 		ConfigIdx: rand.Uint64(),
 		VoterRing: rand.Intn(2)%2 == 0,
 		Voting:    rand.Intn(2)%2 == 0,
-		Voters:    make(map[common.Address]uint64),
-		Signers:   make(map[common.Address]Signer),
-		Dropped:   make(map[common.Address]uint64),
-		Tally:     make(map[common.Address]Tally),
+		Voters:    make(map[common.Address]uint64, votersCount),
+		Signers:   make(map[common.Address]Signer, signersCount),
+		Dropped:   make(map[common.Address]uint64, droppedCount),
+		Tally:     make(map[common.Address]Tally, tallyCount),
 	}
 	for i := 0; i < votersCount; i++ {
 		snap.Voters[newRandomAddress()] = rand.Uint64()
@@ -613,3 +613,282 @@ func TestCompareSnapshotEncodings(t *testing.T) {
 }
 
 // ADDED by Jakub Pajek END (rlp encoded snapshots)
+
+// ADDED by Jakub Pajek BEG (benchmarks)
+
+const (
+	benchmarkAddressCount = 1_000_000
+	benchmarkCalcCount    = 100
+)
+
+func newRandomBenchSnapshot(votersCount int, votersAllSigned bool, signersCount int, signersAllSigned bool, droppedCount, votesCount, tallyCount int) *Snapshot {
+	snap := &Snapshot{
+		Number:    rand.Uint64(),
+		Hash:      newRandomHash(),
+		ConfigIdx: rand.Uint64(),
+		VoterRing: rand.Intn(2)%2 == 0,
+		Voting:    rand.Intn(2)%2 == 0,
+		Voters:    make(map[common.Address]uint64, votersCount),
+		Signers:   make(map[common.Address]Signer, signersCount),
+		Dropped:   make(map[common.Address]uint64, droppedCount),
+		Tally:     make(map[common.Address]Tally, tallyCount),
+	}
+	for i := 0; i < votersCount; i++ {
+		if votersAllSigned {
+			snap.Voters[newRandomAddress()] = rand.Uint64()
+		} else {
+			snap.Voters[newRandomAddress()] = 0
+		}
+	}
+	for i := 0; i < signersCount; i++ {
+		if signersAllSigned {
+			snap.Signers[newRandomAddress()] = Signer{LastSignedBlock: rand.Uint64() + 1, SignedCount: rand.Uint64(), StrikeCount: rand.Uint64()}
+		} else {
+			snap.Signers[newRandomAddress()] = Signer{LastSignedBlock: 0, SignedCount: rand.Uint64(), StrikeCount: rand.Uint64()}
+		}
+	}
+	for i := 0; i < droppedCount; i++ {
+		snap.Dropped[newRandomAddress()] = rand.Uint64()
+	}
+	for i := 0; i < votesCount; i++ {
+		snap.Votes = append(snap.Votes, &Vote{
+			Voter:    newRandomAddress(),
+			Block:    rand.Uint64(),
+			Address:  newRandomAddress(),
+			Proposal: uint64(rand.Intn(3)),
+		})
+	}
+	for i := 0; i < tallyCount; i++ {
+		snap.Tally[newRandomAddress()] = Tally{Proposal: uint64(rand.Intn(3)), Votes: rand.Uint64()}
+	}
+	return snap
+}
+
+func (s *Snapshot) copyV2() *Snapshot {
+	cpy := &Snapshot{
+		config:    s.config,
+		sigcache:  s.sigcache,
+		Number:    s.Number,
+		Hash:      s.Hash,
+		ConfigIdx: s.ConfigIdx,
+		VoterRing: s.VoterRing,
+		Voting:    s.Voting,
+		Voters:    make(map[common.Address]uint64, len(s.Voters)),
+		Signers:   make(map[common.Address]Signer, len(s.Signers)),
+		Dropped:   make(map[common.Address]uint64, len(s.Dropped)),
+		Votes:     make([]*Vote, len(s.Votes)),
+		Tally:     make(map[common.Address]Tally, len(s.Tally)),
+	}
+	for voter := range s.Voters {
+		cpy.Voters[voter] = s.Voters[voter]
+	}
+	for signer := range s.Signers {
+		cpy.Signers[signer] = s.Signers[signer]
+	}
+	for signer := range s.Dropped {
+		cpy.Dropped[signer] = s.Dropped[signer]
+	}
+	for address := range s.Tally {
+		cpy.Tally[address] = s.Tally[address]
+	}
+	copy(cpy.Votes, s.Votes)
+
+	return cpy
+}
+
+func BenchmarkCopyV1(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount/2, true, benchmarkAddressCount/2, true,
+		benchmarkAddressCount/2, benchmarkAddressCount/2, benchmarkAddressCount/2)
+	b.ResetTimer()
+
+	snap.copy()
+}
+
+func BenchmarkCopyV2(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount/2, true, benchmarkAddressCount/2, true,
+		benchmarkAddressCount/2, benchmarkAddressCount/2, benchmarkAddressCount/2)
+	b.ResetTimer()
+
+	snap.copyV2()
+}
+
+func (s *Snapshot) addressMapToArrayV1() []common.Address {
+	sigs := make([]common.Address, 0, len(s.Signers))
+	for sig := range s.Signers {
+		sigs = append(sigs, sig)
+	}
+	return sigs
+}
+
+func (s *Snapshot) addressMapToArrayV2() []common.Address {
+	sigs := make([]common.Address, len(s.Signers))
+	i := 0
+	for sig := range s.Signers {
+		sigs[i], i = sig, i+1
+	}
+	return sigs
+}
+
+func BenchmarkAddressMapToArrayV1(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, true, benchmarkAddressCount, true, 0, 0, 0)
+	b.ResetTimer()
+
+	snap.addressMapToArrayV1()
+}
+
+func BenchmarkAddressMapToArrayV2(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, true, benchmarkAddressCount, true, 0, 0, 0)
+	b.ResetTimer()
+
+	snap.addressMapToArrayV2()
+}
+
+func (s *Snapshot) calcSealerRingDifficultyV2(signer common.Address) *big.Int {
+	difficulty := uint64(1)
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if signerSigned, ok := s.Signers[signer]; !ok {
+		return big.NewInt(0)
+	} else if signerSigned.LastSignedBlock > 0 {
+		for addr := range s.Signers {
+			if s.Signers[addr].LastSignedBlock > signerSigned.LastSignedBlock {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr := range s.Signers {
+			if s.Signers[addr].LastSignedBlock > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
+}
+
+func BenchmarkCalcSealerRingDifficultyV1AllSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, true, benchmarkAddressCount, true, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for signer := range snap.Signers {
+		snap.calcSealerRingDifficulty(signer)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcSealerRingDifficultyV2AllSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, true, benchmarkAddressCount, true, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for signer := range snap.Signers {
+		snap.calcSealerRingDifficultyV2(signer)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcSealerRingDifficultyV1NonSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, false, benchmarkAddressCount, false, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for signer := range snap.Signers {
+		snap.calcSealerRingDifficulty(signer)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcSealerRingDifficultyV2NonSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(0, false, benchmarkAddressCount, false, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for signer := range snap.Signers {
+		snap.calcSealerRingDifficultyV2(signer)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func (s *Snapshot) calcVoterRingDifficultyV2(voter common.Address) *big.Int {
+	difficulty := uint64(len(s.Signers)) + 1
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if lastSignedBlock, ok := s.Voters[voter]; !ok {
+		return big.NewInt(0)
+	} else if lastSignedBlock > 0 {
+		for addr := range s.Voters {
+			if s.Voters[addr] > lastSignedBlock {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr := range s.Voters {
+			if s.Voters[addr] > 0 || bytes.Compare(addr[:], voter[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	return new(big.Int).SetUint64(difficulty)
+}
+
+func BenchmarkCalcVoterRingDifficultyV1AllSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount, true, 0, true, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for voter := range snap.Voters {
+		snap.calcVoterRingDifficulty(voter)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcVoterRingDifficultyV2AllSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount, true, 0, true, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for voter := range snap.Voters {
+		snap.calcVoterRingDifficultyV2(voter)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcVoterRingDifficultyV1NonSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount, false, 0, false, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for voter := range snap.Voters {
+		snap.calcVoterRingDifficulty(voter)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+func BenchmarkCalcVoterRingDifficultyV2NonSigned(b *testing.B) {
+	snap := newRandomBenchSnapshot(benchmarkAddressCount, false, 0, false, 0, 0, 0)
+	b.ResetTimer()
+
+	i := 0
+	for voter := range snap.Voters {
+		snap.calcVoterRingDifficultyV2(voter)
+		if i++; i >= benchmarkCalcCount {
+			break
+		}
+	}
+}
+
+// ADDED by Jakub Pajek END (benchmarks)

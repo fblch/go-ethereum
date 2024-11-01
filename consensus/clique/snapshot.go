@@ -297,8 +297,8 @@ func newGenesisSnapshot(config params.CliqueConfig, sigcache *sigLRU, number uin
 		ConfigIdx: configIndex,
 		VoterRing: fakeVoterRing,
 		Voting:    false,
-		Voters:    make(map[common.Address]uint64),
-		Signers:   make(map[common.Address]Signer),
+		Voters:    make(map[common.Address]uint64, len(voters)),
+		Signers:   make(map[common.Address]Signer, len(signers)),
 		Dropped:   make(map[common.Address]uint64),
 		Tally:     make(map[common.Address]Tally),
 	}
@@ -396,6 +396,8 @@ func (s *Snapshot) store(db ethdb.Database) error {
 }
 
 // copy creates a deep copy of the snapshot, though not the config nor the individual votes.
+// Note on performance: BenchmarkCopyV1 and BenchmarkCopyV2 proved that using range with values
+// (the below implementation) is slightly faster compared to using range with keys.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
 		config:    s.config,
@@ -405,11 +407,11 @@ func (s *Snapshot) copy() *Snapshot {
 		ConfigIdx: s.ConfigIdx,
 		VoterRing: s.VoterRing,
 		Voting:    s.Voting,
-		Voters:    make(map[common.Address]uint64),
-		Signers:   make(map[common.Address]Signer),
-		Dropped:   make(map[common.Address]uint64),
+		Voters:    make(map[common.Address]uint64, len(s.Voters)),
+		Signers:   make(map[common.Address]Signer, len(s.Signers)),
+		Dropped:   make(map[common.Address]uint64, len(s.Dropped)),
 		Votes:     make([]*Vote, len(s.Votes)),
-		Tally:     make(map[common.Address]Tally),
+		Tally:     make(map[common.Address]Tally, len(s.Tally)),
 	}
 	for voter, signed := range s.Voters {
 		cpy.Voters[voter] = signed
@@ -816,6 +818,8 @@ func (s *Snapshot) CurrentConfig() *params.CliqueConfigEntry {
 }
 
 // voters retrieves the list of authorized voters in ascending order.
+// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that
+// there is no difference between appending (the below implementation) and assigning using indexes.
 func (s *Snapshot) voters() []common.Address {
 	vtrs := make([]common.Address, 0, len(s.Voters))
 	for vtr := range s.Voters {
@@ -826,6 +830,8 @@ func (s *Snapshot) voters() []common.Address {
 }
 
 // signers retrieves the list of authorized signers in ascending order.
+// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that
+// there is no difference between appending (the below implementation) and assigning using indexes.
 func (s *Snapshot) signers() []common.Address {
 	sigs := make([]common.Address, 0, len(s.Signers))
 	for sig := range s.Signers {
@@ -858,6 +864,9 @@ func (s *Snapshot) maxRingBreakerDifficulty() *big.Int {
 // Sealer ring difficulty is defined as 1 plus the number of lower priority sealers, with more
 // recent sealers having lower priority. If multiple sealers have not yet signed (0), then addresses
 // which lexicographically sort later have lower priority.
+//
+// Note on performance: BenchmarkCalcSealerRingDifficultyV1 and BenchmarkCalcSealerRingDifficultyV2 proved that
+// using range with values (the below implementation) is faster compared to using range with keys.
 func (s *Snapshot) calcSealerRingDifficulty(signer common.Address) *big.Int {
 	difficulty := uint64(1)
 	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
@@ -889,6 +898,9 @@ func (s *Snapshot) calcSealerRingDifficulty(signer common.Address) *big.Int {
 // Voter ring difficulty for voters is defined as a maximum sealer ring difficulty N plus 1 plus the number
 // of lower priority voters, with more recent voters having lower priority. If multiple voters have not yet
 // signed (0), then addresses which lexicographically sort later have lower priority.
+//
+// Note on performance: BenchmarkCalcVoterRingDifficultyV1 and BenchmarkCalcVoterRingDifficultyV2 proved that
+// using range with values (the below implementation) is faster compared to using range with keys.
 func (s *Snapshot) calcVoterRingDifficulty(voter common.Address) *big.Int {
 	difficulty := uint64(len(s.Signers)) + 1
 	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
@@ -921,6 +933,9 @@ func (s *Snapshot) calcVoterRingDifficulty(voter common.Address) *big.Int {
 // Voter ring difficulty for signers is defined as a maximum voter ring difficulty N+M plus 1 plus the number
 // of lower priority sealers, with more recent sealers having lower priority. If multiple sealers have not yet
 // signed (0), then addresses which lexicographically sort later have lower priority.
+//
+// Note on performance: BenchmarkCalcSealerRingDifficultyV1 and BenchmarkCalcSealerRingDifficultyV2 proved that
+// using range with values (the below implementation) is faster compared to using range with keys.
 func (s *Snapshot) calcRingBreakerDifficulty(signer common.Address) *big.Int {
 	difficulty := uint64(len(s.Signers)+len(s.Voters)) + 1
 	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
