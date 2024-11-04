@@ -37,20 +37,11 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// Vote represents a single vote that an authorized voter made to modify the
-// list of permissions.
-type Vote struct {
-	Voter    common.Address `json:"voter"`    // Authorized voter that cast this vote
-	Block    uint64         `json:"block"`    // Block number the vote was cast in (expire old votes)
-	Address  common.Address `json:"address"`  // Account being voted on to change its authorization
-	Proposal uint64         `json:"proposal"` // Whether to authorize or deauthorize the voted account
-}
-
 // Tally is a simple vote tally to keep the current score of votes. Votes that
 // go against the proposal aren't counted since it's equivalent to not voting.
 type Tally struct {
-	Proposal uint64 `json:"proposal"` // Whether the vote is about authorizing or kicking someone
-	Votes    uint64 `json:"votes"`    // Number of votes until now wanting to pass the proposal
+	Proposal uint64                    `json:"proposal"` // Whether the voting is about authorizing or kicking someone
+	Votes    map[common.Address]uint64 `json:"votes"`    // Mapping of voters that have voted for the proposal to the block number the vote was cast in
 }
 
 type sigLRU = lru.Cache[common.Hash, common.Address]
@@ -73,18 +64,16 @@ type Snapshot struct {
 	ConfigIdx uint64                    `json:"configIdx"` // Index of the current config entry inside the config array
 	VoterRing bool                      `json:"voterRing"` // Flag to indicate the ring in which blocks are signed (the sealer ring or the voter ring)
 	Voting    bool                      `json:"voting"`    // Flag to indicate voting activity (heuristic)
-	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their most recently signed block
+	Voters    map[common.Address]uint64 `json:"voters"`    // Set of authorized voters at this moment and their state (most recently signed block only)
 	Signers   map[common.Address]Signer `json:"signers"`   // Set of authorized signers at this moment and their state
-	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their drop block number
-	Votes     []*Vote                   `json:"votes"`     // List of votes cast in chronological order
-	Tally     map[common.Address]Tally  `json:"tally"`     // Current vote tally to avoid recalculating
+	Dropped   map[common.Address]uint64 `json:"dropped"`   // Set of authorized signers dropped due to inactivity and their state (droppd block number only)
+	Tally     map[common.Address]Tally  `json:"tally"`     // Current vote tally
 }
 
 var (
 	uint64Size         = int(reflect.TypeOf(uint64(0)).Size())
 	mapKeyHashSize     = int(8) // Map key's hash value size, 8 bytes
 	signerStructSize   = int(reflect.TypeOf(Signer{}).Size())
-	votePtrSize        = int(reflect.TypeOf(&Vote{}).Size())
 	tallyStructSize    = int(reflect.TypeOf(Tally{}).Size())
 	snapshotStructSize = int(reflect.TypeOf(Snapshot{}).Size())
 )
@@ -92,12 +81,13 @@ var (
 // Size implements lru.SizeType, returning the approximate memory used by all internal contents
 // of the snapshot. It is used to approximate and limit the memory consumption of snapshot cache.
 func (s *Snapshot) Size() int {
+	// Assume majority voting rule in which case the number of votes for a given proposal will never exceed half of the number of voters
+	tallyVotesAvgSize := (len(s.Voters)/2 + 1) * (mapKeyHashSize + common.AddressLength + uint64Size) // s.Tally.Votes
 	return snapshotStructSize +
 		(len(s.Voters) * (mapKeyHashSize + common.AddressLength + uint64Size)) + // s.Voters
 		(len(s.Signers) * (mapKeyHashSize + common.AddressLength + signerStructSize)) + // s.Signers
 		(len(s.Dropped) * (mapKeyHashSize + common.AddressLength + uint64Size)) + // s.Dropped
-		(cap(s.Votes) * votePtrSize) + // s.Votes
-		(len(s.Tally) * (mapKeyHashSize + common.AddressLength + tallyStructSize)) // s.Tally
+		(len(s.Tally) * (mapKeyHashSize + common.AddressLength + tallyStructSize + tallyVotesAvgSize)) // s.Tally
 }
 
 // EncodeRLP implements rlp.Encoder.
@@ -157,20 +147,27 @@ func (s *Snapshot) EncodeRLP(w io.Writer) error {
 			return err
 		}
 	}
-	// Votes
-	if err := rlp.Encode(w, s.Votes); err != nil {
-		return err
-	}
 	// Tally
 	if err := rlp.Encode(w, uint64(len(s.Tally))); err != nil {
 		return err
 	}
-	for address := range s.Tally {
+	for address, tally := range s.Tally {
 		if err := rlp.Encode(w, address); err != nil {
 			return err
 		}
-		if err := rlp.Encode(w, s.Tally[address]); err != nil {
+		if err := rlp.Encode(w, tally.Proposal); err != nil {
 			return err
+		}
+		if err := rlp.Encode(w, uint64(len(tally.Votes))); err != nil {
+			return err
+		}
+		for voter, blockNumber := range tally.Votes {
+			if err := rlp.Encode(w, voter); err != nil {
+				return err
+			}
+			if err := rlp.Encode(w, blockNumber); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -246,10 +243,6 @@ func (s *Snapshot) DecodeRLP(stream *rlp.Stream) error {
 		}
 		s.Dropped[address] = dropped
 	}
-	// Votes
-	if err := stream.Decode(&s.Votes); err != nil {
-		return err
-	}
 	// Tally
 	if err := stream.Decode(&len); err != nil {
 		return err
@@ -261,8 +254,24 @@ func (s *Snapshot) DecodeRLP(stream *rlp.Stream) error {
 			return err
 		}
 		var tally Tally
-		if err := stream.Decode(&tally); err != nil {
+		if err := stream.Decode(&tally.Proposal); err != nil {
 			return err
+		}
+		var votes uint64
+		if err := stream.Decode(&votes); err != nil {
+			return err
+		}
+		tally.Votes = make(map[common.Address]uint64, votes)
+		for j := uint64(0); j < votes; j++ {
+			var voter common.Address
+			if err := stream.Decode(&voter); err != nil {
+				return err
+			}
+			var blockNumber uint64
+			if err := stream.Decode(&blockNumber); err != nil {
+				return err
+			}
+			tally.Votes[voter] = blockNumber
 		}
 		s.Tally[address] = tally
 	}
@@ -395,7 +404,7 @@ func (s *Snapshot) store(db ethdb.Database) error {
 	return db.Put(append(rawdb.CliqueSnapshotRlpPrefix, s.Hash[:]...), buf.Bytes())
 }
 
-// copy creates a deep copy of the snapshot, though not the config nor the individual votes.
+// copy creates a deep copy of the snapshot, though not the config nor the recent block signatures cache.
 // Note on performance: BenchmarkCopyV1 and BenchmarkCopyV2 proved that using range with values
 // (the below implementation) is slightly faster compared to using range with keys.
 func (s *Snapshot) copy() *Snapshot {
@@ -410,7 +419,6 @@ func (s *Snapshot) copy() *Snapshot {
 		Voters:    make(map[common.Address]uint64, len(s.Voters)),
 		Signers:   make(map[common.Address]Signer, len(s.Signers)),
 		Dropped:   make(map[common.Address]uint64, len(s.Dropped)),
-		Votes:     make([]*Vote, len(s.Votes)),
 		Tally:     make(map[common.Address]Tally, len(s.Tally)),
 	}
 	for voter, signed := range s.Voters {
@@ -423,9 +431,15 @@ func (s *Snapshot) copy() *Snapshot {
 		cpy.Dropped[signer] = dropped
 	}
 	for address, tally := range s.Tally {
-		cpy.Tally[address] = tally
+		tallyCpy := Tally{
+			Proposal: tally.Proposal,
+			Votes:    make(map[common.Address]uint64, len(tally.Votes)),
+		}
+		for voter, blockNumber := range tally.Votes {
+			tallyCpy.Votes[voter] = blockNumber
+		}
+		cpy.Tally[address] = tallyCpy
 	}
-	copy(cpy.Votes, s.Votes)
 
 	return cpy
 }
@@ -447,50 +461,52 @@ func (s *Snapshot) validVote(address common.Address, proposal uint64) bool {
 // alreadyVoted returns whether a given voter has already cast a vote on the specified
 // proposal in the given snapshot context (e.g. don't cast the same vote multiple times).
 func (s *Snapshot) alreadyVoted(voter common.Address, address common.Address, proposal uint64) bool {
-	for _, vote := range s.Votes {
-		if vote.Voter == voter && vote.Address == address && vote.Proposal == proposal {
-			return true
-		}
+	if tally, okTally := s.Tally[address]; okTally && tally.Proposal == proposal {
+		_, okVoter := tally.Votes[voter]
+		return okVoter
 	}
 	return false
 }
 
 // cast adds a new vote into the tally.
-func (s *Snapshot) cast(address common.Address, proposal uint64) bool {
+func (s *Snapshot) cast(voter, address common.Address, proposal, blockNumber uint64) bool {
 	// Ensure the vote is meaningful
 	if !s.validVote(address, proposal) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
-	if old, ok := s.Tally[address]; ok {
+	if tally, ok := s.Tally[address]; ok {
 		// Don't count votes that go against the existing tally
 		// (e.g. tally is proposalVoterVote, vote is proposalSignerVote)
-		if old.Proposal != proposal {
+		if tally.Proposal != proposal {
 			return false
 		}
-		old.Votes++
-		s.Tally[address] = old
+		tally.Votes[voter] = blockNumber
 	} else {
-		s.Tally[address] = Tally{Proposal: proposal, Votes: 1}
+		tally = Tally{
+			Proposal: proposal,
+			Votes:    make(map[common.Address]uint64, len(s.Voters)/2+1),
+		}
+		tally.Votes[voter] = blockNumber
+		s.Tally[address] = tally
 	}
 	return true
 }
 
 // uncast removes a previously cast vote from the tally.
-func (s *Snapshot) uncast(address common.Address, proposal uint64) bool {
+func (s *Snapshot) uncast(voter, address common.Address) bool {
 	// If there's no tally, it's a dangling vote, just drop
 	tally, ok := s.Tally[address]
 	if !ok {
 		return false
 	}
 	// Ensure we only revert counted votes
-	if tally.Proposal != proposal {
+	if _, okVoter := tally.Votes[voter]; !okVoter {
 		return false
 	}
 	// Otherwise revert the vote
-	if tally.Votes > 1 {
-		tally.Votes--
-		s.Tally[address] = tally
+	if len(tally.Votes) > 1 {
+		delete(tally.Votes, voter)
 	} else {
 		delete(s.Tally, address)
 	}
@@ -541,7 +557,6 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 
 		// Remove any votes on checkpoint blocks
 		if checkpoint {
-			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
 			// For post-PrivateHardFork3 blocks, also clear the dropped signers list, otherwise the list
 			// will continue to grow indefinitely.
@@ -686,12 +701,6 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 					// Discard any previous votes the deauthorized voter cast
 					// (...not needed for non-voters)
 					// Discard any previous votes around the just changed account
-					for i := 0; i < len(snap.Votes); i++ {
-						if snap.Votes[i].Address == address {
-							snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-							i--
-						}
-					}
 					delete(snap.Tally, address)
 				}
 			}
@@ -702,11 +711,11 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 			// Calculate the effective vote threshold at the beginning of vote processing
 			// (Voter count might change later due to passed votes)
 			// Effective vote threshold: vote_threshold = voter_count / voting_rule
-			var voteThreshold uint64
+			var voteThreshold int
 			if config.IsPrivateHardFork2(header.Number) {
-				voteThreshold = uint64(len(snap.Voters) / currConfig.VotingRulePrivHardFork2)
+				voteThreshold = len(snap.Voters) / currConfig.VotingRulePrivHardFork2
 			} else {
-				voteThreshold = uint64(len(snap.Voters) / currConfig.VotingRule)
+				voteThreshold = len(snap.Voters) / currConfig.VotingRule
 			}
 			// Process every vote
 			// Note that the protocol forbids casting other votes when voting on dropping self.
@@ -718,16 +727,7 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				copy(address[:], header.Extra[index:])
 
 				// Discard any previous votes from the voter
-				for i, vote := range snap.Votes {
-					if vote.Voter == signer && vote.Address == address {
-						// Uncast the vote from the cached tally
-						snap.uncast(vote.Address, vote.Proposal)
-
-						// Uncast the vote from the chronological list
-						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-						break // only one vote allowed
-					}
-				}
+				snap.uncast(signer, address)
 				// Tally up the new vote from the voter
 				var proposal uint64
 				switch header.Extra[index+common.AddressLength] {
@@ -740,17 +740,10 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 				default:
 					return nil, errInvalidVote
 				}
-				if snap.cast(address, proposal) {
-					snap.Votes = append(snap.Votes, &Vote{
-						Voter:    signer,
-						Block:    number,
-						Address:  address,
-						Proposal: proposal,
-					})
-				}
+				snap.cast(signer, address, proposal, number)
 				// If the vote passed, update the list of voters/signers.
 				// Vote passes if the number of proposals exceeds the effective vote threshold.
-				if tally := snap.Tally[address]; tally.Votes > voteThreshold {
+				if tally := snap.Tally[address]; len(tally.Votes) > voteThreshold {
 					if tally.Proposal == proposalVoterVote {
 						snap.Voters[address] = 0
 						snap.Signers[address] = Signer{LastSignedBlock: 0, SignedCount: 0, StrikeCount: 0}
@@ -768,25 +761,12 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 						delete(snap.Dropped, address)
 
 						// Discard any previous votes the deauthorized voter cast
-						for i := 0; i < len(snap.Votes); i++ {
-							if snap.Votes[i].Voter == address {
-								// Uncast the vote from the cached tally
-								snap.uncast(snap.Votes[i].Address, snap.Votes[i].Proposal)
-
-								// Uncast the vote from the chronological list
-								snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-
-								i--
-							}
+						for addr := range snap.Tally {
+							// Uncast the vote from the cached tally
+							snap.uncast(address, addr)
 						}
 					}
 					// Discard any previous votes around the just changed account
-					for i := 0; i < len(snap.Votes); i++ {
-						if snap.Votes[i].Address == address {
-							snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-							i--
-						}
-					}
 					delete(snap.Tally, address)
 				}
 			}
@@ -823,8 +803,8 @@ func (s *Snapshot) CurrentConfig() *params.CliqueConfigEntry {
 }
 
 // voters retrieves the list of authorized voters in ascending order.
-// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that
-// there is no difference between appending (the below implementation) and assigning using indexes.
+// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that there
+// is no significant difference between appending (the below implementation) and assigning using indexes.
 func (s *Snapshot) voters() []common.Address {
 	vtrs := make([]common.Address, 0, len(s.Voters))
 	for vtr := range s.Voters {
@@ -835,8 +815,8 @@ func (s *Snapshot) voters() []common.Address {
 }
 
 // signers retrieves the list of authorized signers in ascending order.
-// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that
-// there is no difference between appending (the below implementation) and assigning using indexes.
+// Note on performance: BenchmarkAddressMapToArrayV1 and BenchmarkAddressMapToArrayV2 proved that there
+// is no significant difference between appending (the below implementation) and assigning using indexes.
 func (s *Snapshot) signers() []common.Address {
 	sigs := make([]common.Address, 0, len(s.Signers))
 	for sig := range s.Signers {
