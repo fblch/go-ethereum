@@ -351,6 +351,20 @@ func mapEquals[T comparable](a, b map[common.Address]T) bool {
 	return true
 }
 
+type comparator func(a, b any) bool
+
+func anyMapEquals[T any](a, b map[common.Address]T, cmp comparator) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if w, ok := b[k]; !ok || !cmp(v, w) {
+			return false
+		}
+	}
+	return true
+}
+
 func TestProposalsRlpEncoding(t *testing.T) {
 	const maxCount int = 100
 	for _, test := range []testProposalsRlpEncoding{
@@ -429,7 +443,7 @@ func newRandomHash() common.Hash {
 		byte(rand.Intn(256)), byte(rand.Intn(256)), byte(rand.Intn(256)), byte(rand.Intn(256))})
 }
 
-func newRandomSnapshot(votersCount, signersCount, droppedCount, votesCount, tallyCount int) *Snapshot {
+func newRandomSnapshot(votersCount, signersCount, droppedCount, tallyCount, votesCount int) *Snapshot {
 	snap := &Snapshot{
 		Number:    rand.Uint64(),
 		Hash:      newRandomHash(),
@@ -450,16 +464,15 @@ func newRandomSnapshot(votersCount, signersCount, droppedCount, votesCount, tall
 	for i := 0; i < droppedCount; i++ {
 		snap.Dropped[newRandomAddress()] = rand.Uint64()
 	}
-	for i := 0; i < votesCount; i++ {
-		snap.Votes = append(snap.Votes, &Vote{
-			Voter:    newRandomAddress(),
-			Block:    rand.Uint64(),
-			Address:  newRandomAddress(),
-			Proposal: uint64(rand.Intn(3)),
-		})
-	}
 	for i := 0; i < tallyCount; i++ {
-		snap.Tally[newRandomAddress()] = Tally{Proposal: uint64(rand.Intn(3)), Votes: rand.Uint64()}
+		tally := Tally{
+			Proposal: uint64(rand.Intn(3)),
+			Votes:    make(map[common.Address]uint64, votesCount),
+		}
+		for j := 0; j < votesCount; j++ {
+			tally.Votes[newRandomAddress()] = rand.Uint64()
+		}
+		snap.Tally[newRandomAddress()] = tally
 	}
 	return snap
 }
@@ -485,8 +498,11 @@ func (a *Snapshot) equals(b *Snapshot) bool {
 		mapEquals(a.Voters, b.Voters) &&
 		mapEquals(a.Signers, b.Signers) &&
 		mapEquals(a.Dropped, b.Dropped) &&
-		ptrArrayEquals(a.Votes, b.Votes) &&
-		mapEquals(a.Tally, b.Tally)
+		anyMapEquals(a.Tally, b.Tally, func(a, b any) bool {
+			aTally, bTally := a.(Tally), b.(Tally)
+			return aTally.Proposal == bTally.Proposal &&
+				mapEquals(aTally.Votes, bTally.Votes)
+		})
 }
 
 func TestSnapshotRlpEncoding(t *testing.T) {
@@ -509,12 +525,8 @@ func TestSnapshotRlpEncoding(t *testing.T) {
 			snap: newRandomSnapshot(0, 0, 1, 0, 0),
 		},
 		{
-			name: "snapshot/singleVotes",
-			snap: newRandomSnapshot(0, 0, 0, 1, 0),
-		},
-		{
 			name: "snapshot/singleTally",
-			snap: newRandomSnapshot(0, 0, 0, 0, 1),
+			snap: newRandomSnapshot(0, 0, 0, 1, 1),
 		},
 		{
 			name: "snapshot/singleAll",
@@ -533,12 +545,8 @@ func TestSnapshotRlpEncoding(t *testing.T) {
 			snap: newRandomSnapshot(0, 0, rand.Intn(maxCount)+1, 0, 0),
 		},
 		{
-			name: "snapshot/multipleVotes",
-			snap: newRandomSnapshot(0, 0, 0, rand.Intn(maxCount)+1, 0),
-		},
-		{
 			name: "snapshot/multipleTally",
-			snap: newRandomSnapshot(0, 0, 0, 0, rand.Intn(maxCount)+1),
+			snap: newRandomSnapshot(0, 0, 0, rand.Intn(maxCount)+1, rand.Intn(maxCount)+1),
 		},
 		{
 			name: "snapshot/multipleAll",
@@ -574,13 +582,13 @@ func (test *testSnapshotRlpEncoding) run(t *testing.T) {
 
 func TestCompareSnapshotEncodings(t *testing.T) {
 	const (
-		votersCount  = 3
+		votersCount  = 6
 		signersCount = 1_000_000
 		droppedCount = 0
-		votesCount   = 0
 		tallyCount   = 0
+		votesCount   = 0
 	)
-	snap := newRandomSnapshot(votersCount, signersCount, droppedCount, votesCount, tallyCount)
+	snap := newRandomSnapshot(votersCount, signersCount, droppedCount, tallyCount, votesCount)
 	// RLP encode
 	startTime := time.Now()
 	buf := new(bytes.Buffer)
@@ -618,10 +626,12 @@ func TestCompareSnapshotEncodings(t *testing.T) {
 
 const (
 	benchmarkAddressCount = 1_000_000
+	benchmarkTallyCount   = 100
+	benchmarkVotesCount   = 4
 	benchmarkCalcCount    = 100
 )
 
-func newRandomBenchSnapshot(votersCount int, votersAllSigned bool, signersCount int, signersAllSigned bool, droppedCount, votesCount, tallyCount int) *Snapshot {
+func newRandomBenchSnapshot(votersCount int, votersAllSigned bool, signersCount int, signersAllSigned bool, droppedCount, tallyCount, votesCount int) *Snapshot {
 	snap := &Snapshot{
 		Number:    rand.Uint64(),
 		Hash:      newRandomHash(),
@@ -650,16 +660,15 @@ func newRandomBenchSnapshot(votersCount int, votersAllSigned bool, signersCount 
 	for i := 0; i < droppedCount; i++ {
 		snap.Dropped[newRandomAddress()] = rand.Uint64()
 	}
-	for i := 0; i < votesCount; i++ {
-		snap.Votes = append(snap.Votes, &Vote{
-			Voter:    newRandomAddress(),
-			Block:    rand.Uint64(),
-			Address:  newRandomAddress(),
-			Proposal: uint64(rand.Intn(3)),
-		})
-	}
 	for i := 0; i < tallyCount; i++ {
-		snap.Tally[newRandomAddress()] = Tally{Proposal: uint64(rand.Intn(3)), Votes: rand.Uint64()}
+		tally := Tally{
+			Proposal: uint64(rand.Intn(3)),
+			Votes:    make(map[common.Address]uint64, votesCount),
+		}
+		for j := 0; j < votesCount; j++ {
+			tally.Votes[newRandomAddress()] = rand.Uint64()
+		}
+		snap.Tally[newRandomAddress()] = tally
 	}
 	return snap
 }
@@ -676,7 +685,6 @@ func (s *Snapshot) copyV2() *Snapshot {
 		Voters:    make(map[common.Address]uint64, len(s.Voters)),
 		Signers:   make(map[common.Address]Signer, len(s.Signers)),
 		Dropped:   make(map[common.Address]uint64, len(s.Dropped)),
-		Votes:     make([]*Vote, len(s.Votes)),
 		Tally:     make(map[common.Address]Tally, len(s.Tally)),
 	}
 	for voter := range s.Voters {
@@ -688,17 +696,23 @@ func (s *Snapshot) copyV2() *Snapshot {
 	for signer := range s.Dropped {
 		cpy.Dropped[signer] = s.Dropped[signer]
 	}
-	for address := range s.Tally {
-		cpy.Tally[address] = s.Tally[address]
+	for address, tally := range s.Tally {
+		tallyCpy := Tally{
+			Proposal: tally.Proposal,
+			Votes:    make(map[common.Address]uint64, len(tally.Votes)),
+		}
+		for voter := range tally.Votes {
+			tallyCpy.Votes[voter] = tally.Votes[voter]
+		}
+		cpy.Tally[address] = tallyCpy
 	}
-	copy(cpy.Votes, s.Votes)
 
 	return cpy
 }
 
 func BenchmarkCopyV1(b *testing.B) {
 	snap := newRandomBenchSnapshot(benchmarkAddressCount/2, true, benchmarkAddressCount/2, true,
-		benchmarkAddressCount/2, benchmarkAddressCount/2, benchmarkAddressCount/2)
+		benchmarkAddressCount/2, benchmarkTallyCount, benchmarkVotesCount)
 	b.ResetTimer()
 
 	snap.copy()
@@ -706,7 +720,7 @@ func BenchmarkCopyV1(b *testing.B) {
 
 func BenchmarkCopyV2(b *testing.B) {
 	snap := newRandomBenchSnapshot(benchmarkAddressCount/2, true, benchmarkAddressCount/2, true,
-		benchmarkAddressCount/2, benchmarkAddressCount/2, benchmarkAddressCount/2)
+		benchmarkAddressCount/2, benchmarkTallyCount, benchmarkVotesCount)
 	b.ResetTimer()
 
 	snap.copyV2()
