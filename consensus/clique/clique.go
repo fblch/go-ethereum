@@ -1024,9 +1024,25 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 
 		// Gather all the proposals that make sense voting on
 		// On that occasion, also purge already passed and old proposals
-		addresses, purged, dropSelf := make([]common.Address, 0, len(c.proposals)), 0, false
+		addresses, dropSelf := make([]common.Address, 0, len(c.proposals)), false
+		purgeThreshold, purged := snap.calcProposalPurgeThreshold(), 0
 		for address, proposal := range c.proposals {
-			// Proposal should be valid, and created after the signer was dropped for inactivity,
+			// Purge proposals that are older than the proposal purge threshold (we can not purge proposals
+			// immediately after they are passed because they can become valid again due to reorgs).
+			//
+			// Note, post-PrivateHardFork3 the dropped signers list will be cleared on every epoch transition.
+			// This optimization creates an edge case where a signer dropped due to inactivity will be re-joined
+			// by the voters because the proposal to add him becomes valid again (the signer becomes not joined)
+			// and the signer is not on the dropped signers list (if the list has been cleared). This only happens
+			// if the proposal has not yet been purged due to an old age. By setting the proposal purge threshold
+			// to the effective number of blocks it will takes for an authorized signers to be dropped due to inactivity
+			// (capped at the the ligh immutability threshold) we make sure that a proposal to add any given signer
+			// will be purged before that signer is dropped by the network.
+			if number > proposal.Block && number-proposal.Block > purgeThreshold {
+				delete(c.proposals, address)
+				purged++
+			} else
+			// Proposal should be valid, and created after the signer was dropped due to inactivity,
 			// in order not to automatically vote on re-adding those dropped signers
 			if snap.validVote(address, proposal.Proposal) && snap.Dropped[address] < proposal.Block {
 				if address == signer && proposal.Proposal == proposalDropVote {
@@ -1039,13 +1055,6 @@ func (c *Clique) Prepare(chain consensus.ChainHeaderReader, header *types.Header
 				if !snap.alreadyVoted(signer, address, proposal.Proposal) {
 					addresses = append(addresses, address)
 				}
-			} else
-			// Purge already passed proposals that are older than the light immutability threshold
-			// (we can not purge proposals immediately after they are passed because they can
-			// become valid again due to reorgs)
-			if number > proposal.Block && number-proposal.Block > params.LightImmutabilityThreshold {
-				delete(c.proposals, address)
-				purged++
 			}
 		}
 		// If there are any purged proposals, save to disk

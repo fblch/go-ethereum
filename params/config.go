@@ -435,8 +435,8 @@ var NetworkNames = map[string]string{
 	GoerliChainConfig.ChainID.String():  "goerli",
 	SepoliaChainConfig.ChainID.String(): "sepolia",
 	// ADDED by Jakub Pajek BEG (network names)
-	"116111110106":   "TONE Coin Testnet",
-	"116111110101":   "TONE Coin Mainnet",
+	"116111110106":   "TONE Chain Testnet",
+	"116111110101":   "TONE Chain Mainnet",
 	"10298105116":    "FreeBit Chain Mainnet",
 	"949394939493":   "Test Chain Testnet",
 	"10311497112101": "Grape Chain Mainnet",
