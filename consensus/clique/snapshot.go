@@ -543,6 +543,11 @@ func (s *Snapshot) apply(config *params.ChainConfig, headers []*types.Header) (*
 		if checkpoint {
 			snap.Votes = nil
 			snap.Tally = make(map[common.Address]Tally)
+			// For post-PrivateHardFork3 blocks, also clear the dropped signers list, otherwise the list
+			// will continue to grow indefinitely.
+			if config.IsPrivateHardFork3(header.Number) {
+				snap.Dropped = make(map[common.Address]uint64)
+			}
 		}
 		// Resolve the authorization key and check against signers
 		signer, err := ecrecover(header, s.sigcache)
@@ -991,4 +996,28 @@ func (s *Snapshot) calcStrikeThreshold() uint64 {
 		return currConfig.MinStrikeCount
 	}
 	return strikeThreshold
+}
+
+// calcProposalPurgeThreshold returns the number of blocks after which proposals can be safely
+// purged. This value is equal to the effective number of blocks it takes for an authorized
+// signers to be dropped due to inactivity by the offline penalties mechanism, but is not greater
+// than the ligh immutability threshold.
+// Proposal purge threshold:
+// purge_threshold = MIN(MAX(min_offline_time / block_period, min_strike_count * signer_count), light_immutability_threshold)
+// For TONE Chain Mainnet the threshold changes with the number of joined signers as follows:
+// https://www.desmos.com/calculator/gltrtgaoht
+func (s *Snapshot) calcProposalPurgeThreshold() uint64 {
+	currConfig := s.CurrentConfig()
+	signerCount := uint64(len(s.Signers))
+	purgeThreshold := uint64(math.MaxUint64)
+	if currConfig.Period > 0 {
+		purgeThreshold = currConfig.MinOfflineTime / currConfig.Period
+	}
+	if purgeThreshold < currConfig.MinStrikeCount*signerCount {
+		purgeThreshold = currConfig.MinStrikeCount * signerCount
+	}
+	if purgeThreshold > params.LightImmutabilityThreshold {
+		return params.LightImmutabilityThreshold
+	}
+	return purgeThreshold
 }
