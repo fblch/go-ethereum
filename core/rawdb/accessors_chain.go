@@ -339,7 +339,7 @@ func ReadHeaderRange(db ethdb.Reader, number uint64, count uint64) []rlp.RawValu
 	// MEMO by Jakub Pajek: sealers limit
 	// This limit should be either disabled or take into account the checkpoint blocks with up to CliqueMaxSealerCount of sealer data.
 	//max := count * 700
-	max := count * 1024
+	max := count * 10 * 1024
 	data, err := db.AncientRange(ChainFreezerHeaderTable, i+1-count, count, max)
 	if err != nil {
 		log.Error("Failed to read headers from freezer", "err", err)
