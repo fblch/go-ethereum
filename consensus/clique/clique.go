@@ -1310,8 +1310,11 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 
 	// Bail out if we're unauthorized to sign a block
 	var (
-		nextNumber uint64
-		inturnDiff *big.Int
+		nextNumber           uint64
+		delayOffset          time.Duration
+		delayFactor          *big.Int
+		sealersCount         int
+		sealersPerWiggleSlot int
 	)
 	if signed, ok := snap.Signers[signer]; !ok {
 		return errUnauthorizedSigner
@@ -1321,40 +1324,81 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 			// We are currently signing blocks in the sealer ring.
 			// Check the diffuculty to determine if we want to stay
 			// in the sealer ring or switch to the voter ring.
-			if inturnDiff = snap.maxSealerRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
+			if inturnDiff := snap.maxSealerRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to stay in the sealer ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
-			} else if inturnDiff = snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
+				delayFactor = new(big.Int).Sub(inturnDiff, header.Difficulty)
+				sealersCount = len(snap.Signers)
+				// In general, only half of sealers in the sealer ring are allowed to sign, the other half
+				// is among the recent signers. However, this ratio might shift due to sealers joining
+				// or leaving the network, or after returning from the voter ring.
+				sealersPerWiggleSlot = 2
+			} else if inturnDiff := snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to switch to the voter ring
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
 				// Since, unlike mobile signers, voters are most likely to always be online,
 				// they will sign in-turn most of the time while trying to switch to the voter ring.
 				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes {
-					// Set in-turn difficulty value to 0, in order to treat all non-voting voters trying to switch
-					// to the voter ring because of a network stall as out-of-turn. This will result in their block
+					// Add a constant delay offset equal to 10% of the current block period in order to delay all non-voting
+					// voters trying to switch to the voter ring because of a network stall. This will result in their blocks
 					// being broadcast with a delay and will allow some of the in-turnish online signers to broadcast
 					// their blocks faster, which in consequence will allow to prevent switching to the voter ring.
-					inturnDiff = big.NewInt(0)
+					// (Period is always greater than zero here, because 0-period chains switch to the voter ring only when voting)
+					delayOffset = time.Duration(currConfig.Period) * time.Second * time.Duration(10) / time.Duration(100)
+					// Decrease the constant delay offset by the additional delay already passed since the last block
+					parent := chain.GetHeader(header.ParentHash, number-1)
+					if parent == nil {
+						return consensus.ErrUnknownAncestor
+					}
+					passedDelay := time.Duration(header.Time-(parent.Time+(currConfig.MinStallPeriod*currConfig.Period))) * time.Second
+					delayOffset -= passedDelay
+					if delayOffset < 0 {
+						delayOffset = 0
+					}
 				}
-			} else {
+				delayFactor = new(big.Int).Sub(inturnDiff, header.Difficulty)
+				sealersCount = len(snap.Voters)
+				// In general, only half of voters in the voter ring are allowed to sign, the other half
+				// is among the recent signers. However, this ratio might shift due to voters joining
+				// or leaving the network.
+				sealersPerWiggleSlot = 2
+			} else if inturnDiff := snap.maxRingBreakerDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to preemptively prevent switching to the voter ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
-				inturnDiff = snap.maxRingBreakerDifficulty()
+				delayFactor = new(big.Int).Sub(inturnDiff, header.Difficulty)
+				sealersCount = len(snap.Signers)
+				// In general, only half of sealers in the sealer ring are allowed to sign, the other half
+				// is among the recent signers. However, this ratio might shift due to sealers joining
+				// or leaving the network, or after returning from the voter ring. Increasing the below
+				// parameter by a maximum factor of 10 will decrease the delay factor cap (see below)
+				// accordingly and cause a more aggressiv (shorter wiggle delays) block broadcasting
+				// (at maximum 10 sealers per wiggle slot of wiggleTime miliseconds).
+				sealersPerWiggleSlot = sealersCount / 2
+				if sealersPerWiggleSlot > 10 {
+					sealersPerWiggleSlot = 10
+				}
+				sealersPerWiggleSlot *= 2
+			} else {
+				// Difficulties above maxRingBreakerDifficulty are not allowed
+				return errWrongDifficultySealerRing
 			}
 		} else {
 			// We are currently signing blocks in the voter ring.
 			// Check the difficulty to determine if we want to stay
 			// in the voter ring or return to the sealer ring.
-			if inturnDiff = snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
+			if header.Difficulty.Cmp(snap.maxSealerRingDifficulty()) <= 0 {
+				// Difficulties from the sealer ring range are not allowed in the voter ring
+				return errWrongDifficultyVoterRing
+			} else if inturnDiff := snap.maxVoterRingDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to stay in the voter ring
 				nextNumber = snap.nextVoterRingSignableBlockNumber(signed.LastSignedBlock)
 				// Since, unlike mobile signers, voters are most likely to always be online,
 				// they will sign in-turn most of the time while in the voter ring.
 				if headerHasVotes := number%currConfig.Epoch != 0 && len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal > 0; !headerHasVotes && !snap.Voting {
-					// Set in-turn difficulty value to 0, in order to treat all non-voting voters in the voter ring
-					// as out-of-turn, thus broadcast their blocks with a delay. This will allow some of the in-turnish
-					// online signers to broadcast their blocks faster, which in consequence will allow to disband
-					// the voter ring.
+					// Add a constant delay offset equal to 10% of the current block period in order to delay all non-voting
+					// voters in the voter ring, thus broadcast their blocks with a delay. This will allow some of the in-turnish
+					// online signers to broadcast their blocks faster, which in consequence will allow to disband the voter ring.
+					// (Period is always greater than zero here, because 0-period chains switch to the voter ring only when voting)
 					//
 					// Note, using only !headerHasVotes in the condition above will introduce out-of-turn delay for
 					// all non-voting blocks, including the block which signals to the network that voting has ended
@@ -1362,12 +1406,43 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 					// By changing the condition to !headerHasVotes && !snap.Voting, the fist non-voting block will
 					// also be broadcasted in-turn, allowing online signers to smoothly disband the voter ring without
 					// any out-of-turn delays in block times.
-					inturnDiff = big.NewInt(0)
+					delayOffset = time.Duration(currConfig.Period) * time.Second * time.Duration(10) / time.Duration(100)
+					// Decrease the constant delay offset by the additional delay already passed since the last block
+					parent := chain.GetHeader(header.ParentHash, number-1)
+					if parent == nil {
+						return consensus.ErrUnknownAncestor
+					}
+					passedDelay := time.Duration(header.Time-(parent.Time+currConfig.Period)) * time.Second
+					delayOffset -= passedDelay
+					if delayOffset < 0 {
+						delayOffset = 0
+					}
 				}
-			} else {
+				delayFactor = new(big.Int).Sub(inturnDiff, header.Difficulty)
+				sealersCount = len(snap.Voters)
+				// In general, only half of voters in the voter ring are allowed to sign, the other half
+				// is among the recent signers. However, this ratio might shift due to voters joining
+				// or leaving the network.
+				sealersPerWiggleSlot = 2
+			} else if inturnDiff := snap.maxRingBreakerDifficulty(); header.Difficulty.Cmp(inturnDiff) <= 0 {
 				// We want to return to the sealer ring
 				nextNumber = snap.nextSealerRingSignableBlockNumber(signed.LastSignedBlock)
-				inturnDiff = snap.maxRingBreakerDifficulty()
+				delayFactor = new(big.Int).Sub(inturnDiff, header.Difficulty)
+				sealersCount = len(snap.Signers)
+				// In general, only half of sealers in the sealer ring are allowed to sign, the other half
+				// is among the recent signers. However, this ratio might shift due to sealers joining
+				// or leaving the network, or after returning from the voter ring. Increasing the below
+				// parameter by a maximum factor of 10 will decrease the delay factor cap (see below)
+				// accordingly and cause a more aggressiv (shorter wiggle delays) block broadcasting
+				// (at maximum 10 sealers per wiggle slot of wiggleTime miliseconds).
+				sealersPerWiggleSlot = sealersCount / 2
+				if sealersPerWiggleSlot > 10 {
+					sealersPerWiggleSlot = 10
+				}
+				sealersPerWiggleSlot *= 2
+			} else {
+				// Difficulties above maxRingBreakerDifficulty are not allowed
+				return errWrongDifficultyVoterRing
 			}
 		}
 		if signed.LastSignedBlock > 0 {
@@ -1380,13 +1455,37 @@ func (c *Clique) Seal(chain consensus.ChainHeaderReader, block *types.Block, res
 	}
 	// Sweet, the protocol permits us to sign the block, wait for our time
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
-	if header.Difficulty.Cmp(inturnDiff) != 0 {
-		// It's not our turn explicitly to sign, delay it a bit
-		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
-		delay += time.Duration(rand.Int63n(int64(wiggle)))
-
-		log.Trace("Out-of-turn signing requested", "wiggle", common.PrettyDuration(wiggle))
+	// For out-of-turn signers calculate additional skew and randomized wiggle delays.
+	// Delay factor used for wiggle delay calculation is in the <0, sealersCount - 1> range,
+	// where 0 is the next in-turn signer broadcasting without a skew nor wiggle delays.
+	// Since, in general, only half of sealers in the current ring are allowed to sign,
+	// we do not want the delay factor to exceed sealersCount/2 (sealersPerWiggleSlot = 2).
+	// In some special cases (when preemptively preventing switching to the voter ring,
+	// or disbanding the voter ring after finished voting) we want to use a more aggressive
+	// block broadcast strategy (shorter delays) by setting sealersPerWiggleSlot to values
+	// higher than 2. This approach has to be used with caution though, in order not to
+	// flood the network with block broadcasts on every block period.
+	var delaySkew, delayWiggle time.Duration
+	if delayFactor.Cmp(big.NewInt(0)) > 0 {
+		// Wrap the delay factor of out-of-turn signers (in the <1, sealersCount - 1> range)
+		// onto the <1, sealersCount/sealersPerWiggleSlot> range
+		delayFactorCap := big.NewInt(int64(sealersCount / sealersPerWiggleSlot))
+		if delayFactorCap.Cmp(big.NewInt(0)) > 0 {
+			if delayFactor.Cmp(delayFactorCap) > 0 {
+				delayFactor.Mod(delayFactor, delayFactorCap)
+				delayFactor.Add(delayFactor, big.NewInt(1))
+			}
+			// Calculate additional skew delay
+			delaySkew = time.Duration(delayFactor.Int64()) * wiggleTime / time.Duration(delayFactorCap.Int64())
+		}
+		// Calculate additional wiggle delay
+		wiggleLimit := time.Duration(delayFactor.Int64()) * wiggleTime
+		delayWiggle = time.Duration(rand.Int63n(int64(wiggleLimit)))
 	}
+	//  Add up all the additional delays (if any)
+	delay += delayOffset + delaySkew + delayWiggle
+	log.Trace("Signing requested", "delayFactor", delayFactor, "delayOffset", common.PrettyDuration(delayOffset),
+		"delaySkew", common.PrettyDuration(delaySkew), "delayWiggle", common.PrettyDuration(delayWiggle))
 	// Sign all the things!
 	sighash, err := signFn(accounts.Account{Address: signer}, accounts.MimetypeClique, CliqueRLP(header))
 	if err != nil {
