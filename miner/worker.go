@@ -540,16 +540,25 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 					headTime = headBlock.Time
 				}
 				if cliqueCfg == nil || cliqueCfg.Period > 0 {
+					// Check if enough stall occured to switch to the voter ring.
+					// (If we are here and clique is used, clique period is always greater than zero)
+					networkStalled := cliqueCfg != nil && headTime+cliqueCfg.MinStallPeriod*cliqueCfg.Period <= uint64(time.Now().Unix())
 					// Short circuit if no new transaction arrives.
-					if w.newTxs.Load() == 0 {
-						// Do not short circut if enough stall occured to switch to the voter ring.
-						// (If we are here and clique is used, clique period is always greater than zero)
-						if cliqueCfg == nil || headTime+cliqueCfg.MinStallPeriod*cliqueCfg.Period > uint64(time.Now().Unix()) {
-							timer.Reset(recommit)
-							continue
-						}
+					// Do not short circut if enough stall occured to switch to the voter ring.
+					if w.newTxs.Load() == 0 && !networkStalled {
+						timer.Reset(recommit)
+						continue
 					}
 					commit(true, commitInterruptResubmit)
+					// If enough stall occured to switch to the voter ring, notify resubmit loop to increase resubmitting
+					// interval in order to give voters enough time to broadcast their offset-delayed blocks.
+					// (Disable this logic if resubmitHook is set in order not to break the TestAdjustIntervalClique test)
+					if networkStalled && w.resubmitHook == nil {
+						w.resubmitAdjustCh <- &intervalAdjust{
+							ratio: 0.1,
+							inc:   true,
+						}
+					}
 				}
 			}
 			// MODIFIED by Jakub Pajek END (clique config: variable period)
