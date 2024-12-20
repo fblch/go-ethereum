@@ -129,6 +129,10 @@ type NodeConfig struct {
 	SyncMode int64 // uint32 in truth, but Java can't handle that...
 
 	// ADDED by Jakub Pajek
+	// The maximum number of blocks from head whose tx indices are reserved
+	TxLookupLimit int64 // uint32 in truth, but Java can't handle that...
+
+	// ADDED by Jakub Pajek
 	// If ListenAddr is set to a non-nil address, the server
 	// will listen for incoming connections.
 	//
@@ -199,6 +203,7 @@ var defaultNodeConfig = &NodeConfig{
 	EthereumSnapshotCache:  16,
 	UserIdent:              "",
 	SyncMode:               int64(downloader.LightSync),
+	TxLookupLimit:          int64(ethconfig.Defaults.TxLookupLimit),
 	ListenAddr:             ":0",
 	NAT:                    "any",
 	NoDiscovery:            true,
@@ -249,7 +254,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config == nil {
 		config = NewNodeConfig()
 	}
-	if config.MaxPeers == 0 {
+	if config.MaxPeers < 0 {
+		return nil, errors.New("invalid config: MaxPeers is negative")
+	} else if config.MaxPeers == 0 {
 		config.MaxPeers = defaultNodeConfig.MaxPeers
 	}
 	if config.BootstrapNodes == nil || config.BootstrapNodes.Size() == 0 {
@@ -260,8 +267,34 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		debug.StartPProf(config.PprofAddress, true)
 	}
 	// ADDED by Jakub Pajek BEG
+	if config.EthereumDatabaseCache < 0 {
+		return nil, errors.New("invalid config: EthereumDatabaseCache is negative")
+	} else if config.EthereumDatabaseCache == 0 {
+		config.EthereumDatabaseCache = defaultNodeConfig.EthereumDatabaseCache
+	}
+	if config.EthereumTrieCleanCache < 0 {
+		return nil, errors.New("invalid config: EthereumTrieCleanCache is negative")
+	} else if config.EthereumTrieCleanCache == 0 {
+		config.EthereumTrieCleanCache = defaultNodeConfig.EthereumTrieCleanCache
+	}
+	if config.EthereumTrieDirtyCache < 0 {
+		return nil, errors.New("invalid config: EthereumTrieDirtyCache is negative")
+	} else if config.EthereumTrieDirtyCache == 0 {
+		config.EthereumTrieDirtyCache = defaultNodeConfig.EthereumTrieDirtyCache
+	}
+	if config.EthereumSnapshotCache < 0 {
+		return nil, errors.New("invalid config: EthereumSnapshotCache is negative")
+	} else if config.EthereumSnapshotCache == 0 {
+		config.EthereumSnapshotCache = defaultNodeConfig.EthereumSnapshotCache
+	}
+	if config.TxLookupLimit < 0 {
+		return nil, errors.New("invalid config: TxLookupLimit is negative")
+	}
 	if config.UserIdent == "" {
 		config.UserIdent = defaultNodeConfig.UserIdent
+	}
+	if !downloader.SyncMode(config.SyncMode).IsValid() {
+		return nil, errors.New("invalid config: SyncMode is invalid")
 	}
 	if config.ListenAddr == "" {
 		config.ListenAddr = defaultNodeConfig.ListenAddr
@@ -269,14 +302,30 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config.NAT == "" {
 		config.NAT = defaultNodeConfig.NAT
 	}
-	if config.MinerGasLimit <= 0 {
+	if config.MinerGasLimit < 0 {
+		return nil, errors.New("invalid config: MinerGasLimit is negative")
+	} else if config.MinerGasLimit == 0 {
 		config.MinerGasLimit = defaultNodeConfig.MinerGasLimit
 	}
-	if config.MinerGasPrice == nil || config.MinerGasPrice.Sign() <= 0 {
+	if config.MinerGasPrice != nil && config.MinerGasPrice.Sign() < 0 {
+		return nil, errors.New("invalid config: MinerGasPrice is negative")
+	} else if config.MinerGasPrice == nil || config.MinerGasPrice.Sign() == 0 {
 		config.MinerGasPrice = defaultNodeConfig.MinerGasPrice
 	}
-	if config.MinerRecommit <= 0 {
+	if config.MinerRecommit < 0 {
+		return nil, errors.New("invalid config: MinerRecommit is negative")
+	} else if config.MinerRecommit == 0 {
 		config.MinerRecommit = defaultNodeConfig.MinerRecommit
+	}
+	if config.CliqueSnapshotCacheSize < 0 {
+		return nil, errors.New("invalid config: CliqueSnapshotCacheSize is negative")
+	} else if config.CliqueSnapshotCacheSize == 0 {
+		config.CliqueSnapshotCacheSize = defaultNodeConfig.CliqueSnapshotCacheSize
+	}
+	if config.CliqueSnapshotCacheCount < 0 {
+		return nil, errors.New("invalid config: CliqueSnapshotCacheCount is negative")
+	} else if config.CliqueSnapshotCacheCount == 0 {
+		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
 
 	natif, err := nat.Parse(config.NAT)
@@ -369,6 +418,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// MODIFIED by Jakub Pajek BEG
 		//ethConf.SyncMode = downloader.LightSync
 		ethConf.SyncMode = downloader.SyncMode(config.SyncMode)
+		ethConf.TxLookupLimit = uint64(config.TxLookupLimit)
 		// MODIFIED by Jakub Pajek END
 		ethConf.NetworkId = uint64(config.EthereumNetworkID)
 		ethConf.DatabaseCache = config.EthereumDatabaseCache
