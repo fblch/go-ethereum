@@ -1054,8 +1054,16 @@ func doAndroidArchive(cmdline []string) {
 	//	exit status 1
 	//	make: *** [android] Error 1
 	// As a temporary fix, build with the previous gomobile version v0.0.0-20240806205939-81131f6468ab
-	//install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest")
-	install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab")
+	//install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab")
+	//
+	// Gomobile module versions memo:
+	// https://pkg.go.dev/golang.org/x/mobile?tab=versions
+	// https://cs.opensource.google/go/x/mobile;bpv=1
+	//	v0.0.0-20250106192035-c31d5b91ecc3	Jan 6, 2025 (@latest)
+	//	v0.0.0-20250103163954-5e5de4c85663	Jan 3, 2025
+	//	v0.0.0-20241213221354-a87c1cf6cf46	Dec 13, 2024
+	//	v0.0.0-20240930194658-c6794c95c70b	Sep 30, 2024
+	install := tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest")
 	install.Env = append(install.Env)
 	build.MustRun(install)
 
@@ -1198,8 +1206,16 @@ func doXCodeFramework(cmdline []string) {
 	//	exit status 1
 	//	make: *** [ios] Error 1
 	// As a temporary fix, build with the previous gomobile version v0.0.0-20240806205939-81131f6468ab
-	//build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
-	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab"))
+	//build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@v0.0.0-20240806205939-81131f6468ab", "golang.org/x/mobile/cmd/gobind@v0.0.0-20240806205939-81131f6468ab"))
+	//
+	// Gomobile module versions memo:
+	// https://pkg.go.dev/golang.org/x/mobile?tab=versions
+	// https://cs.opensource.google/go/x/mobile;bpv=1
+	//	v0.0.0-20250106192035-c31d5b91ecc3	Jan 6, 2025 (@latest)
+	//	v0.0.0-20250103163954-5e5de4c85663	Jan 3, 2025
+	//	v0.0.0-20241213221354-a87c1cf6cf46	Dec 13, 2024
+	//	v0.0.0-20240930194658-c6794c95c70b	Sep 30, 2024
+	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
 
 	// Build the iOS XCode framework
 	bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
