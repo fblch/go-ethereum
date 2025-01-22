@@ -78,7 +78,9 @@ type fullNodeBackend interface {
 	backend
 	Miner() *miner.Miner
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
-	CurrentBlock() *types.Block
+	// MODIFIED by Jakub Pajek (ethstats txcount bugfix)
+	//CurrentBlock() *types.Block
+	CurrentBlock() *types.Header
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
 }
 
@@ -633,10 +635,20 @@ func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 	// check if backend is a full node
 	fullBackend, ok := s.backend.(fullNodeBackend)
 	if ok {
+		// MODIFIED by Jakub Pajek BEG (ethstats txcount bugfix)
+		/*
+			if block == nil {
+				block = fullBackend.CurrentBlock()
+			}
+			header = block.Header()
+		*/
 		if block == nil {
-			block = fullBackend.CurrentBlock()
+			header = fullBackend.CurrentBlock()
+			block, _ = fullBackend.BlockByNumber(context.Background(), rpc.BlockNumber(header.Number.Int64())) // TODO ignore error here ?
+		} else {
+			header = block.Header()
 		}
-		header = block.Header()
+		// MODIFIED by Jakub Pajek END (ethstats txcount bugfix)
 		td = fullBackend.GetTd(context.Background(), header.Hash())
 
 		txs = make([]txStats, len(block.Transactions()))
