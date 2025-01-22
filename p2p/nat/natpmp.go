@@ -70,6 +70,10 @@ func (n *pmp) DeleteMapping(protocol string, extport, intport int) (err error) {
 	return err
 }
 
+func (n *pmp) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("natpmp:%v", n.gw)), nil
+}
+
 // MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 // func discoverPMP() Interface {
 func discoverPMP(_, gateway net.IP) Interface {

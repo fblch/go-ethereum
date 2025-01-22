@@ -21,6 +21,8 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/fatih/color v1.7.0
 	github.com/fjl/gencodec v0.0.0-20220412091415-8bb9e558978c
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//github.com/fjl/gencodec v0.0.0-20250117152317-bc3e1c7619d4
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
@@ -60,14 +62,20 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
 	golang.org/x/crypto v0.1.0
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad
 	// ADDED by Jakub Pajek (revert mobile nuke)
 	golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.6.0
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//golang.org/x/sys v0.29.0
 	golang.org/x/text v0.8.0
 	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
 	golang.org/x/tools v0.7.0
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//golang.org/x/tools v0.29.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
@@ -121,7 +129,11 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/mod v0.11.0 // indirect
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//golang.org/x/mod v0.22.0
 	golang.org/x/net v0.8.0 // indirect
+	// MEMO by Jakub Pajek: update module after updating go to 1.22.0 (go version)
+	//golang.org/x/net v0.34.0
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

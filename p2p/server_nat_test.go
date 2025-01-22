@@ -102,3 +102,8 @@ func (m *mockNAT) ExternalIP() (net.IP, error) {
 func (m *mockNAT) String() string {
 	return "mockNAT"
 }
+
+// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+func (m *mockNAT) MarshalText() ([]byte, error) {
+	return []byte("mockNAT"), nil
+}

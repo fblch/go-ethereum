@@ -37,8 +37,8 @@ const (
 )
 
 type upnp struct {
-	// ADDED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
-	local       net.IP
+	// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	local, gw   net.IP
 	dev         *goupnp.RootDevice
 	service     string
 	client      upnpClient
@@ -173,7 +173,22 @@ func (n *upnp) DeleteMapping(protocol string, extport, intport int) error {
 }
 
 func (n *upnp) String() string {
-	return "UPNP " + n.service
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//return "UPNP " + n.service
+	if n.gw != nil {
+		return fmt.Sprintf("UPNP %s(%v,%v)", n.service, n.gw, n.local)
+	} else {
+		return "UPNP " + n.service
+	}
+}
+
+// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+func (n *upnp) MarshalText() ([]byte, error) {
+	if n.gw != nil {
+		return fmt.Appendf(nil, "upnp:%v,%v", n.gw, n.local), nil
+	} else {
+		return []byte("upnp"), nil
+	}
 }
 
 func (n *upnp) withRateLimit(fn func() error) error {
@@ -203,11 +218,11 @@ func discoverUPnP(local net.IP, gateway net.IP) Interface {
 		case internetgateway1.URN_WANIPConnection_1:
 			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 			//return &upnp{service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
-			return &upnp{local: local, service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, gw: gateway, service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
 		case internetgateway1.URN_WANPPPConnection_1:
 			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 			//return &upnp{service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
-			return &upnp{local: local, service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, gw: gateway, service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
 		}
 		return nil
 	})
@@ -219,15 +234,15 @@ func discoverUPnP(local net.IP, gateway net.IP) Interface {
 		case internetgateway2.URN_WANIPConnection_1:
 			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 			//return &upnp{service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
-			return &upnp{local: local, service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, gw: gateway, service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
 		case internetgateway2.URN_WANIPConnection_2:
 			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 			//return &upnp{service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
-			return &upnp{local: local, service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
+			return &upnp{local: local, gw: gateway, service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
 		case internetgateway2.URN_WANPPPConnection_1:
 			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 			//return &upnp{service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
-			return &upnp{local: local, service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, gw: gateway, service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
 		}
 		return nil
 	})

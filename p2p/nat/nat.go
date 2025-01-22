@@ -47,6 +47,9 @@ type Interface interface {
 
 	// String should return name of the method. This is used for logging.
 	String() string
+
+	// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	MarshalText() ([]byte, error)
 }
 
 // Parse parses a NAT interface description.
@@ -108,6 +111,11 @@ func Parse(spec string) (Interface, error) {
 		if ip == nil {
 			return nil, errors.New("missing IP address")
 		}
+		// ADDED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		if local != nil {
+			return nil, errors.New("redundant IP address")
+		}
+		// ADDED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		return ExtIP(ip), nil
 	case "upnp":
 		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
@@ -120,7 +128,10 @@ func Parse(spec string) (Interface, error) {
 	case "pmp", "natpmp", "nat-pmp":
 		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		//return PMP(ip), nil
-		return PMP(local, ip), nil
+		if local != nil {
+			return nil, errors.New("redundant IP address")
+		}
+		return PMP(ip), nil
 	default:
 		return nil, fmt.Errorf("unknown mechanism %q", before)
 	}
@@ -184,8 +195,9 @@ func Map(m Interface, c <-chan struct{}, protocol string, extport, intport int, 
 // Mapping operations will not return an error but won't actually do anything.
 type ExtIP net.IP
 
-func (n ExtIP) ExternalIP() (net.IP, error) { return net.IP(n), nil }
-func (n ExtIP) String() string              { return fmt.Sprintf("ExtIP(%v)", net.IP(n)) }
+func (n ExtIP) ExternalIP() (net.IP, error)  { return net.IP(n), nil }
+func (n ExtIP) String() string               { return fmt.Sprintf("ExtIP(%v)", net.IP(n)) }
+func (n ExtIP) MarshalText() ([]byte, error) { return []byte(fmt.Sprintf("extip:%v", net.IP(n))), nil }
 
 // These do nothing.
 
@@ -203,8 +215,8 @@ func Any(local, gateway net.IP) Interface {
 	// TODO: attempt to discover whether the local machine has an
 	// Internet-class address. Return ExtIP in this case.
 	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
-	//return startautodisc("UPnP or NAT-PMP", func() Interface {
-	return startautodisc("UPnP or NAT-PMP", local, gateway, func(local, gateway net.IP) Interface {
+	//return startautodisc("any", func() Interface {
+	return startautodisc("any", local, gateway, func(local, gateway net.IP) Interface {
 		found := make(chan Interface, 2)
 		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		//go func() { found <- discoverUPnP() }()
@@ -227,25 +239,23 @@ func Any(local, gateway net.IP) Interface {
 // func UPnP() Interface {
 func UPnP(local, gateway net.IP) Interface {
 	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
-	//return startautodisc("UPnP", discoverUPnP)
-	return startautodisc("UPnP", local, gateway, discoverUPnP)
+	//return startautodisc("upnp", discoverUPnP)
+	return startautodisc("upnp", local, gateway, discoverUPnP)
 }
 
 // PMP returns a port mapper that uses NAT-PMP. The provided gateway
 // address should be the IP of your router. If the given gateway
 // address is nil, PMP will attempt to auto-discover the router.
-// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
-// func PMP(gateway net.IP) Interface {
-func PMP(local, gateway net.IP) Interface {
+func PMP(gateway net.IP) Interface {
 	// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	/*
 		if gateway != nil {
 			return &pmp{gw: gateway, c: natpmp.NewClient(gateway)}
 		}
-		return startautodisc("NAT-PMP", discoverPMP)
+		return startautodisc("natpmp", discoverPMP)
 	*/
 	// Always use discoverPMP because it enforces a short timeout
-	return startautodisc("NAT-PMP", local, gateway, discoverPMP)
+	return startautodisc("natpmp", nil, gateway, discoverPMP)
 	// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 }
 
@@ -306,6 +316,18 @@ func (n *autodisc) String() string {
 		return n.what
 	}
 	return n.found.String()
+}
+
+func (n *autodisc) MarshalText() ([]byte, error) {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//return []byte(n.what), nil
+	if n.gateway != nil && n.local != nil {
+		return fmt.Appendf(nil, "%s:%v,%v", n.what, n.gateway, n.local), nil
+	} else if n.gateway != nil {
+		return fmt.Appendf(nil, "%s:%v", n.what, n.gateway), nil
+	} else {
+		return []byte("upnp"), nil
+	}
 }
 
 // wait blocks until auto-discovery has been performed.
