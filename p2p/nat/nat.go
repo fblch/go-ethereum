@@ -62,6 +62,8 @@ type Interface interface {
 //	"upnp"               uses the Universal Plug and Play protocol
 //	"pmp"                uses NAT-PMP with an auto-detected gateway address
 //	"pmp:192.168.0.1"    uses NAT-PMP with the given gateway address
+//	"stun"               uses stun protocol with default stun server
+//	"stun:192.168.0.1:1234"   uses stun protocol with stun server address 192.168.0.1:1234
 //
 // ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 //
@@ -75,7 +77,8 @@ func Parse(spec string) (Interface, error) {
 		//ip                   net.IP
 		ip, local net.IP
 	)
-	if found {
+	// stun is not a valid ip
+	if found && mech != "stun" {
 		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		/*
 			ip = net.ParseIP(after)
@@ -132,6 +135,8 @@ func Parse(spec string) (Interface, error) {
 			return nil, errors.New("redundant IP address")
 		}
 		return PMP(ip), nil
+	case "stun":
+		return newSTUN(after)
 	default:
 		return nil, fmt.Errorf("unknown mechanism %q", before)
 	}

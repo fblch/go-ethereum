@@ -849,8 +849,10 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 	NATFlag = &cli.StringFlag{
-		Name:     "nat",
-		Usage:    "NAT port mapping mechanism (any|none|upnp|pmp|pmp:<IP>|extip:<IP>)",
+		Name: "nat",
+		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//Usage:    "NAT port mapping mechanism (any|none|upnp|pmp|pmp:<IP>|extip:<IP>|stun:<IP:PORT>)",
+		Usage:    "NAT port mapping mechanism (any|any:<GW,LOCAL>|none|upnp|upnp:<GW,LOCAL>|pmp|pmp:<IP>|extip:<IP>|stun:<IP:PORT>)",
 		Value:    "any",
 		Category: flags.NetworkingCategory,
 	}
