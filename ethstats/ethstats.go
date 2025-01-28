@@ -585,6 +585,8 @@ type blockStats struct {
 	TxHash     common.Hash    `json:"transactionsRoot"`
 	Root       common.Hash    `json:"stateRoot"`
 	Uncles     uncleStats     `json:"uncles"`
+	// ADDED by Jakub Pajek (ethstats votes count)
+	Votes voteStats `json:"votes"`
 }
 
 // txStats is the information to report about individual transactions.
@@ -602,6 +604,26 @@ func (s uncleStats) MarshalJSON() ([]byte, error) {
 	}
 	return []byte("[]"), nil
 }
+
+// ADDED by Jakub Pajek BEG  (ethstats votes count)
+
+type vote struct {
+	Address  common.Address `json:"address"`
+	Proposal string         `json:"proposal"`
+}
+
+// voteStats is a custom wrapper around an vote array to force serializing
+// empty arrays instead of returning null for them.
+type voteStats []vote
+
+func (s voteStats) MarshalJSON() ([]byte, error) {
+	if votes := ([]vote)(s); len(votes) > 0 {
+		return json.Marshal(votes)
+	}
+	return []byte("[]"), nil
+}
+
+// ADDED by Jakub Pajek END  (ethstats votes count)
 
 // reportBlock retrieves the current chain head and reports it to the stats server.
 func (s *Service) reportBlock(conn *connWrapper, block *types.Block) error {
@@ -630,6 +652,8 @@ func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 		td     *big.Int
 		txs    []txStats
 		uncles []*types.Header
+		// ADDED by Jakub Pajek (ethstats votes count)
+		votes []vote
 	)
 
 	// check if backend is a full node
@@ -667,6 +691,28 @@ func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 		txs = []txStats{}
 	}
 
+	// ADDED by Jakub Pajek BEG (ethstats votes count)
+	{
+		votesCount := header.Number.Int64() % 10
+		votes = make([]vote, votesCount)
+		for i := 0; i < int(votesCount); i++ {
+			var proposal string
+			switch i % 3 {
+			case 0:
+				proposal = "signer"
+			case 1:
+				proposal = "voter"
+			case 2:
+				proposal = "drop"
+			}
+			votes[i] = vote{
+				Address:  common.BigToAddress(new(big.Int).SetUint64(uint64(i) + 1)),
+				Proposal: proposal,
+			}
+		}
+	}
+	// ADDED by Jakub Pajek END (ethstats votes count)
+
 	// Assemble and return the block stats
 	author, _ := s.engine.Author(header)
 
@@ -684,6 +730,8 @@ func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 		TxHash:     header.TxHash,
 		Root:       header.Root,
 		Uncles:     uncles,
+		// ADDED by Jakub Pajek (ethstats votes count)
+		Votes: votes,
 	}
 }
 
