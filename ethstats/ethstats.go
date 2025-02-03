@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/websocket"
 )
@@ -70,6 +71,8 @@ type backend interface {
 	GetTd(ctx context.Context, hash common.Hash) *big.Int
 	Stats() (pending int, queued int)
 	SyncProgress() ethereum.SyncProgress
+	// ADDED by Jakub Pajek (ethstats votes count)
+	ChainConfig() *params.ChainConfig
 }
 
 // fullNodeBackend encompasses the functionality necessary for a full node
@@ -605,7 +608,7 @@ func (s uncleStats) MarshalJSON() ([]byte, error) {
 	return []byte("[]"), nil
 }
 
-// ADDED by Jakub Pajek BEG  (ethstats votes count)
+// ADDED by Jakub Pajek BEG (ethstats votes count)
 
 type vote struct {
 	Address  common.Address `json:"address"`
@@ -623,7 +626,36 @@ func (s voteStats) MarshalJSON() ([]byte, error) {
 	return []byte("[]"), nil
 }
 
-// ADDED by Jakub Pajek END  (ethstats votes count)
+// isTTDReached checks if the TotalTerminalDifficulty has been surpassed on the `parentHash` block.
+// It depends on the parentHash already being stored in the database.
+// If the parentHash is not stored in the database a UnknownAncestor error is returned.
+func (s *Service) isTTDReached(parentHash common.Hash) (bool, error) {
+	ttd := s.backend.ChainConfig().TerminalTotalDifficulty
+	if ttd == nil {
+		return false, nil
+	}
+	td := s.backend.GetTd(context.Background(), parentHash)
+	if td == nil {
+		return false, consensus.ErrUnknownAncestor
+	}
+	return td.Cmp(ttd) >= 0, nil
+}
+
+// poaEngine returns the PoA consensus engine, or nil if PoW or PoS is being used.
+func (s *Service) poaEngine(header *types.Header) consensus.PoA {
+	if pos, ok := s.engine.(consensus.PoS); ok {
+		if poa, ok := pos.EthOneEngine().(consensus.PoA); ok {
+			if reached, err := s.isTTDReached(header.ParentHash); err == nil && !reached {
+				return poa
+			}
+		}
+	} else if poa, ok := s.engine.(consensus.PoA); ok {
+		return poa
+	}
+	return nil
+}
+
+// ADDED by Jakub Pajek END (ethstats votes count)
 
 // reportBlock retrieves the current chain head and reports it to the stats server.
 func (s *Service) reportBlock(conn *connWrapper, block *types.Block) error {
@@ -692,22 +724,39 @@ func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 	}
 
 	// ADDED by Jakub Pajek BEG (ethstats votes count)
-	{
-		votesCount := header.Number.Int64() % 10
-		votes = make([]vote, votesCount)
-		for i := 0; i < int(votesCount); i++ {
-			var proposal string
-			switch i % 3 {
-			case 0:
-				proposal = "signer"
-			case 1:
-				proposal = "voter"
-			case 2:
-				proposal = "drop"
-			}
-			votes[i] = vote{
-				Address:  common.BigToAddress(new(big.Int).SetUint64(uint64(i) + 1)),
-				Proposal: proposal,
+	if poa, cliqueCfg := s.poaEngine(header), s.backend.ChainConfig().Clique; poa != nil && cliqueCfg != nil {
+		// MEMO by Jakub Pajek (clique config: variable period)
+		// How to handle variable epoch changing with the number of sealers?
+		cliqueEpoch := cliqueCfg[0].Epoch
+		if cliqueEpoch == 0 {
+			cliqueEpoch = params.CliqueEpoch
+		}
+		if checkpoint, extraBytes := header.Number.Uint64()%cliqueEpoch == 0, len(header.Extra)-params.CliqueExtraVanity-params.CliqueExtraSeal; !checkpoint && extraBytes > 0 {
+			voteCount := extraBytes / (common.AddressLength + 1)
+			votes = make([]vote, voteCount)
+			for voteIdx := 0; voteIdx < voteCount; voteIdx++ {
+				// Get the address of the vote
+				index := params.CliqueExtraVanity + voteIdx*(common.AddressLength+1)
+				var address common.Address
+				copy(address[:], header.Extra[index:])
+				// Get the proposal of the vote
+				index += common.AddressLength
+				var proposal string
+				switch header.Extra[index] {
+				case params.CliqueExtraVoterVote:
+					proposal = "voter"
+				case params.CliqueExtraSignerVote:
+					proposal = "signer"
+				case params.CliqueExtraDropVote:
+					proposal = "drop"
+				default:
+					proposal = "unknown"
+				}
+				// Add the vote
+				votes[voteIdx] = vote{
+					Address:  address,
+					Proposal: proposal,
+				}
 			}
 		}
 	}
