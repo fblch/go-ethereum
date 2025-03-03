@@ -662,7 +662,10 @@ func (s *Service) reportBlock(conn *connWrapper, block *types.Block) error {
 	// Gather the block details from the header or block chain
 	details := s.assembleBlockStats(block)
 	// ADDED by Jakub Pajek (ethstats txcount bugfix)
+<<<<<<< HEAD
 	// Short circuit if the block detail is not available.
+=======
+>>>>>>> 486f1f908 (ethstats: bugfix transaction details not sent to ethstats server (cont.))
 	if details == nil {
 		return errors.New("block stats assembly failed")
 	}
