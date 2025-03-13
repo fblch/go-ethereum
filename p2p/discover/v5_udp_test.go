@@ -293,7 +293,7 @@ func TestUDPv5_findnodeCall(t *testing.T) {
 	)
 	go func() {
 		var err error
-		response, err = test.udp.findnode(remote, distances)
+		response, err = test.udp.Findnode(remote, distances)
 		done <- err
 	}()
 
@@ -403,7 +403,7 @@ func TestUDPv5_callTimeoutReset(t *testing.T) {
 		done     = make(chan error, 1)
 	)
 	go func() {
-		_, err := test.udp.findnode(remote, []uint{distance})
+		_, err := test.udp.Findnode(remote, []uint{distance})
 		done <- err
 	}()
 
