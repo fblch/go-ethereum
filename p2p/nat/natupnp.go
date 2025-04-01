@@ -86,7 +86,7 @@ func (n *upnp) AddMapping(protocol string, extport, intport int, desc string, li
 	/*
 		ip, err := n.internalAddress()
 		if err != nil {
-			return 0, nil // TODO: Shouldn't we return the error?
+			return 0, err
 		}
 	*/
 	var ip net.IP
@@ -94,7 +94,7 @@ func (n *upnp) AddMapping(protocol string, extport, intport int, desc string, li
 	if n.local == nil {
 		ip, err = n.internalAddress(false)
 		if err != nil {
-			return 0, nil // TODO: Shouldn't we return the error?
+			return 0, err
 		}
 	} else {
 		ip = n.local
@@ -110,14 +110,15 @@ func (n *upnp) AddMapping(protocol string, extport, intport int, desc string, li
 	if err == nil {
 		return uint16(extport), nil
 	}
-
-	return uint16(extport), n.withRateLimit(func() error {
+	// Try addAnyPortMapping if mapping specified port didn't work.
+	err = n.withRateLimit(func() error {
 		p, err := n.addAnyPortMapping(protocol, extport, intport, ip, desc, lifetimeS)
 		if err == nil {
 			extport = int(p)
 		}
 		return err
 	})
+	return uint16(extport), err
 }
 
 func (n *upnp) addAnyPortMapping(protocol string, extport, intport int, ip net.IP, desc string, lifetimeS uint32) (uint16, error) {
