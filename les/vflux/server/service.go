@@ -101,12 +101,16 @@ func (s *Server) Serve(id enode.ID, address string, requests vflux.Requests) vfl
 }
 
 // ServeEncoded serves an encoded vflux request batch and returns the encoded replies
-func (s *Server) ServeEncoded(id enode.ID, addr *net.UDPAddr, req []byte) []byte {
+// MODIFIED by Jakub Pajek (fix after p2p cherry-pick d2176f463b873567ff8982f362b843a898c429d1)
+// func (s *Server) ServeEncoded(id enode.ID, addr *net.UDPAddr, req []byte) []byte {
+func (s *Server) ServeEncoded(n *enode.Node, addr *net.UDPAddr, req []byte) []byte {
 	var requests vflux.Requests
 	if err := rlp.DecodeBytes(req, &requests); err != nil {
 		return nil
 	}
-	results := s.Serve(id, addr.String(), requests)
+	// MODIFIED by Jakub Pajek (fix after p2p cherry-pick d2176f463b873567ff8982f362b843a898c429d1)
+	//results := s.Serve(id, addr.String(), requests)
+	results := s.Serve(n.ID(), addr.String(), requests)
 	if results == nil {
 		return nil
 	}
