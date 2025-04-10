@@ -643,10 +643,7 @@ func (n *Node) StartSealer(passphrase string) error {
 
 // GetEthereumClient retrieves a client to access the Ethereum subsystem.
 func (n *Node) GetEthereumClient() (client *EthereumClient, _ error) {
-	rpc, err := n.node.Attach()
-	if err != nil {
-		return nil, err
-	}
+	rpc := n.node.Attach()
 	return &EthereumClient{ethclient.NewClient(rpc)}, nil
 }
 
