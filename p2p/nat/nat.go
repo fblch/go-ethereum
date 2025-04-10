@@ -66,27 +66,27 @@ type Interface interface {
 //	"upnp:<gw>,<local>"  uses the Universal Plug and Play protocol with given gateway and local addresses
 func Parse(spec string) (Interface, error) {
 	var (
-		parts = strings.SplitN(spec, ":", 2)
-		mech  = strings.ToLower(parts[0])
+		before, after, found = strings.Cut(spec, ":")
+		mech                 = strings.ToLower(before)
 		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
-		//ip    net.IP
+		//ip                   net.IP
 		ip, local net.IP
 	)
-	if len(parts) > 1 {
+	if found {
 		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		/*
-			ip = net.ParseIP(parts[1])
+			ip = net.ParseIP(after)
 			if ip == nil {
 				return nil, errors.New("invalid IP address")
 			}
 		*/
-		ipParts := strings.SplitN(parts[1], ",", 2)
-		ip = net.ParseIP(ipParts[0])
+		ipBefore, ipAfter, ipFound := strings.Cut(after, ",")
+		ip = net.ParseIP(ipBefore)
 		if ip == nil {
 			return nil, errors.New("invalid IP address")
 		}
-		if len(ipParts) > 1 {
-			local = net.ParseIP(ipParts[1])
+		if ipFound {
+			local = net.ParseIP(ipAfter)
 			if local == nil {
 				return nil, errors.New("invalid IP address")
 			}
@@ -122,7 +122,7 @@ func Parse(spec string) (Interface, error) {
 		//return PMP(ip), nil
 		return PMP(local, ip), nil
 	default:
-		return nil, fmt.Errorf("unknown mechanism %q", parts[0])
+		return nil, fmt.Errorf("unknown mechanism %q", before)
 	}
 }
 
