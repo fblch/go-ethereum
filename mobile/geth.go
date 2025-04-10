@@ -151,6 +151,10 @@ type NodeConfig struct {
 	NoDiscovery bool
 
 	// ADDED by Jakub Pajek
+	// DiscoveryV4 specifies whether V4 discovery should be started.
+	DiscoveryV4 bool
+
+	// ADDED by Jakub Pajek
 	// DiscoveryV5 specifies whether the new topic-discovery based V5 discovery
 	// protocol should be started or not.
 	DiscoveryV5 bool
@@ -206,7 +210,8 @@ var defaultNodeConfig = &NodeConfig{
 	TxLookupLimit:          int64(ethconfig.Defaults.TxLookupLimit),
 	ListenAddr:             ":0",
 	NAT:                    "any",
-	NoDiscovery:            true,
+	NoDiscovery:            false,
+	DiscoveryV4:            false,
 	DiscoveryV5:            true,
 	UseLightweightKDF:      false,
 	MinerGasLimit:          int64(ethconfig.Defaults.Miner.GasCeil),
@@ -302,6 +307,12 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	if config.NAT == "" {
 		config.NAT = defaultNodeConfig.NAT
 	}
+	if config.NoDiscovery && config.DiscoveryV4 {
+		return nil, errors.New("invalid config: NoDiscovery and DiscoveryV4 can not be set at the same time")
+	}
+	if config.NoDiscovery && config.DiscoveryV5 {
+		return nil, errors.New("invalid config: NoDiscovery and DiscoveryV5 can not be set at the same time")
+	}
 	if config.MinerGasLimit < 0 {
 		return nil, errors.New("invalid config: MinerGasLimit is negative")
 	} else if config.MinerGasLimit == 0 {
@@ -355,6 +366,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			ListenAddr:     config.ListenAddr,
 			NAT:            natif,
 			NoDiscovery:    config.NoDiscovery,
+			DiscoveryV4:    config.DiscoveryV4,
 			DiscoveryV5:    config.DiscoveryV5,
 			BootstrapNodes: config.BootstrapNodes.nodes,
 			// MODIFIED by Jakub Pajek END
