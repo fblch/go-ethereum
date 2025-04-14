@@ -70,6 +70,7 @@ type Ethereum struct {
 	// Handlers
 	handler *handler
 	discmix *enode.FairMix
+	dropper *dropper
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -233,6 +234,8 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}); err != nil {
 		return nil, err
 	}
+
+	eth.dropper = newDropper(eth.p2pServer.MaxDialedConns(), eth.p2pServer.MaxInboundConns())
 
 	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, eth.isLocalBlock)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
@@ -543,6 +546,10 @@ func (s *Ethereum) Start() error {
 	}
 	// Start the networking layer and the light server if requested
 	s.handler.Start(maxPeers)
+
+	// Start the connection manager
+	s.dropper.Start(s.p2pServer, func() bool { return !s.Synced() })
+
 	return nil
 }
 
@@ -583,6 +590,7 @@ func (s *Ethereum) setupDiscovery() error {
 func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.discmix.Close()
+	s.dropper.Stop()
 	s.handler.Stop()
 
 	// Then stop everything else.
