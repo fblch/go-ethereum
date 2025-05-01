@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	natpmp "github.com/jackpal/go-nat-pmp"
+	//natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 // Interface An implementation of nat.Interface can map local ports to ports
@@ -59,32 +59,68 @@ type Interface interface {
 //	"upnp"               uses the Universal Plug and Play protocol
 //	"pmp"                uses NAT-PMP with an auto-detected gateway address
 //	"pmp:192.168.0.1"    uses NAT-PMP with the given gateway address
+//
+// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+//
+//	"any:<gw>,<local>"   uses the first auto-detected mechanism with given gateway and local addresses
+//	"upnp:<gw>,<local>"  uses the Universal Plug and Play protocol with given gateway and local addresses
 func Parse(spec string) (Interface, error) {
 	var (
 		parts = strings.SplitN(spec, ":", 2)
 		mech  = strings.ToLower(parts[0])
-		ip    net.IP
+		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//ip    net.IP
+		ip, local net.IP
 	)
 	if len(parts) > 1 {
-		ip = net.ParseIP(parts[1])
+		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		/*
+			ip = net.ParseIP(parts[1])
+			if ip == nil {
+				return nil, errors.New("invalid IP address")
+			}
+		*/
+		ipParts := strings.SplitN(parts[1], ",", 2)
+		ip = net.ParseIP(ipParts[0])
 		if ip == nil {
 			return nil, errors.New("invalid IP address")
 		}
+		if len(ipParts) > 1 {
+			local = net.ParseIP(ipParts[1])
+			if local == nil {
+				return nil, errors.New("invalid IP address")
+			}
+		}
+		// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	}
 	switch mech {
 	case "", "none", "off":
 		return nil, nil
 	case "any", "auto", "on":
-		return Any(), nil
+		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//return Any(), nil
+		if ip != nil && local == nil {
+			return nil, errors.New("missing IP address")
+		}
+		return Any(local, ip), nil
+		// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	case "extip", "ip":
 		if ip == nil {
 			return nil, errors.New("missing IP address")
 		}
 		return ExtIP(ip), nil
 	case "upnp":
-		return UPnP(), nil
+		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//return UPnP(), nil
+		if ip != nil && local == nil {
+			return nil, errors.New("missing IP address")
+		}
+		return UPnP(local, ip), nil
+		// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	case "pmp", "natpmp", "nat-pmp":
-		return PMP(ip), nil
+		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//return PMP(ip), nil
+		return PMP(local, ip), nil
 	default:
 		return nil, fmt.Errorf("unknown mechanism %q", parts[0])
 	}
@@ -140,13 +176,22 @@ func (ExtIP) DeleteMapping(string, int, int) error                     { return 
 
 // Any returns a port mapper that tries to discover any supported
 // mechanism on the local network.
-func Any() Interface {
+
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func Any() Interface {
+func Any(local, gateway net.IP) Interface {
 	// TODO: attempt to discover whether the local machine has an
 	// Internet-class address. Return ExtIP in this case.
-	return startautodisc("UPnP or NAT-PMP", func() Interface {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//return startautodisc("UPnP or NAT-PMP", func() Interface {
+	return startautodisc("UPnP or NAT-PMP", local, gateway, func(local, gateway net.IP) Interface {
 		found := make(chan Interface, 2)
-		go func() { found <- discoverUPnP() }()
-		go func() { found <- discoverPMP() }()
+		// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//go func() { found <- discoverUPnP() }()
+		//go func() { found <- discoverPMP() }()
+		go func() { found <- discoverUPnP(local, gateway) }()
+		go func() { found <- discoverPMP(local, gateway) }()
+		// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 		for i := 0; i < cap(found); i++ {
 			if c := <-found; c != nil {
 				return c
@@ -158,18 +203,30 @@ func Any() Interface {
 
 // UPnP returns a port mapper that uses UPnP. It will attempt to
 // discover the address of your router using UDP broadcasts.
-func UPnP() Interface {
-	return startautodisc("UPnP", discoverUPnP)
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func UPnP() Interface {
+func UPnP(local, gateway net.IP) Interface {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//return startautodisc("UPnP", discoverUPnP)
+	return startautodisc("UPnP", local, gateway, discoverUPnP)
 }
 
 // PMP returns a port mapper that uses NAT-PMP. The provided gateway
 // address should be the IP of your router. If the given gateway
 // address is nil, PMP will attempt to auto-discover the router.
-func PMP(gateway net.IP) Interface {
-	if gateway != nil {
-		return &pmp{gw: gateway, c: natpmp.NewClient(gateway)}
-	}
-	return startautodisc("NAT-PMP", discoverPMP)
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func PMP(gateway net.IP) Interface {
+func PMP(local, gateway net.IP) Interface {
+	// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	/*
+		if gateway != nil {
+			return &pmp{gw: gateway, c: natpmp.NewClient(gateway)}
+		}
+		return startautodisc("NAT-PMP", discoverPMP)
+	*/
+	// Always use discoverPMP because it enforces a short timeout
+	return startautodisc("NAT-PMP", local, gateway, discoverPMP)
+	// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 }
 
 // autodisc represents a port mapping mechanism that is still being
@@ -181,16 +238,24 @@ func PMP(gateway net.IP) Interface {
 // want return an Interface value from UPnP, PMP and Auto immediately.
 type autodisc struct {
 	what string // type of interface being autodiscovered
-	once sync.Once
-	doit func() Interface
+	// ADDED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	local, gateway net.IP
+	once           sync.Once
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	// doit    func() Interface
+	doit func(net.IP, net.IP) Interface
 
 	mu    sync.Mutex
 	found Interface
 }
 
-func startautodisc(what string, doit func() Interface) Interface {
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func startautodisc(what string, doit func() Interface) Interface {
+func startautodisc(what string, local, gateway net.IP, doit func(net.IP, net.IP) Interface) Interface {
 	// TODO: monitor network configuration and rerun doit when it changes.
-	return &autodisc{what: what, doit: doit}
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//return &autodisc{what: what, doit: doit}
+	return &autodisc{what: what, local: local, gateway: gateway, doit: doit}
 }
 
 func (n *autodisc) AddMapping(protocol string, extport, intport int, name string, lifetime time.Duration) error {
@@ -227,7 +292,9 @@ func (n *autodisc) String() string {
 func (n *autodisc) wait() error {
 	n.once.Do(func() {
 		n.mu.Lock()
-		n.found = n.doit()
+		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//n.found = n.doit()
+		n.found = n.doit(n.local, n.gateway)
 		n.mu.Unlock()
 	})
 	if n.found == nil {

@@ -62,7 +62,9 @@ var DefaultConfig = Config{
 	P2P: p2p.Config{
 		ListenAddr: ":30303",
 		MaxPeers:   50,
-		NAT:        nat.Any(),
+		// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+		//NAT:        nat.Any(),
+		NAT: nat.Any(nil, nil),
 	},
 	DBEngine: "",
 }

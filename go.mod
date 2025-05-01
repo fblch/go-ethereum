@@ -37,7 +37,8 @@ require (
 	github.com/hashicorp/go-bexpr v0.1.10
 	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/holiman/uint256 v1.2.2-0.20230321075855-87b91420868c
-	github.com/huin/goupnp v1.0.3
+	//github.com/huin/goupnp v1.0.3
+	github.com/huin/goutil v0.0.0-20170803182201-1ca381bf3150
 	github.com/influxdata/influxdb-client-go/v2 v2.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/jackpal/go-nat-pmp v1.0.2

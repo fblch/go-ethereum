@@ -76,9 +76,19 @@ func (n *pmp) DeleteMapping(protocol string, extport, intport int) (err error) {
 	return err
 }
 
-func discoverPMP() Interface {
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func discoverPMP() Interface {
+func discoverPMP(_, gateway net.IP) Interface {
 	// run external address lookups on all potential gateways
-	gws := potentialGateways()
+	// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//gws := potentialGateways()
+	var gws []net.IP
+	if gateway != nil {
+		gws = append(gws, gateway)
+	} else {
+		gws = potentialGateways(false)
+	}
+	// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	found := make(chan *pmp, len(gws))
 	for i := range gws {
 		gw := gws[i]
@@ -111,7 +121,9 @@ func discoverPMP() Interface {
 
 // TODO: improve this. We currently assume that (on most networks)
 // the router is X.X.X.1 in a local LAN range.
-func potentialGateways() (gws []net.IP) {
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func potentialGateways() (gws []net.IP) {
+func potentialGateways(dummy bool) (gws []net.IP) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil

@@ -26,7 +26,9 @@ import (
 // consistent results when multiple goroutines call its methods
 // concurrently.
 func TestAutoDiscRace(t *testing.T) {
-	ad := startautodisc("thing", func() Interface {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//ad := startautodisc("thing", func() Interface {
+	ad := startautodisc("thing", nil, nil, func(net.IP, net.IP) Interface {
 		time.Sleep(500 * time.Millisecond)
 		return ExtIP{33, 44, 55, 66}
 	})

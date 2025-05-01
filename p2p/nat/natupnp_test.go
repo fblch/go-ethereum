@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/huin/goupnp/httpu"
+	"github.com/ethereum/go-ethereum/p2p/nat/goupnp/httpu"
 )
 
 func TestUPNP_DDWRT(t *testing.T) {
@@ -161,7 +161,9 @@ func TestUPNP_DDWRT(t *testing.T) {
 	defer dev.close()
 
 	// Attempt to discover the fake device.
-	discovered := discoverUPnP()
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//discovered := discoverUPnP()
+	discovered := discoverUPnP(nil, nil)
 	if discovered == nil {
 		if os.Getenv("CI") != "" {
 			t.Fatalf("not discovered")

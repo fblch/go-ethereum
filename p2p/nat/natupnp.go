@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/huin/goupnp"
-	"github.com/huin/goupnp/dcps/internetgateway1"
-	"github.com/huin/goupnp/dcps/internetgateway2"
+	"github.com/ethereum/go-ethereum/p2p/nat/goupnp"
+	"github.com/ethereum/go-ethereum/p2p/nat/goupnp/dcps/internetgateway1"
+	"github.com/ethereum/go-ethereum/p2p/nat/goupnp/dcps/internetgateway2"
 )
 
 const (
@@ -35,6 +35,8 @@ const (
 )
 
 type upnp struct {
+	// ADDED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	local       net.IP
 	dev         *goupnp.RootDevice
 	service     string
 	client      upnpClient
@@ -77,10 +79,24 @@ func (n *upnp) ExternalIP() (addr net.IP, err error) {
 }
 
 func (n *upnp) AddMapping(protocol string, extport, intport int, desc string, lifetime time.Duration) error {
-	ip, err := n.internalAddress()
-	if err != nil {
-		return nil // TODO: Shouldn't we return the error?
+	// MODIFIED by Jakub Pajek BEG (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	/*
+		ip, err := n.internalAddress()
+		if err != nil {
+			return nil // TODO: Shouldn't we return the error?
+		}
+	*/
+	var ip net.IP
+	if n.local == nil {
+		var err error
+		ip, err = n.internalAddress(false)
+		if err != nil {
+			return nil // TODO: Shouldn't we return the error?
+		}
+	} else {
+		ip = n.local
 	}
+	// MODIFIED by Jakub Pajek END (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
 	protocol = strings.ToUpper(protocol)
 	lifetimeS := uint32(lifetime / time.Second)
 	n.DeleteMapping(protocol, extport, intport)
@@ -90,7 +106,9 @@ func (n *upnp) AddMapping(protocol string, extport, intport int, desc string, li
 	})
 }
 
-func (n *upnp) internalAddress() (net.IP, error) {
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func (n *upnp) internalAddress() (net.IP, error) {
+func (n *upnp) internalAddress(dummy bool) (net.IP, error) {
 	devaddr, err := net.ResolveUDPAddr("udp4", n.dev.URLBase.Host)
 	if err != nil {
 		return nil, err
@@ -138,27 +156,43 @@ func (n *upnp) withRateLimit(fn func() error) error {
 
 // discoverUPnP searches for Internet Gateway Devices
 // and returns the first one it can find on the local network.
-func discoverUPnP() Interface {
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func discoverUPnP() Interface {
+func discoverUPnP(local net.IP, gateway net.IP) Interface {
 	found := make(chan *upnp, 2)
 	// IGDv1
-	go discover(found, internetgateway1.URN_WANConnectionDevice_1, func(sc goupnp.ServiceClient) *upnp {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//go discover(found, internetgateway1.URN_WANConnectionDevice_1, func(sc goupnp.ServiceClient) *upnp {
+	go discover(found, local, gateway, internetgateway1.URN_WANConnectionDevice_1, func(sc goupnp.ServiceClient) *upnp {
 		switch sc.Service.ServiceType {
 		case internetgateway1.URN_WANIPConnection_1:
-			return &upnp{service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
+			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+			//return &upnp{service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, service: "IGDv1-IP1", client: &internetgateway1.WANIPConnection1{ServiceClient: sc}}
 		case internetgateway1.URN_WANPPPConnection_1:
-			return &upnp{service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
+			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+			//return &upnp{service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, service: "IGDv1-PPP1", client: &internetgateway1.WANPPPConnection1{ServiceClient: sc}}
 		}
 		return nil
 	})
 	// IGDv2
-	go discover(found, internetgateway2.URN_WANConnectionDevice_2, func(sc goupnp.ServiceClient) *upnp {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	//go discover(found, internetgateway2.URN_WANConnectionDevice_2, func(sc goupnp.ServiceClient) *upnp {
+	go discover(found, local, gateway, internetgateway2.URN_WANConnectionDevice_2, func(sc goupnp.ServiceClient) *upnp {
 		switch sc.Service.ServiceType {
 		case internetgateway2.URN_WANIPConnection_1:
-			return &upnp{service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
+			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+			//return &upnp{service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, service: "IGDv2-IP1", client: &internetgateway2.WANIPConnection1{ServiceClient: sc}}
 		case internetgateway2.URN_WANIPConnection_2:
-			return &upnp{service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
+			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+			//return &upnp{service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
+			return &upnp{local: local, service: "IGDv2-IP2", client: &internetgateway2.WANIPConnection2{ServiceClient: sc}}
 		case internetgateway2.URN_WANPPPConnection_1:
-			return &upnp{service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
+			// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+			//return &upnp{service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
+			return &upnp{local: local, service: "IGDv2-PPP1", client: &internetgateway2.WANPPPConnection1{ServiceClient: sc}}
 		}
 		return nil
 	})
@@ -173,8 +207,12 @@ func discoverUPnP() Interface {
 // finds devices matching the given target and calls matcher for all
 // advertised services of each device. The first non-nil service found
 // is sent into out. If no service matched, nil is sent.
-func discover(out chan<- *upnp, target string, matcher func(goupnp.ServiceClient) *upnp) {
-	devs, err := goupnp.DiscoverDevices(target)
+// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+// func discover(out chan<- *upnp, target string, matcher func(goupnp.ServiceClient) *upnp) {
+func discover(out chan<- *upnp, local, _ net.IP, target string, matcher func(goupnp.ServiceClient) *upnp) {
+	// MODIFIED by Jakub Pajek (x/mobile: Calling net.Interfaces() fails on Android SDK 30+)
+	// devs, err := goupnp.DiscoverDevices(target)
+	devs, err := goupnp.DiscoverDevices(local, target)
 	if err != nil {
 		out <- nil
 		return
