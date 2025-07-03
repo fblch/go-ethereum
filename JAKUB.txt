@@ -1,3 +1,6 @@
 Jakub Test
 
+cmd/bootnode: merged updates from upstream up to v1.15.0
+    - cmd/bootnode removed from upstream at commit 53f66c1b03d5880fa807e088c865b31d144fabd0
+
 p2p: merged updates from upstream up to v1.15.11
