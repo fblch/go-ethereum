@@ -32,6 +32,7 @@ type NodeInfo struct {
 func (ni *NodeInfo) GetID() string              { return ni.info.ID }
 func (ni *NodeInfo) GetName() string            { return ni.info.Name }
 func (ni *NodeInfo) GetEnode() string           { return ni.info.Enode }
+func (ni *NodeInfo) GetENR() string             { return ni.info.ENR }
 func (ni *NodeInfo) GetIP() string              { return ni.info.IP }
 func (ni *NodeInfo) GetDiscoveryPort() int      { return ni.info.Ports.Discovery }
 func (ni *NodeInfo) GetListenerPort() int       { return ni.info.Ports.Listener }
@@ -51,16 +52,21 @@ type PeerInfo struct {
 
 func (pi *PeerInfo) GetID() string            { return pi.info.ID }
 func (pi *PeerInfo) GetName() string          { return pi.info.Name }
+func (pi *PeerInfo) GetEnode() string         { return pi.info.Enode }
+func (pi *PeerInfo) GetENR() string           { return pi.info.ENR }
 func (pi *PeerInfo) GetCaps() *Strings        { return &Strings{pi.info.Caps} }
 func (pi *PeerInfo) GetLocalAddress() string  { return pi.info.Network.LocalAddress }
 func (pi *PeerInfo) GetRemoteAddress() string { return pi.info.Network.RemoteAddress }
-
-// ADDED by Jakub Pajek BEG
-func (pi *PeerInfo) GetIsInbound() bool { return pi.info.Network.Inbound }
-func (pi *PeerInfo) GetIsTrusted() bool { return pi.info.Network.Trusted }
-func (pi *PeerInfo) GetIsStatic() bool  { return pi.info.Network.Static }
-
-// ADDED by Jakub Pajek END
+func (pi *PeerInfo) GetIsInbound() bool       { return pi.info.Network.Inbound }
+func (pi *PeerInfo) GetIsTrusted() bool       { return pi.info.Network.Trusted }
+func (pi *PeerInfo) GetIsStatic() bool        { return pi.info.Network.Static }
+func (pi *PeerInfo) GetProtocols() *Strings {
+	protos := []string{}
+	for proto := range pi.info.Protocols {
+		protos = append(protos, proto)
+	}
+	return &Strings{protos}
+}
 
 // PeerInfos represents a slice of infos about remote peers.
 type PeerInfos struct {
