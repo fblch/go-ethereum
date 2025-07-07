@@ -344,3 +344,12 @@ func (s *p2pDebugAPI) DiscoveryV4Table() [][]discover.BucketNode {
 	}
 	return nil
 }
+
+// ADDED by Jakub Pajek
+func (s *p2pDebugAPI) DiscoveryV5Table() [][]discover.BucketNode {
+	disc := s.stack.server.DiscoveryV5()
+	if disc != nil {
+		return disc.Nodes()
+	}
+	return nil
+}
