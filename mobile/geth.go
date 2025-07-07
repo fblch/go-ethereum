@@ -675,6 +675,26 @@ func (n *Node) GetPeersInfo() *PeerInfos {
 }
 
 // ADDED by Jakub Pajek
+// GetDiscoveryV4Table returns discovery V4 protocol's table
+func (n *Node) GetDiscoveryV4Table() *DiscoveryTable {
+	disc := n.node.Server().DiscoveryV4()
+	if disc != nil {
+		return &DiscoveryTable{disc.TableBuckets()}
+	}
+	return nil
+}
+
+// ADDED by Jakub Pajek
+// GetDiscoveryV5Table returns discovery V5 protocol's table
+func (n *Node) GetDiscoveryV5Table() *DiscoveryTable {
+	disc := n.node.Server().DiscoveryV5()
+	if disc != nil {
+		return &DiscoveryTable{disc.Nodes()}
+	}
+	return nil
+}
+
+// ADDED by Jakub Pajek
 // HasSealerAccount reports whether the sealer account (first account) is present.
 func (n *Node) HasSealerAccount() bool {
 	ks := n.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)

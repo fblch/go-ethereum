@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
 // NodeInfo represents pi short summary of the information known about the host.
@@ -84,4 +85,56 @@ func (pi *PeerInfos) Get(index int) (info *PeerInfo, _ error) {
 		return nil, errors.New("index out of bounds")
 	}
 	return &PeerInfo{pi.infos[index]}, nil
+}
+
+// DiscoveryNode represents a node entry in the discovery table.
+type DiscoveryNode struct {
+	node discover.BucketNode
+}
+
+func (dn *DiscoveryNode) GetNode() string          { return dn.node.Node.String() }
+func (dn *DiscoveryNode) GetNodeID() string        { return dn.node.Node.ID().String() }
+func (dn *DiscoveryNode) GetNodeHostname() string  { return dn.node.Node.Hostname() }
+func (dn *DiscoveryNode) GetNodeIP() string        { return dn.node.Node.IPAddr().String() }
+func (dn *DiscoveryNode) GetNodeUDP() int          { return dn.node.Node.UDP() }
+func (dn *DiscoveryNode) GetNodeTCP() int          { return dn.node.Node.TCP() }
+func (dn *DiscoveryNode) GetAddedToTable() string  { return dn.node.AddedToTable.String() }
+func (dn *DiscoveryNode) GetAddedToBucket() string { return dn.node.AddedToBucket.String() }
+func (dn *DiscoveryNode) GetChecks() int           { return dn.node.Checks }
+func (dn *DiscoveryNode) GetLive() bool            { return dn.node.Live }
+
+// DiscoveryBucket represents a slice of nodes in a discovery bucket.
+type DiscoveryBucket struct {
+	nodes []discover.BucketNode
+}
+
+// Size returns the number of node entries in the discovery bucket.
+func (db *DiscoveryBucket) Size() int {
+	return len(db.nodes)
+}
+
+// Get returns the node at the given index from the discovery bucket.
+func (db *DiscoveryBucket) Get(index int) (node *DiscoveryNode, _ error) {
+	if index < 0 || index >= len(db.nodes) {
+		return nil, errors.New("index out of bounds")
+	}
+	return &DiscoveryNode{db.nodes[index]}, nil
+}
+
+// DiscoveryTable represents a slice of buckets in a discovery table.
+type DiscoveryTable struct {
+	buckets [][]discover.BucketNode
+}
+
+// Size returns the number of bucket entries in the discovery table.
+func (dt *DiscoveryTable) Size() int {
+	return len(dt.buckets)
+}
+
+// Get returns the bucket at the given index from the discovery table.
+func (dt *DiscoveryTable) Get(index int) (nodes *DiscoveryBucket, _ error) {
+	if index < 0 || index >= len(dt.buckets) {
+		return nil, errors.New("index out of bounds")
+	}
+	return &DiscoveryBucket{dt.buckets[index]}, nil
 }
