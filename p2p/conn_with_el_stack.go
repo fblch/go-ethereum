@@ -6,6 +6,8 @@ package p2p
 
 import (
 	"fmt"
+	"net"
+	"net/netip"
 	"os"
 	"strconv"
 
@@ -52,10 +54,44 @@ func readFileOrEmpty(path string) []byte {
 	return b
 }
 
+type ElStackUdpConn struct {
+	*el_stack.ElStackUdpConn
+}
+
+func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
+    if raw == nil {
+        return nil // ラッパーの「非存在」を素直に表現
+    }
+    return &ElStackUdpConn{ElStackUdpConn: raw}
+}
+
+func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
+    if c == nil { // ラッパー自体が nil のときに備える
+        return nil
+    }
+    return c.ElStackUdpConn
+}
+
+func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	n, udpAddr, err := c.ReadFromUDP(b)
+	// 返ってきたudpAddrがnilの場合、空のnetip.AddrPor{}を返す
+	if udpAddr == nil {
+		return n, netip.AddrPort{}, err
+	}
+	return n, udpAddr.AddrPort(), err
+}
+
+
+func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
+	// netip.AddrPortをnet.UDPAddrに変換
+	addr2 := net.UDPAddrFromAddrPort(addr)
+	return c.WriteToUDP(b, addr2)
+}
+
 // WisteriaVpnEventDelegate 実装
 type vpnDelegate struct {
 	core *el_stack.ElStackCore
-	conn *el_stack.ElStackUdpConn
+	conn *ElStackUdpConn	// *el_stack.ElStackUdpConn wrapper
 	done chan struct{}
 }
 
@@ -82,7 +118,9 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 		}
 
 		conn := el_stack.NewElStackUdpConn(socket)
-		d.conn = conn
+		// *el_stack.ElStackUdpConn型をラッパー用の型であるElStackUdpConnに変換
+		wrappedConn := wrap(conn)
+		d.conn = wrappedConn
 		d.done <-struct{}{}
 		// defer conn.Close()
 
@@ -106,7 +144,7 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	}()
 }
 
-func ListenElUDP(conn chan *el_stack.ElStackUdpConn) {
+func ListenElUDP(conn chan *ElStackUdpConn) {
 	// 環境変数から各種値を取得
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
@@ -142,6 +180,7 @@ func ListenElUDP(conn chan *el_stack.ElStackUdpConn) {
 		return
 	}
 	defer core.Stop()
+	defer delegate.conn.Close()
 
 	<-delegate.done
 	conn <-delegate.conn

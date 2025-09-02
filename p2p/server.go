@@ -21,10 +21,10 @@ import (
 	"bytes"
 	"cmp"
 	"crypto/ecdsa"
-	"el_stack"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"sync"
@@ -338,28 +338,73 @@ func (srv *Server) Stop() {
 
 // sharedUDPConn implements a shared connection. Write sends messages to the underlying connection while read returns
 // messages that were found unprocessable and sent to the unhandled channel by the primary listener.
+// type sharedUDPConn struct {
+// 	*net.UDPConn
+// 	unhandled chan discover.ReadPacket
+// }
+
+// // ReadFromUDPAddrPort implements discover.UDPConn
+// func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+// 	packet, ok := <-s.unhandled
+// 	if !ok {
+// 		return 0, netip.AddrPort{}, errors.New("connection was closed")
+// 	}
+// 	l := len(packet.Data)
+// 	if l > len(b) {
+// 		l = len(b)
+// 	}
+// 	copy(b[:l], packet.Data[:l])
+// 	return l, packet.Addr, nil
+// }
+
+// // Close implements discover.UDPConn
+// func (s *sharedUDPConn) Close() error {
+// 	return nil
+// }
+
+type UDP interface {
+    ReadFromUDPAddrPort([]byte) (int, netip.AddrPort, error)
+    WriteToUDPAddrPort([]byte, netip.AddrPort) (int, error)
+    SetReadDeadline(time.Time) error
+    Close() error
+}
+
+type ReadPacket struct {
+    Data []byte
+    Addr netip.AddrPort
+}
+
 type sharedUDPConn struct {
-	*net.UDPConn
-	unhandled chan discover.ReadPacket
+    udp       UDP                    // ★ ここをインターフェースに
+    unhandled chan ReadPacket        // 主系が捌けなかったパケットが流れてくる
 }
 
-// ReadFromUDPAddrPort implements discover.UDPConn
-func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	packet, ok := <-s.unhandled
-	if !ok {
-		return 0, netip.AddrPort{}, errors.New("connection was closed")
-	}
-	l := len(packet.Data)
-	if l > len(b) {
-		l = len(b)
-	}
-	copy(b[:l], packet.Data[:l])
-	return l, packet.Addr, nil
+func NewShared(udp UDP, bufN int) *sharedUDPConn {
+    return &sharedUDPConn{
+        udp:       udp,
+        unhandled: make(chan ReadPacket, bufN),
+    }
 }
 
-// Close implements discover.UDPConn
-func (s *sharedUDPConn) Close() error {
-	return nil
+// 読み取り：unhandled から取り出して返す
+func (c *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (int, netip.AddrPort, error) {
+    pkt, ok := <-c.unhandled
+    if !ok {
+        return 0, netip.AddrPort{}, io.EOF
+    }
+    n := copy(b, pkt.Data)
+    return n, pkt.Addr, nil
+}
+
+// 書き込み：下位に委譲
+func (c *sharedUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (int, error) {
+    return c.udp.WriteToUDPAddrPort(b, ap)
+}
+
+func (c *sharedUDPConn) SetReadDeadline(t time.Time) error { return c.udp.SetReadDeadline(t) }
+func (c *sharedUDPConn) Close() error                       { close(c.unhandled); return c.udp.Close() }
+func (c *sharedUDPConn) LocalAddr() net.Addr {
+	return c.udp.LocalAddr
 }
 
 // Start starts running the server.
@@ -476,6 +521,7 @@ func (srv *Server) setupDiscovery() error {
 	// connection, so v5 can read unhandled messages from v4.
 	if srv.Config.DiscoveryV4 && srv.Config.DiscoveryV5 {
 		unhandled = make(chan discover.ReadPacket, 100)
+		// sconn = &sharedUDPConn{conn, unhandled}
 		sconn = &sharedUDPConn{conn, unhandled}
 	}
 
@@ -617,7 +663,7 @@ func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 	return conn, nil
 }
 
-func (srv *Server) setupElUDPListening() (*el_stack.ElStackUdpConn, error) {
+func (srv *Server) setupElUDPListening() (*ElStackUdpConn, error) {
 	// listenAddr := srv.ListenAddr
 
 	// // Use an alternate listening address for UDP if
@@ -648,8 +694,8 @@ func (srv *Server) setupElUDPListening() (*el_stack.ElStackUdpConn, error) {
 	return conn, nil
 }
 
-func (srv *Server) listenElUDP() *el_stack.ElStackUdpConn {
-	connCh := make(chan *el_stack.ElStackUdpConn)
+func (srv *Server) listenElUDP() *ElStackUdpConn {
+	connCh := make(chan *ElStackUdpConn)
 	go ListenElUDP(connCh)
 	conn := <-connCh
 	return conn
