@@ -5,14 +5,15 @@ package p2p
 // #include <el_stack.h>
 
 import (
-    "fmt"
-    "net"
-    "net/netip"
-    "os"
-    "strconv"
+	"fmt"
+	"net"
+	"net/netip"
+	"os"
+	"strconv"
 
-    "el_stack"
-    "github.com/ethereum/go-ethereum/log"
+	"el_stack"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var elLog = log.Root().New("cmp", "p2p/el_stack")
@@ -62,130 +63,140 @@ type ElStackUdpConn struct {
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
-    if raw == nil {
-        return nil // ラッパーの「非存在」を素直に表現
-    }
-    return &ElStackUdpConn{ElStackUdpConn: raw}
+	if raw == nil {
+		return nil // ラッパーの「非存在」を素直に表現
+	}
+	return &ElStackUdpConn{ElStackUdpConn: raw}
 }
 
 func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
-    if c == nil { // ラッパー自体が nil のときに備える
-        return nil
-    }
-    return c.ElStackUdpConn
+	if c == nil { // ラッパー自体が nil のときに備える
+		return nil
+	}
+	return c.ElStackUdpConn
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-    n, udpAddr, err := c.ReadFromUDP(b)
-    if err != nil {
-        elLog.Debug("ElUDP ReadFromUDP error", "err", err)
-    }
-    // 返ってきたudpAddrがnilの場合、空のnetip.AddrPor{}を返す
-    if udpAddr == nil {
-        elLog.Debug("ElUDP ReadFromUDP got nil addr", "n", n)
-        return n, netip.AddrPort{}, err
-    }
-    elLog.Debug("ElUDP ReadFromUDP", "n", n, "from", udpAddr.String())
-    return n, udpAddr.AddrPort(), err
+	n, udpAddr, err := c.ReadFromUDP(b)
+	if err != nil {
+		elLog.Debug("ElUDP ReadFromUDP error", "err", err)
+	}
+	// 返ってきたudpAddrがnilの場合、空のnetip.AddrPor{}を返す
+	if udpAddr == nil {
+		elLog.Debug("ElUDP ReadFromUDP got nil addr", "n", n)
+		return n, netip.AddrPort{}, err
+	}
+	elLog.Debug("ElUDP ReadFromUDP", "n", n, "from", udpAddr.String())
+	return n, udpAddr.AddrPort(), err
 }
 
-
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-    // netip.AddrPortをnet.UDPAddrに変換
-    addr2 := net.UDPAddrFromAddrPort(addr)
-    n, err = c.WriteToUDP(b, addr2)
-    if err != nil {
-        elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
-    } else {
-        elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
-    }
-    return n, err
+	// netip.AddrPortをnet.UDPAddrに変換
+	addr2 := net.UDPAddrFromAddrPort(addr)
+	n, err = c.WriteToUDP(b, addr2)
+	if err != nil {
+		elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
+	} else {
+		elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
+	}
+	return n, err
 }
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-    elLog.Debug("ElUDP Close called")
-    u := c.underlying()
-    if u == nil {
-        return nil
-    }
-    return u.Close()
+	elLog.Debug("ElUDP Close called")
+	u := c.underlying()
+	if u == nil {
+		return nil
+	}
+	return u.Close()
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
-    u := c.underlying()
-    if u == nil {
-        elLog.Debug("ElUDP LocalAddr", "addr", "<nil>")
-        return nil
-    }
-    a := u.LocalAddr()
-    elLog.Debug("ElUDP LocalAddr", "addr", func() string { if a != nil { return a.String() } ; return "<nil>" }())
-    return a
+	u := c.underlying()
+	if u == nil {
+		elLog.Debug("ElUDP LocalAddr", "addr", "<nil>")
+		return nil
+	}
+	a := u.LocalAddr()
+	elLog.Debug("ElUDP LocalAddr", "addr", func() string {
+		if a != nil {
+			return a.String()
+		}
+		return "<nil>"
+	}())
+	return a
 }
 
 // WisteriaVpnEventDelegate 実装
 type vpnDelegate struct {
-	core *el_stack.ElStackCore
-	conn *ElStackUdpConn	// *el_stack.ElStackUdpConn wrapper
-	done chan struct{}
+    core *el_stack.ElStackCore
+    conn *ElStackUdpConn // *el_stack.ElStackUdpConn wrapper
+    done chan struct{}
+    // preferred UDP bind port provided by server (0 means auto)
+    preferPort int
 }
 
 func (d *vpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
-    fmt.Println("Status:", status)
-    elLog.Debug("VPN Status", "status", status)
+	fmt.Println("Status:", status)
+	elLog.Debug("VPN Status", "status", status)
 }
 
 func (d *vpnDelegate) OnConnectionError(msg string) {
-    fmt.Println("Connection error:", msg)
-    elLog.Debug("VPN Connection error", "msg", msg)
+	fmt.Println("Connection error:", msg)
+	elLog.Debug("VPN Connection error", "msg", msg)
 }
 
 func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
-    fmt.Println("IP:", ipAddrs)
-    fmt.Println("DNS:", dnsAddrs)
-    fmt.Println("Routes:", routes)
-    elLog.Debug("VPN LinkedParams", "ips", ipAddrs, "dns", dnsAddrs, "routes", routes)
+	fmt.Println("IP:", ipAddrs)
+	fmt.Println("DNS:", dnsAddrs)
+	fmt.Println("Routes:", routes)
+	elLog.Debug("VPN LinkedParams", "ips", ipAddrs, "dns", dnsAddrs, "routes", routes)
 
-    go func() {
-        // UDPソケットを取得
-        // BIND_ADDRが"auto"または未設定なら、付与されたIPv4の最初のアドレスに:0でバインド
-        bindCfg := getEnvOrDefault("BIND_ADDR", "auto")
-        bindAddr := bindCfg
+	go func() {
+		// UDPソケットを取得
+		// BIND_ADDRが"auto"または未設定なら、付与されたIPv4の最初のアドレスに:0でバインド
+		bindCfg := getEnvOrDefault("BIND_ADDR", "auto")
+		bindAddr := bindCfg
         if bindCfg == "auto" {
-            // ipAddrsの中からIPv4を優先して選ぶ
-            chosen := ""
-            for _, ip := range ipAddrs {
-                if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
-                    chosen = ip
-                    break
-                }
-            }
-            if chosen == "" && len(ipAddrs) > 0 {
-                chosen = ipAddrs[0] // IPv4が無ければ最初のもの
-            }
+			// ipAddrsの中からIPv4を優先して選ぶ
+			chosen := ""
+			for _, ip := range ipAddrs {
+				if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
+					chosen = ip
+					break
+				}
+			}
+			if chosen == "" && len(ipAddrs) > 0 {
+				chosen = ipAddrs[0] // IPv4が無ければ最初のもの
+			}
             if chosen == "" {
                 fmt.Println("No IP assigned by VPN; cannot bind UDP")
                 elLog.Debug("No VPN IP available for UDP bind")
                 return
             }
-            bindAddr = chosen + ":0"
+            port := 0
+            if d.preferPort > 0 {
+                port = d.preferPort
+            }
+            bindAddr = fmt.Sprintf("%s:%d", chosen, port)
         }
-        fmt.Println("Binding UDP via el_stack to:", bindAddr)
-        elLog.Debug("ElUDP Binding", "bind", bindAddr)
-        socket, err2 := d.core.UdpBind(bindAddr)
-        if err2 != nil {
-            fmt.Println("Udp bind failed:", err2)
-            elLog.Debug("ElUDP Bind failed", "err", err2)
-            return
-        }
+		fmt.Println("Binding UDP via el_stack to:", bindAddr)
+		elLog.Debug("ElUDP Binding", "bind", bindAddr)
+		socket, err2 := d.core.UdpBind(bindAddr)
+		if err2 != nil {
+			fmt.Println("Udp bind failed:", err2)
+			elLog.Debug("ElUDP Bind failed", "err", err2)
+			return
+		}
 
-        conn := el_stack.NewElStackUdpConn(socket)
-        // *el_stack.ElStackUdpConn型をラッパー用の型であるElStackUdpConnに変換
-        wrappedConn := wrap(conn)
-        d.conn = wrappedConn
-        elLog.Debug("ElUDP conn ready, signaling done")
-        d.done <-struct{}{}
-        // defer conn.Close()
+		conn := el_stack.NewElStackUdpConn(socket)
+		// *el_stack.ElStackUdpConn型をラッパー用の型であるElStackUdpConnに変換
+		wrappedConn := wrap(conn)
+		d.conn = wrappedConn
+		elLog.Debug("ElUDP conn ready, signaling done")
+		d.done <- struct{}{}
+		// defer conn.Close()
 
 		// for {
 		// 	buf := make([]byte, 1500)
@@ -207,7 +218,7 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	}()
 }
 
-func ListenElUDP(srv *Server, conn chan *ElStackUdpConn) {
+func ListenElUDP(srv *Server, conn chan *ElStackUdpConn, preferPort int) {
 	// 環境変数から各種値を取得
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
@@ -223,7 +234,7 @@ func ListenElUDP(srv *Server, conn chan *ElStackUdpConn) {
 	vpnTimeoutSec := getEnvUint64OrDefault("RECV_TIMEOUT", 180)
 	vpnCfg := el_stack.NewElStackVpnConfig(
 		vpnHost, vpnPort, antiOverlap,
-		vpnKeepAliveSec, vpnTimeoutSec,
+		vpnTimeoutSec, vpnKeepAliveSec,
 		el_stack.ElStackVpnConnectionTypeTls,
 	)
 
@@ -233,10 +244,11 @@ func ListenElUDP(srv *Server, conn chan *ElStackUdpConn) {
 	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert)
 
 	core := el_stack.NewElStackCore(accountCfg, vpnCfg, prodCfg)
-	delegate := &vpnDelegate{
-		core: core,
-		done: make(chan struct{}, 1),
-	}
+    delegate := &vpnDelegate{
+        core:       core,
+        done:       make(chan struct{}, 1),
+        preferPort: preferPort,
+    }
 	err := core.Start(delegate)
 	if err != nil {
 		fmt.Println("start failed:", err)
@@ -246,7 +258,7 @@ func ListenElUDP(srv *Server, conn chan *ElStackUdpConn) {
 	defer delegate.conn.Close()
 
 	<-delegate.done
-	conn <-delegate.conn
+	conn <- delegate.conn
 
 	// select {}
 	<-srv.quit
