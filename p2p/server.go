@@ -24,7 +24,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
+    // "io" // no longer used after refactor of sharedUDPConn
 	"net"
 	"net/netip"
 	"sync"
@@ -343,69 +343,61 @@ func (srv *Server) Stop() {
 // 	unhandled chan discover.ReadPacket
 // }
 
-// // ReadFromUDPAddrPort implements discover.UDPConn
-// func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-// 	packet, ok := <-s.unhandled
-// 	if !ok {
-// 		return 0, netip.AddrPort{}, errors.New("connection was closed")
-// 	}
-// 	l := len(packet.Data)
-// 	if l > len(b) {
-// 		l = len(b)
-// 	}
-// 	copy(b[:l], packet.Data[:l])
-// 	return l, packet.Addr, nil
-// }
-
-// // Close implements discover.UDPConn
-// func (s *sharedUDPConn) Close() error {
-// 	return nil
-// }
-
-type UDP interface {
-    ReadFromUDPAddrPort([]byte) (int, netip.AddrPort, error)
-    WriteToUDPAddrPort([]byte, netip.AddrPort) (int, error)
-    SetReadDeadline(time.Time) error
-    Close() error
-}
-
-type ReadPacket struct {
-    Data []byte
-    Addr netip.AddrPort
-}
-
 type sharedUDPConn struct {
-    udp       UDP                    // ★ ここをインターフェースに
-    unhandled chan ReadPacket        // 主系が捌けなかったパケットが流れてくる
+	*ElStackUdpConn
+	unhandled chan discover.ReadPacket
 }
 
-func NewShared(udp UDP, bufN int) *sharedUDPConn {
-    return &sharedUDPConn{
-        udp:       udp,
-        unhandled: make(chan ReadPacket, bufN),
-    }
+// ReadFromUDPAddrPort implements discover.UDPConn
+func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	packet, ok := <-s.unhandled
+	if !ok {
+		return 0, netip.AddrPort{}, errors.New("connection was closed")
+	}
+	l := len(packet.Data)
+	if l > len(b) {
+		l = len(b)
+	}
+	copy(b[:l], packet.Data[:l])
+	return l, packet.Addr, nil
 }
 
-// 読み取り：unhandled から取り出して返す
-func (c *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (int, netip.AddrPort, error) {
-    pkt, ok := <-c.unhandled
-    if !ok {
-        return 0, netip.AddrPort{}, io.EOF
-    }
-    n := copy(b, pkt.Data)
-    return n, pkt.Addr, nil
+// Close implements discover.UDPConn
+func (s *sharedUDPConn) Close() error {
+	return nil
 }
 
-// 書き込み：下位に委譲
-func (c *sharedUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (int, error) {
-    return c.udp.WriteToUDPAddrPort(b, ap)
-}
+// sharedUDPConn wraps a primary UDPConn and feeds back unhandled packets
+// to a secondary consumer (e.g., discv5) while delegating writes.
+// type sharedUDPConn struct {
+//     udp       discover.UDPConn
+//     unhandled chan discover.ReadPacket
+// }
 
-func (c *sharedUDPConn) SetReadDeadline(t time.Time) error { return c.udp.SetReadDeadline(t) }
-func (c *sharedUDPConn) Close() error                       { close(c.unhandled); return c.udp.Close() }
-func (c *sharedUDPConn) LocalAddr() net.Addr {
-	return c.udp.LocalAddr
-}
+// // ReadFromUDPAddrPort implements discover.UDPConn by pulling from the
+// // unhandled packet channel populated by the primary listener.
+// func (c *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (int, netip.AddrPort, error) {
+//     pkt, ok := <-c.unhandled
+//     if !ok {
+//         return 0, netip.AddrPort{}, io.EOF
+//     }
+//     n := copy(b, pkt.Data)
+//     return n, pkt.Addr, nil
+// }
+
+// // WriteToUDPAddrPort delegates to the underlying UDPConn.
+// func (c *sharedUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (int, error) {
+//     return c.udp.WriteToUDPAddrPort(b, ap)
+// }
+
+// // Close closes the shared channel and the underlying UDPConn.
+// func (c *sharedUDPConn) Close() error {
+//     close(c.unhandled)
+//     return c.udp.Close()
+// }
+
+// // LocalAddr delegates to the underlying UDPConn.
+// func (c *sharedUDPConn) LocalAddr() net.Addr { return c.udp.LocalAddr() }
 
 // Start starts running the server.
 // Servers can not be re-used after stopping.
@@ -696,7 +688,7 @@ func (srv *Server) setupElUDPListening() (*ElStackUdpConn, error) {
 
 func (srv *Server) listenElUDP() *ElStackUdpConn {
 	connCh := make(chan *ElStackUdpConn)
-	go ListenElUDP(connCh)
+	go ListenElUDP(srv, connCh)
 	conn := <-connCh
 	return conn
 }

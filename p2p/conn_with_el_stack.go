@@ -5,13 +5,13 @@ package p2p
 // #include <el_stack.h>
 
 import (
-	"fmt"
-	"net"
-	"net/netip"
-	"os"
-	"strconv"
+    "fmt"
+    "net"
+    "net/netip"
+    "os"
+    "strconv"
 
-	"el_stack"
+    "el_stack"
 )
 
 // 環境変数から値取得
@@ -83,9 +83,18 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	// netip.AddrPortをnet.UDPAddrに変換
-	addr2 := net.UDPAddrFromAddrPort(addr)
-	return c.WriteToUDP(b, addr2)
+    // netip.AddrPortをnet.UDPAddrに変換
+    addr2 := net.UDPAddrFromAddrPort(addr)
+    return c.WriteToUDP(b, addr2)
+}
+
+// discover.UDPConn の要件を満たすためのラッパーメソッド
+func (c *ElStackUdpConn) Close() error {
+    return c.underlying().Close()
+}
+
+func (c *ElStackUdpConn) LocalAddr() net.Addr {
+    return c.underlying().LocalAddr()
 }
 
 // WisteriaVpnEventDelegate 実装
@@ -144,7 +153,7 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	}()
 }
 
-func ListenElUDP(conn chan *ElStackUdpConn) {
+func ListenElUDP(srv *Server, conn chan *ElStackUdpConn) {
 	// 環境変数から各種値を取得
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
@@ -185,5 +194,6 @@ func ListenElUDP(conn chan *ElStackUdpConn) {
 	<-delegate.done
 	conn <-delegate.conn
 
-	select {}
+	// select {}
+	<-srv.quit
 }
