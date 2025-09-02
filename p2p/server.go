@@ -367,38 +367,6 @@ func (s *sharedUDPConn) Close() error {
 	return nil
 }
 
-// sharedUDPConn wraps a primary UDPConn and feeds back unhandled packets
-// to a secondary consumer (e.g., discv5) while delegating writes.
-// type sharedUDPConn struct {
-//     udp       discover.UDPConn
-//     unhandled chan discover.ReadPacket
-// }
-
-// // ReadFromUDPAddrPort implements discover.UDPConn by pulling from the
-// // unhandled packet channel populated by the primary listener.
-// func (c *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (int, netip.AddrPort, error) {
-//     pkt, ok := <-c.unhandled
-//     if !ok {
-//         return 0, netip.AddrPort{}, io.EOF
-//     }
-//     n := copy(b, pkt.Data)
-//     return n, pkt.Addr, nil
-// }
-
-// // WriteToUDPAddrPort delegates to the underlying UDPConn.
-// func (c *sharedUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (int, error) {
-//     return c.udp.WriteToUDPAddrPort(b, ap)
-// }
-
-// // Close closes the shared channel and the underlying UDPConn.
-// func (c *sharedUDPConn) Close() error {
-//     close(c.unhandled)
-//     return c.udp.Close()
-// }
-
-// // LocalAddr delegates to the underlying UDPConn.
-// func (c *sharedUDPConn) LocalAddr() net.Addr { return c.udp.LocalAddr() }
-
 // Start starts running the server.
 // Servers can not be re-used after stopping.
 func (srv *Server) Start() (err error) {
