@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"cmp"
 	"crypto/ecdsa"
+	"el_stack"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -459,7 +460,10 @@ func (srv *Server) setupDiscovery() error {
 	if srv.NoDiscovery {
 		return nil
 	}
-	conn, err := srv.setupUDPListening()
+	// conn, err := srv.setupUDPListening()
+	// ADDED by Hinata AWAIISHIMA
+	// TODO: el_stack.ElStackUDPConnのdiscover.UDPConnインターフェース実装
+	conn, err := srv.setupElUDPListening()
 	if err != nil {
 		return err
 	}
@@ -611,6 +615,44 @@ func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 	}
 
 	return conn, nil
+}
+
+func (srv *Server) setupElUDPListening() (*el_stack.ElStackUdpConn, error) {
+	// listenAddr := srv.ListenAddr
+
+	// // Use an alternate listening address for UDP if
+	// // a custom discovery address is configured.
+	// if srv.DiscAddr != "" {
+	// 	listenAddr = srv.DiscAddr
+	// }
+	// addr, err := net.ResolveUDPAddr("udp", listenAddr)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// conn, err := net.ListenUDP("udp", addr)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	conn := srv.listenElUDP()
+	laddr := conn.LocalAddr().(*net.UDPAddr)
+	srv.localnode.SetFallbackUDP(laddr.Port)
+	srv.log.Debug("UDP listener up", "addr", laddr)
+	if !laddr.IP.IsLoopback() && !laddr.IP.IsPrivate() {
+		srv.portMappingRegister <- &portMapping{
+			protocol: "UDP",
+			name:     "ethereum peer discovery",
+			port:     laddr.Port,
+		}
+	}
+
+	return conn, nil
+}
+
+func (srv *Server) listenElUDP() *el_stack.ElStackUdpConn {
+	connCh := make(chan *el_stack.ElStackUdpConn)
+	go ListenElUDP(connCh)
+	conn := <-connCh
+	return conn
 }
 
 // doPeerOp runs fn on the main loop.
