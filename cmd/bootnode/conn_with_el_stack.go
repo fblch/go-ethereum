@@ -1,4 +1,4 @@
-package p2p
+package main
 
 // #cgo CFLAGS: -I../../el-stack-rs/golang/el_stack
 // #cgo LDFLAGS: -L../../el-stack-rs/target/release -lel_stack
@@ -102,21 +102,15 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-    // netip.AddrPortをnet.UDPAddrに変換
-    elLog.Debug("ElUDP WriteToUDPAddrPort begin", "to", addr.String(), "n", len(b))
-    addr2 := net.UDPAddrFromAddrPort(addr)
-    if addr2 == nil {
-        elLog.Debug("ElUDP WriteToUDPAddrPort addr2 nil", "to", addr.String())
-    } else {
-        elLog.Debug("ElUDP WriteToUDPAddrPort addr2", "udp", addr2.String())
-    }
-    n, err = c.WriteToUDP(b, addr2)
-    if err != nil {
-        elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
-    } else {
-        elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
-    }
-    return n, err
+	// netip.AddrPortをnet.UDPAddrに変換
+	addr2 := net.UDPAddrFromAddrPort(addr)
+	n, err = c.WriteToUDP(b, addr2)
+	if err != nil {
+		elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
+	} else {
+		elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
+	}
+	return n, err
 }
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
@@ -216,28 +210,26 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 		// defer conn.Close()
 
 		// for {
-			// buf := make([]byte, 1500)
-			// n, from, err := conn.ReadFromUDP(buf)
-			// if err != nil {
-			// 	fmt.Println("Udp RecvFrom failed:", err)
-			// 	// break
-			// }
-			// fmt.Println("recv from: ", from)
-			// fmt.Println("recved: ", buf[:n])
+		// 	buf := make([]byte, 1500)
+		// 	n, from, err := conn.ReadFromUDP(buf)
+		// 	if err != nil {
+		// 		fmt.Println("Udp RecvFrom failed:", err)
+		// 		break
+		// 	}
+		// 	fmt.Println("recv from: ", from)
+		// 	fmt.Println("recved: ", buf[:n])
 
-			// buf = append(buf, byte)
-
-			// _, err = conn.WriteToUDP(buf[:n], from)
-			// if err != nil {
-			// 	fmt.Println("Udp SendTo failed:", err)
-			// 	// break
-			// }
-			// fmt.Println("sent: ", n)
+		// 	_, err = conn.WriteToUDP(buf[:n], from)
+		// 	if err != nil {
+		// 		fmt.Println("Udp SendTo failed:", err)
+		// 		break
+		// 	}
+		// 	fmt.Println("sent: ", n)
 		// }
 	}()
 }
 
-func ListenElUDP(srv *Server, conn chan *ElStackUdpConn, preferPort int) {
+func ListenElUDP(conn chan *ElStackUdpConn, preferPort int) {
 	// 環境変数から各種値を取得
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
@@ -274,11 +266,9 @@ func ListenElUDP(srv *Server, conn chan *ElStackUdpConn, preferPort int) {
 		return
 	}
 	defer core.Stop()
-	defer delegate.conn.Close()
 
 	<-delegate.done
 	conn <- delegate.conn
 
-	// select {}
-	<-srv.quit
+	select {}
 }

@@ -25,10 +25,11 @@ import (
 	"errors"
 	"fmt"
     // "io" // no longer used after refactor of sharedUDPConn
-	"net"
-	"net/netip"
-	"sync"
-	"sync/atomic"
+    "net"
+    "net/netip"
+    "strconv"
+    "sync"
+    "sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -344,8 +345,8 @@ func (srv *Server) Stop() {
 // }
 
 type sharedUDPConn struct {
-	*ElStackUdpConn
-	unhandled chan discover.ReadPacket
+    discover.UDPConn
+    unhandled chan discover.ReadPacket
 }
 
 // ReadFromUDPAddrPort implements discover.UDPConn
@@ -364,7 +365,47 @@ func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPor
 
 // Close implements discover.UDPConn
 func (s *sharedUDPConn) Close() error {
-	return nil
+    return nil
+}
+
+// WriteToUDPAddrPort forwards write calls to the underlying UDPConn with diagnostics.
+func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
+    if s.UDPConn == nil {
+        return 0, fmt.Errorf("sharedUDPConn: underlying is nil")
+    }
+    // Note: underlying type may be a metered wrapper.
+    log.Root().Debug("sharedUDP write", "to", addr, "n", len(b), "under", fmt.Sprintf("%T", s.UDPConn))
+    n, err := s.UDPConn.WriteToUDPAddrPort(b, addr)
+    if err != nil {
+        log.Root().Debug("sharedUDP write error", "to", addr, "n", n, "err", err)
+    } else {
+        log.Root().Debug("sharedUDP write done", "to", addr, "n", n)
+    }
+    return n, err
+}
+
+// stdUDPConn adapts *net.UDPConn to the discover.UDPConn interface.
+type stdUDPConn struct{
+    *net.UDPConn
+}
+
+func (c *stdUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+    n, udpAddr, err := c.ReadFromUDP(b)
+    if udpAddr == nil {
+        return n, netip.AddrPort{}, err
+    }
+    return n, udpAddr.AddrPort(), err
+}
+
+func (c *stdUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (n int, err error) {
+    log.Root().Debug("stdUDP write", "to", ap, "n", len(b))
+    n, err = c.WriteToUDP(b, net.UDPAddrFromAddrPort(ap))
+    if err != nil {
+        log.Root().Debug("stdUDP write error", "to", ap, "n", n, "err", err)
+    } else {
+        log.Root().Debug("stdUDP write done", "to", ap, "n", n)
+    }
+    return n, err
 }
 
 // Start starts running the server.
@@ -474,25 +515,34 @@ func (srv *Server) setupDiscovery() error {
 	if srv.NoDiscovery {
 		return nil
 	}
-	// conn, err := srv.setupUDPListening()
-	// ADDED by Hinata AWAIISHIMA
-	// TODO: el_stack.ElStackUDPConnのdiscover.UDPConnインターフェース実装
-    conn, err := srv.setupElUDPListening()
-    if err != nil {
-        return err
-    }
 
-	var (
-		sconn     discover.UDPConn = conn
-		unhandled chan discover.ReadPacket
-	)
+    var conn discover.UDPConn
+    var err error
+    // Prefer el_stack transport if it can be started; otherwise fall back to std UDP.
+    if c, e := srv.setupElUDPListening(); e == nil {
+        conn = c
+    } else {
+        srv.log.Debug("setupDiscovery: el_stack unavailable, falling back to std UDP", "err", e)
+        c2, e2 := srv.setupUDPListening()
+        if e2 != nil {
+            return e2
+        }
+        conn = &stdUDPConn{UDPConn: c2}
+    }
+    // Log the concrete type of the chosen UDPConn
+    srv.log.Debug("setupDiscovery: conn type", "type", fmt.Sprintf("%T", conn))
+
+    var (
+        sconn     discover.UDPConn = conn
+        unhandled chan discover.ReadPacket
+    )
 	// If both versions of discovery are running, setup a shared
 	// connection, so v5 can read unhandled messages from v4.
     if srv.Config.DiscoveryV4 && srv.Config.DiscoveryV5 {
         unhandled = make(chan discover.ReadPacket, 100)
-        // sconn = &sharedUDPConn{conn, unhandled}
         srv.log.Debug("setupDiscovery: enabling shared UDP for v5")
         sconn = &sharedUDPConn{conn, unhandled}
+        srv.log.Debug("setupDiscovery: sconn type", "type", fmt.Sprintf("%T", sconn))
     }
 
 	// Start discovery services.
@@ -625,36 +675,63 @@ func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 	laddr := conn.LocalAddr().(*net.UDPAddr)
 	srv.localnode.SetFallbackUDP(laddr.Port)
 	srv.log.Debug("UDP listener up", "addr", laddr)
-	if !laddr.IP.IsLoopback() && !laddr.IP.IsPrivate() {
-		srv.portMappingRegister <- &portMapping{
-			protocol: "UDP",
-			name:     "ethereum peer discovery",
-			port:     laddr.Port,
-		}
-	}
+    // Always request NAT mapping for discovery UDP when using el_stack.
+    // The NAT loop will no-op if NAT is not configured.
+    srv.portMappingRegister <- &portMapping{
+        protocol: "UDP",
+        name:     "ethereum peer discovery",
+        port:     laddr.Port,
+    }
 
 	return conn, nil
 }
 
 func (srv *Server) setupElUDPListening() (*ElStackUdpConn, error) {
     srv.log.Debug("setupElUDPListening: begin")
-    // listenAddr := srv.ListenAddr
+    // Ensure el_stack is usable in this environment.
+    required := []string{"ACCOUNT", "PASSWORD", "SERVER_HOST", "SERVER_SERV", "ANTI_OVERLAP"}
+    if !CheckEnvDefinition(required) {
+        return nil, fmt.Errorf("el_stack not configured")
+    }
+    // Derive preferred UDP port from DiscAddr or ListenAddr
+    preferPort := 0
+    pickPort := func(addr string) {
+        if addr == "" {
+            return
+        }
+        host, portStr, err := net.SplitHostPort(addr)
+        _ = host
+        if err == nil {
+            if p, perr := strconv.Atoi(portStr); perr == nil {
+                preferPort = p
+            }
+        }
+    }
+    if srv.DiscAddr != "" {
+        pickPort(srv.DiscAddr)
+    } else if srv.ListenAddr != "" {
+        pickPort(srv.ListenAddr)
+    }
 
-	// // Use an alternate listening address for UDP if
-	// // a custom discovery address is configured.
-	// if srv.DiscAddr != "" {
-	// 	listenAddr = srv.DiscAddr
-	// }
-	// addr, err := net.ResolveUDPAddr("udp", listenAddr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// conn, err := net.ListenUDP("udp", addr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-    conn := srv.listenElUDP()
+    // Start el_stack listener and wait with timeout.
+    connCh := make(chan *ElStackUdpConn, 1)
+    srv.log.Debug("setupElUDPListening: spawn", "preferPort", preferPort)
+    go ListenElUDP(srv, connCh, preferPort)
+    var conn *ElStackUdpConn
+    select {
+    case conn = <-connCh:
+        if conn == nil {
+            return nil, fmt.Errorf("el_stack returned nil conn")
+        }
+    case <-time.After(5 * time.Second):
+        return nil, fmt.Errorf("el_stack setup timeout")
+    }
+
     laddr := conn.LocalAddr().(*net.UDPAddr)
+    // Ensure our ENR advertises the actual VPN IP/UDP discovered via el_stack
+    if ip := laddr.IP; ip != nil {
+        srv.localnode.SetFallbackIP(ip)
+    }
     srv.localnode.SetFallbackUDP(laddr.Port)
     srv.log.Debug("UDP listener up", "addr", laddr)
 	if !laddr.IP.IsLoopback() && !laddr.IP.IsPrivate() {
@@ -667,15 +744,6 @@ func (srv *Server) setupElUDPListening() (*ElStackUdpConn, error) {
 
     srv.log.Debug("setupElUDPListening: done", "port", laddr.Port)
     return conn, nil
-}
-
-func (srv *Server) listenElUDP() *ElStackUdpConn {
-    connCh := make(chan *ElStackUdpConn)
-    srv.log.Debug("listenElUDP: spawn")
-    go ListenElUDP(srv, connCh)
-    conn := <-connCh
-    srv.log.Debug("listenElUDP: got conn")
-    return conn
 }
 
 // doPeerOp runs fn on the main loop.
