@@ -18,19 +18,19 @@
 package p2p
 
 import (
-	"bytes"
-	"cmp"
-	"crypto/ecdsa"
-	"encoding/hex"
-	"errors"
-	"fmt"
+    "bytes"
+    "cmp"
+    "crypto/ecdsa"
+    "encoding/hex"
+    "errors"
+    "fmt"
     // "io" // no longer used after refactor of sharedUDPConn
     "net"
     "net/netip"
     "strconv"
     "sync"
     "sync/atomic"
-	"time"
+    "time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -345,16 +345,16 @@ func (srv *Server) Stop() {
 // }
 
 type sharedUDPConn struct {
-    discover.UDPConn
+    under    discover.UDPConn
     unhandled chan discover.ReadPacket
 }
 
 // ReadFromUDPAddrPort implements discover.UDPConn
 func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	packet, ok := <-s.unhandled
-	if !ok {
-		return 0, netip.AddrPort{}, errors.New("connection was closed")
-	}
+    packet, ok := <-s.unhandled
+    if !ok {
+        return 0, netip.AddrPort{}, errors.New("connection was closed")
+    }
 	l := len(packet.Data)
 	if l > len(b) {
 		l = len(b)
@@ -370,18 +370,26 @@ func (s *sharedUDPConn) Close() error {
 
 // WriteToUDPAddrPort forwards write calls to the underlying UDPConn with diagnostics.
 func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
-    if s.UDPConn == nil {
+    if s.under == nil {
         return 0, fmt.Errorf("sharedUDPConn: underlying is nil")
     }
     // Note: underlying type may be a metered wrapper.
-    log.Root().Debug("sharedUDP write", "to", addr, "n", len(b), "under", fmt.Sprintf("%T", s.UDPConn))
-    n, err := s.UDPConn.WriteToUDPAddrPort(b, addr)
+    log.Root().Debug("sharedUDP write", "to", addr, "n", len(b), "under", fmt.Sprintf("%T", s.under))
+    n, err := s.under.WriteToUDPAddrPort(b, addr)
     if err != nil {
         log.Root().Debug("sharedUDP write error", "to", addr, "n", n, "err", err)
     } else {
         log.Root().Debug("sharedUDP write done", "to", addr, "n", n)
     }
     return n, err
+}
+
+// LocalAddr forwards to the underlying UDPConn.
+func (s *sharedUDPConn) LocalAddr() net.Addr {
+    if s.under == nil {
+        return nil
+    }
+    return s.under.LocalAddr()
 }
 
 // stdUDPConn adapts *net.UDPConn to the discover.UDPConn interface.
@@ -541,23 +549,23 @@ func (srv *Server) setupDiscovery() error {
     if srv.Config.DiscoveryV4 && srv.Config.DiscoveryV5 {
         unhandled = make(chan discover.ReadPacket, 100)
         srv.log.Debug("setupDiscovery: enabling shared UDP for v5")
-        sconn = &sharedUDPConn{conn, unhandled}
+        sconn = &sharedUDPConn{under: conn, unhandled: unhandled}
         srv.log.Debug("setupDiscovery: sconn type", "type", fmt.Sprintf("%T", sconn))
     }
 
 	// Start discovery services.
-	if srv.Config.DiscoveryV4 {
-		cfg := discover.Config{
-			PrivateKey:  srv.PrivateKey,
-			NetRestrict: srv.NetRestrict,
-			Bootnodes:   srv.BootstrapNodes,
-			Unhandled:   unhandled,
-			Log:         srv.log,
-		}
-		ntab, err := discover.ListenV4(conn, srv.localnode, cfg)
-		if err != nil {
-			return err
-		}
+    if srv.Config.DiscoveryV4 {
+        cfg := discover.Config{
+            PrivateKey:  srv.PrivateKey,
+            NetRestrict: srv.NetRestrict,
+            Bootnodes:   srv.BootstrapNodes,
+            Unhandled:   unhandled,
+            Log:         srv.log,
+        }
+        ntab, err := discover.ListenV4(conn, srv.localnode, cfg)
+        if err != nil {
+            return err
+        }
         srv.discv4 = ntab
         srv.log.Debug("setupDiscovery: discv4 up")
         srv.discmix.AddSource(ntab.RandomNodes())
@@ -728,19 +736,19 @@ func (srv *Server) setupElUDPListening() (*ElStackUdpConn, error) {
     }
 
     laddr := conn.LocalAddr().(*net.UDPAddr)
-    // Ensure our ENR advertises the actual VPN IP/UDP discovered via el_stack
+    // Align with std UDP + NAT loop semantics: advertise reachable address.
+    // For el_stack, the VPN IP acts as the externally reachable address.
     if ip := laddr.IP; ip != nil {
-        srv.localnode.SetFallbackIP(ip)
+        srv.localnode.SetStaticIP(ip)
     }
     srv.localnode.SetFallbackUDP(laddr.Port)
     srv.log.Debug("UDP listener up", "addr", laddr)
-	if !laddr.IP.IsLoopback() && !laddr.IP.IsPrivate() {
-		srv.portMappingRegister <- &portMapping{
-			protocol: "UDP",
-			name:     "ethereum peer discovery",
-			port:     laddr.Port,
-		}
-	}
+    // Match std UDP behavior: always request NAT mapping; NAT loop will no-op if not configured.
+    srv.portMappingRegister <- &portMapping{
+        protocol: "UDP",
+        name:     "ethereum peer discovery",
+        port:     laddr.Port,
+    }
 
     srv.log.Debug("setupElUDPListening: done", "port", laddr.Port)
     return conn, nil

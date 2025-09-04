@@ -5,11 +5,12 @@ package p2p
 // #include <el_stack.h>
 
 import (
-	"fmt"
-	"net"
-	"net/netip"
-	"os"
-	"strconv"
+    "fmt"
+    "net"
+    "net/netip"
+    "os"
+    "strconv"
+    "sync"
 
 	"el_stack"
 
@@ -70,7 +71,8 @@ func readFileOrEmpty(path string) []byte {
 }
 
 type ElStackUdpConn struct {
-	*el_stack.ElStackUdpConn
+    *el_stack.ElStackUdpConn
+    mu sync.Mutex
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
@@ -110,7 +112,9 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
     } else {
         elLog.Debug("ElUDP WriteToUDPAddrPort addr2", "udp", addr2.String())
     }
+    c.mu.Lock()
     n, err = c.WriteToUDP(b, addr2)
+    c.mu.Unlock()
     if err != nil {
         elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
     } else {

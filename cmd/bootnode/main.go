@@ -138,19 +138,24 @@ func main() {
 	db, _ := enode.OpenDB("")
 	ln := enode.NewLocalNode(db, nodeKey)
 
-	listenerAddr := conn.LocalAddr().(*net.UDPAddr)
-	if natm != nil && !listenerAddr.IP.IsLoopback() {
-		natAddr := doPortMapping(natm, ln, listenerAddr)
-		if natAddr != nil {
-			listenerAddr = natAddr
-		}
+    listenerAddr := conn.LocalAddr().(*net.UDPAddr)
+    // Ensure ENR reflects the actual bound UDP endpoint.
+    if listenerAddr != nil {
+        ln.SetStaticIP(listenerAddr.IP)
+        ln.SetFallbackUDP(listenerAddr.Port)
+    }
+    if natm != nil && !listenerAddr.IP.IsLoopback() {
+        natAddr := doPortMapping(natm, ln, listenerAddr)
+        if natAddr != nil {
+            listenerAddr = natAddr
+        }
 	}
 
 	printNotice(&nodeKey.PublicKey, *listenerAddr)
-	cfg := discover.Config{
-		PrivateKey:  nodeKey,
-		NetRestrict: restrictList,
-	}
+    cfg := discover.Config{
+        PrivateKey:  nodeKey,
+        NetRestrict: restrictList,
+    }
 	if *runv5 {
 		if _, err := discover.ListenV5(conn, ln, cfg); err != nil {
 			utils.Fatalf("%v", err)

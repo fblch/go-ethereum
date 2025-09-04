@@ -5,11 +5,12 @@ package main
 // #include <el_stack.h>
 
 import (
-	"fmt"
-	"net"
-	"net/netip"
-	"os"
-	"strconv"
+    "fmt"
+    "net"
+    "net/netip"
+    "os"
+    "strconv"
+    "sync"
 
 	"el_stack"
 
@@ -70,7 +71,8 @@ func readFileOrEmpty(path string) []byte {
 }
 
 type ElStackUdpConn struct {
-	*el_stack.ElStackUdpConn
+    *el_stack.ElStackUdpConn
+    mu sync.Mutex
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
@@ -102,15 +104,17 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	// netip.AddrPortをnet.UDPAddrに変換
-	addr2 := net.UDPAddrFromAddrPort(addr)
-	n, err = c.WriteToUDP(b, addr2)
-	if err != nil {
-		elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
-	} else {
-		elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
-	}
-	return n, err
+    // netip.AddrPortをnet.UDPAddrに変換
+    addr2 := net.UDPAddrFromAddrPort(addr)
+    c.mu.Lock()
+    n, err = c.WriteToUDP(b, addr2)
+    c.mu.Unlock()
+    if err != nil {
+        elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
+    } else {
+        elLog.Debug("ElUDP WriteToUDP", "to", addr.String(), "n", n)
+    }
+    return n, err
 }
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
