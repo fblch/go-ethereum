@@ -193,11 +193,14 @@ func (p *Findnode) RequestID() []byte      { return p.ReqID }
 func (p *Findnode) SetRequestID(id []byte) { p.ReqID = id }
 
 func (p *Findnode) AppendLogInfo(ctx []interface{}) []interface{} {
-	ctx = append(ctx, "req", hexutil.Bytes(p.ReqID))
-	if p.OpID != 0 {
-		ctx = append(ctx, "opid", p.OpID)
-	}
-	return ctx
+    ctx = append(ctx, "req", hexutil.Bytes(p.ReqID))
+    if len(p.Distances) > 0 {
+        ctx = append(ctx, "dist", p.Distances)
+    }
+    if p.OpID != 0 {
+        ctx = append(ctx, "opid", p.OpID)
+    }
+    return ctx
 }
 
 func (*Nodes) Name() string             { return "NODES/v5" }

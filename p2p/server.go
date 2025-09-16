@@ -351,8 +351,10 @@ type sharedUDPConn struct {
 
 // ReadFromUDPAddrPort implements discover.UDPConn
 func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-    packet, ok := <-s.unhandled
+    fmt.Println("(*sharedUDPConn).ReadFromUDPAddrPort() START")
+	packet, ok := <-s.unhandled
     if !ok {
+	    fmt.Println("(*sharedUDPConn).ReadFromUDPAddrPort() 1")
         return 0, netip.AddrPort{}, errors.New("connection was closed")
     }
 	l := len(packet.Data)
@@ -360,6 +362,7 @@ func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPor
 		l = len(b)
 	}
 	copy(b[:l], packet.Data[:l])
+    fmt.Println("(*sharedUDPConn).ReadFromUDPAddrPort() 2")
 	return l, packet.Addr, nil
 }
 
@@ -370,18 +373,13 @@ func (s *sharedUDPConn) Close() error {
 
 // WriteToUDPAddrPort forwards write calls to the underlying UDPConn with diagnostics.
 func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
-    if s.under == nil {
+    fmt.Println("(*sharedUDPConn).WriteToUDPAddrPort() START")
+	if s.under == nil {
+	    fmt.Println("(*sharedUDPConn).WriteToUDPAddrPort() 1")
         return 0, fmt.Errorf("sharedUDPConn: underlying is nil")
     }
-    // Note: underlying type may be a metered wrapper.
-    log.Root().Debug("sharedUDP write", "to", addr, "n", len(b), "under", fmt.Sprintf("%T", s.under))
-    n, err := s.under.WriteToUDPAddrPort(b, addr)
-    if err != nil {
-        log.Root().Debug("sharedUDP write error", "to", addr, "n", n, "err", err)
-    } else {
-        log.Root().Debug("sharedUDP write done", "to", addr, "n", n)
-    }
-    return n, err
+    fmt.Println("(*sharedUDPConn).WriteToUDPAddrPort() 2")
+    return s.under.WriteToUDPAddrPort(b, addr)
 }
 
 // LocalAddr forwards to the underlying UDPConn.
@@ -398,22 +396,19 @@ type stdUDPConn struct{
 }
 
 func (c *stdUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-    n, udpAddr, err := c.ReadFromUDP(b)
+    fmt.Println("(stdUDPConn).ReadFromUDPAddrPort() START")
+	n, udpAddr, err := c.ReadFromUDP(b)
     if udpAddr == nil {
+	    fmt.Println("(stdUDPConn).ReadFromUDPAddrPort() 1")
         return n, netip.AddrPort{}, err
     }
+    fmt.Println("(stdUDPConn).ReadFromUDPAddrPort() 2")
     return n, udpAddr.AddrPort(), err
 }
 
 func (c *stdUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (n int, err error) {
-    log.Root().Debug("stdUDP write", "to", ap, "n", len(b))
-    n, err = c.WriteToUDP(b, net.UDPAddrFromAddrPort(ap))
-    if err != nil {
-        log.Root().Debug("stdUDP write error", "to", ap, "n", n, "err", err)
-    } else {
-        log.Root().Debug("stdUDP write done", "to", ap, "n", n)
-    }
-    return n, err
+	fmt.Println("(*stdUDPConn).WriteToUDPAddrPort START")
+	return c.WriteToUDP(b, net.UDPAddrFromAddrPort(ap))
 }
 
 // Start starts running the server.

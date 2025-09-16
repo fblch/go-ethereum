@@ -129,6 +129,7 @@ type reply struct {
 
 func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 	cfg = cfg.withDefaults()
+	cfg.Log.Debug("ListenV4() START")
 	closeCtx, cancel := context.WithCancel(context.Background())
 	t := &UDPv4{
 		conn:            newMeteredConn(c),
@@ -145,6 +146,7 @@ func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 
 	tab, err := newTable(t, ln.Database(), cfg)
 	if err != nil {
+		t.log.Debug("ListenV4() 1")
 		return nil, err
 	}
 	t.tab = tab
@@ -153,6 +155,26 @@ func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 	t.wg.Add(2)
 	go t.loop()
 	go t.readLoop(cfg.Unhandled)
+
+	// // Send a one-off FINDNODE/v4 to a fixed address after starting the read loop.
+    // go func() {
+    //     ip, err := netip.ParseAddr("10.0.12.10")
+    //     if err != nil {
+    //         t.log.Debug("Test FINDNODE: invalid IP", "err", err)
+    //         return
+    //     }
+    //     to := netip.AddrPortFrom(ip, 30310)
+    //     // Build a proper v4 FINDNODE packet with a random target.
+    //     var target v4wire.Pubkey
+    //     crand.Read(target[:])
+    //     req := &v4wire.Findnode{Target: target, Expiration: uint64(time.Now().Add(expiration).Unix())}
+    //     t.log.Debug("ListenV4()", "process", "TestFINDNODE", "req", req)
+    //     t.log.Debug("Test FINDNODE: sending", "to", to)
+    //     // Use zero enode.ID because the remote ID is unknown; this validates the send path only.
+    //     _, _ = t.send(to, enode.ID{}, req)
+    // }()
+
+	t.log.Debug("ListenV4() 2")
 	return t, nil
 }
 
@@ -212,38 +234,47 @@ func (t *UDPv4) ourEndpoint() v4wire.Endpoint {
 
 // ping sends a ping message to the given node and waits for a reply.
 func (t *UDPv4) ping(n *enode.Node) (seq uint64, err error) {
+	t.log.Debug("(*UDPv4).ping() START")
 	addr, ok := n.UDPEndpoint()
 	if !ok {
+		t.log.Debug("(*UDPv4).ping() 1")
 		return 0, errNoUDPEndpoint
 	}
 	rm := t.sendPing(n.ID(), addr, nil)
 	if err = <-rm.errc; err == nil {
 		seq = rm.reply.(*v4wire.Pong).ENRSeq
 	}
+	t.log.Debug("(*UDPv4).ping() 2")	
 	return seq, err
 }
 
 // Ping calls PING on a node and waits for a PONG response.
 func (t *UDPv4) Ping(n *enode.Node) (pong *v4wire.Pong, err error) {
+	t.log.Debug("(*UDPv4).Ping() START")
 	addr, ok := n.UDPEndpoint()
-	if !ok {
+	if !ok {		
+		t.log.Debug("(*UDPv4).Ping() 1")
 		return nil, errNoUDPEndpoint
 	}
 	rm := t.sendPing(n.ID(), addr, nil)
 	if err = <-rm.errc; err == nil {
 		pong = rm.reply.(*v4wire.Pong)
 	}
+	t.log.Debug("(*UDPv4).Ping() 2")
 	return pong, err
 }
 
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *UDPv4) sendPing(toid enode.ID, toaddr netip.AddrPort, callback func()) *replyMatcher {
+	t.log.Debug("(*UDPv4).sendPing() START")
 	req := t.makePing(toaddr)
+	t.log.Debug("(*UDPv4).sendPing()", "req", req)
 	packet, hash, err := v4wire.Encode(t.priv, req)
 	if err != nil {
 		errc := make(chan error, 1)
 		errc <- err
+		t.log.Debug("(*UDPv4).sendPing() 1")
 		return &replyMatcher{errc: errc}
 	}
 	// Add a matcher for the reply to the pending reply queue. Pongs are matched if they
@@ -253,15 +284,18 @@ func (t *UDPv4) sendPing(toid enode.ID, toaddr netip.AddrPort, callback func()) 
 		if matched && callback != nil {
 			callback()
 		}
+		t.log.Debug("(*UDPv4).sendPing() 2")
 		return matched, matched
 	})
 	// Send the packet.
 	t.localNode.UDPContact(toaddr)
 	t.write(toaddr, toid, req.Name(), packet)
+	t.log.Debug("(*UDPv4).sendPing() 3")
 	return rm
 }
 
 func (t *UDPv4) makePing(toaddr netip.AddrPort) *v4wire.Ping {
+	t.log.Debug("(*UDPv4).makePing() START")
 	return &v4wire.Ping{
 		Version:    4,
 		From:       t.ourEndpoint(),
@@ -319,7 +353,8 @@ func (t *UDPv4) newLookup(ctx context.Context, targetKey v4wire.Pubkey) *lookup 
 // the node has sent up to k neighbors.
 func (t *UDPv4) findnode(toid enode.ID, toAddrPort netip.AddrPort, target v4wire.Pubkey) ([]*enode.Node, error) {
 	// Debug: starting FINDNODE
-	t.log.Debug("FINDNODE start", "to", toAddrPort, "id", toid, "targetPrefix", fmt.Sprintf("%x", target[:4]))
+	t.log.Debug("(*UDPv4).findnode() START")
+	// t.log.Debug("(*UDPv4).findnode() START", "to", toAddrPort, "id", toid, "targetPrefix", fmt.Sprintf("%x", target[:4]))
 	t.ensureBond(toid, toAddrPort)
 
 	// Add a matcher for 'neighbours' replies to the pending reply queue. The matcher is
@@ -339,13 +374,16 @@ func (t *UDPv4) findnode(toid enode.ID, toAddrPort netip.AddrPort, target v4wire
 			t.log.Trace("Neighbor accepted", "id", n.ID(), "ip", n.IPAddr())
 			nodes = append(nodes, n)
 		}
+		t.log.Debug("(*UDPv4).findnode() 1")
 		return true, nreceived >= bucketSize
 	})
-	// Send FINDNODE request
-	_, sendErr := t.send(toAddrPort, toid, &v4wire.Findnode{
+	// Send FINDNODE request (log the packet just before sending)
+	req := &v4wire.Findnode{
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
-	})
+	}
+	// t.log.Trace("FINDNODE packet", "to", toAddrPort, "id", toid, "packet", req)
+	_, sendErr := t.send(toAddrPort, toid, req)
 	if sendErr != nil {
 		// write already traced error; add debug context
 		t.log.Debug("FINDNODE send error", "to", toAddrPort, "id", toid, "err", sendErr)
@@ -413,30 +451,32 @@ func (t *UDPv4) TableBuckets() [][]BucketNode {
 // pending adds a reply matcher to the pending reply queue.
 // see the documentation of type replyMatcher for a detailed explanation.
 func (t *UDPv4) pending(id enode.ID, ip netip.Addr, ptype byte, callback replyMatchFunc) *replyMatcher {
-    ch := make(chan error, 1)
-    p := &replyMatcher{from: id, ip: ip, ptype: ptype, callback: callback, errc: ch}
-    select {
-    case t.addReplyMatcher <- p:
-        // loop will handle it
-        t.log.Trace("pending: add", "from", id, "ip", ip, "ptype", ptype)
-    case <-t.closeCtx.Done():
-        ch <- errClosed
-    }
-    return p
+	t.log.Debug("(*UDPv4).pending() START")
+	ch := make(chan error, 1)
+	p := &replyMatcher{from: id, ip: ip, ptype: ptype, callback: callback, errc: ch}
+	select {
+	case t.addReplyMatcher <- p:
+		// loop will handle it
+		t.log.Trace("pending: add", "from", id, "ip", ip, "ptype", ptype)
+	case <-t.closeCtx.Done():
+		t.log.Error("(*UDPv4).pending error", "error", errClosed)
+		ch <- errClosed
+	}
+	return p
 }
 
 // handleReply dispatches a reply packet, invoking reply matchers. It returns
 // whether any matcher considered the packet acceptable.
 func (t *UDPv4) handleReply(from enode.ID, fromIP netip.Addr, req v4wire.Packet) bool {
-    matched := make(chan bool, 1)
-    select {
-    case t.gotreply <- reply{from, fromIP, req, matched}:
-        // loop will handle it
-        t.log.Trace("handleReply: dispatch", "from", from, "ip", fromIP, "kind", req.Kind())
-        return <-matched
-    case <-t.closeCtx.Done():
-        return false
-    }
+	matched := make(chan bool, 1)
+	select {
+	case t.gotreply <- reply{from, fromIP, req, matched}:
+		// loop will handle it
+		t.log.Trace("handleReply: dispatch", "from", from, "ip", fromIP, "kind", req.Kind())
+		return <-matched
+	case <-t.closeCtx.Done():
+		return false
+	}
 }
 
 // loop runs in its own goroutine. it keeps track of
@@ -486,66 +526,77 @@ func (t *UDPv4) loop() {
 			}
 			return
 
-        case p := <-t.addReplyMatcher:
-            p.deadline = time.Now().Add(respTimeout)
-            plist.PushBack(p)
-            t.log.Trace("loop: matcher added", "from", p.from, "ptype", p.ptype, "deadline", p.deadline)
+		case p := <-t.addReplyMatcher:
+			p.deadline = time.Now().Add(respTimeout)
+			plist.PushBack(p)
+			t.log.Trace("loop: matcher added", "from", p.from, "ptype", p.ptype, "deadline", p.deadline)
 
-        case r := <-t.gotreply:
-            var matched bool // whether any replyMatcher considered the reply acceptable.
-            for el := plist.Front(); el != nil; el = el.Next() {
-                p := el.Value.(*replyMatcher)
-                if p.from == r.from && p.ptype == r.data.Kind() && p.ip == r.ip {
-                    ok, requestDone := p.callback(r.data)
-                    matched = matched || ok
-                    p.reply = r.data
-                    // Remove the matcher if callback indicates that all replies have been received.
-                    if requestDone {
-                        p.errc <- nil
-                        plist.Remove(el)
-                        t.log.Trace("loop: matcher completed", "from", p.from, "ptype", p.ptype)
-                    }
-                    // Reset the continuous timeout counter (time drift detection)
-                    contTimeouts = 0
-                }
-            }
-            r.matched <- matched
+		case r := <-t.gotreply:
+			var matched bool // whether any replyMatcher considered the reply acceptable.
+			for el := plist.Front(); el != nil; el = el.Next() {
+				p := el.Value.(*replyMatcher)
+				if p.from == r.from && p.ptype == r.data.Kind() && p.ip == r.ip {
+					// if p.from == r.from && p.ptype == r.data.Kind() {	// test loose checking
+					ok, requestDone := p.callback(r.data)
+					matched = matched || ok
+					p.reply = r.data
+					// Remove the matcher if callback indicates that all replies have been received.
+					if requestDone {
+						p.errc <- nil
+						plist.Remove(el)
+						t.log.Trace("loop: matcher completed", "from", p.from, "ptype", p.ptype)
+					}
+					// Reset the continuous timeout counter (time drift detection)
+					contTimeouts = 0
+				}
+			}
+			r.matched <- matched
 
-        case now := <-timeout.C:
-            nextTimeout = nil
+		case now := <-timeout.C:
+			nextTimeout = nil
 
-            // Notify and remove callbacks whose deadline is in the past.
-            for el := plist.Front(); el != nil; el = el.Next() {
-                p := el.Value.(*replyMatcher)
-                if now.After(p.deadline) || now.Equal(p.deadline) {
-                    p.errc <- errTimeout
-                    plist.Remove(el)
-                    contTimeouts++
-                    t.log.Trace("loop: matcher timeout", "from", p.from, "ptype", p.ptype)
-                }
-            }
-            // If we've accumulated too many timeouts, do an NTP time sync check
-            if contTimeouts > ntpFailureThreshold {
-                if time.Since(ntpWarnTime) >= ntpWarningCooldown {
-                    ntpWarnTime = time.Now()
-                    go checkClockDrift()
-                }
-                contTimeouts = 0
-            }
-        }
-    }
+			// Notify and remove callbacks whose deadline is in the past.
+			for el := plist.Front(); el != nil; el = el.Next() {
+				p := el.Value.(*replyMatcher)
+				if now.After(p.deadline) || now.Equal(p.deadline) {
+					p.errc <- errTimeout
+					plist.Remove(el)
+					contTimeouts++
+					t.log.Trace("loop: matcher timeout", "from", p.from, "ptype", p.ptype)
+				}
+			}
+			// If we've accumulated too many timeouts, do an NTP time sync check
+			if contTimeouts > ntpFailureThreshold {
+				if time.Since(ntpWarnTime) >= ntpWarningCooldown {
+					ntpWarnTime = time.Now()
+					go checkClockDrift()
+				}
+				contTimeouts = 0
+			}
+		}
+	}
 }
 
 func (t *UDPv4) send(toaddr netip.AddrPort, toid enode.ID, req v4wire.Packet) ([]byte, error) {
-	packet, hash, err := v4wire.Encode(t.priv, req)
-	if err != nil {
-		return hash, err
+    // send: rely on standard ">> <msg>" log emitted by write
+    t.log.Debug("(*UDPv4).send() START")
+    // Log the packet content before encoding for diagnostics
+    t.log.Trace("discv4 pre-encode packet", "name", req.Name(), "to", toaddr, "id", toid, "packet", req)
+    packet, hash, err := v4wire.Encode(t.priv, req)
+    if err != nil {
+        t.log.Debug("(*UDPv4).send() 1")
+        return hash, err
 	}
+	t.log.Debug("(*UDPv4).send() 2")
 	return hash, t.write(toaddr, toid, req.Name(), packet)
 }
 
 func (t *UDPv4) write(toaddr netip.AddrPort, toid enode.ID, what string, packet []byte) error {
+	t.log.Debug("(*UDPv4).write() START")
 	_, err := t.conn.WriteToUDPAddrPort(packet, toaddr)
+	if err != nil {
+		t.log.Error("Error occurred in t.write()", "error", err)
+	}
 	t.log.Trace(">> "+what, "id", toid, "addr", toaddr, "err", err)
 	return err
 }
@@ -612,15 +663,19 @@ func (t *UDPv4) checkBond(id enode.ID, ip netip.AddrPort) bool {
 // ensureBond solicits a ping from a node if we haven't seen a ping from it for a while.
 // This ensures there is a valid endpoint proof on the remote end.
 func (t *UDPv4) ensureBond(toid enode.ID, toaddr netip.AddrPort) {
+	t.log.Debug("(*UDPv4).ensureBond() START")
 	tooOld := time.Since(t.db.LastPingReceived(toid, toaddr.Addr())) > bondExpiration
 	fails := t.db.FindFails(toid, toaddr.Addr())
-	t.log.Trace("ensureBond", "to", toaddr, "id", toid, "tooOld", tooOld, "fails", fails)
+	t.log.Debug("(*UDPv4).ensureBond()", "toid", toid)
+	t.log.Debug("(*UDPv4).ensureBond()", "toaddr", toaddr)
+	t.log.Debug("(*UDPv4).ensureBond()", "tooOld", tooOld)
+	t.log.Debug("(*UDPv4).ensureBond()", "fails", fails)
 	if tooOld || fails > maxFindnodeFailures {
 		rm := t.sendPing(toid, toaddr, nil)
 		<-rm.errc
 		// Wait for them to ping back and process our pong.
 		time.Sleep(respTimeout)
-		t.log.Trace("ensureBond: post-ping wait done")
+		t.log.Debug("(*UDPv4).ensureBond() wait done")
 	}
 }
 
