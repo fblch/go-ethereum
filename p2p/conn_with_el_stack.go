@@ -1,8 +1,15 @@
 package p2p
 
-// #cgo CFLAGS: -I../../el-stack-rs/golang/el_stack
-// #cgo LDFLAGS: -L../../el-stack-rs/target/release -lel_stack
-// #include <el_stack.h>
+/*
+#cgo linux CFLAGS:  -I${SRCDIR}/../../el-stack-rs/golang/el_stack
+#cgo linux LDFLAGS: -L${SRCDIR}/../../el-stack-rs/target/release -lel_stack -Wl,-rpath,${SRCDIR}/../../el-stack-rs/target/release
+
+#cgo darwin CFLAGS:  -I${SRCDIR}/../../el-stack-rs/golang/el_stack
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../el-stack-rs/target/release -lel_stack -Wl,-rpath,${SRCDIR}/../../el-stack-rs/target/release
+
+#include "el_stack.h"
+*/
+import "C"
 
 import (
     "fmt"
@@ -76,13 +83,45 @@ func readFileOrEmpty(path string) []byte {
 type ElStackUdpConn struct {
     *el_stack.ElStackUdpConn
     mu sync.Mutex
+
+    // single-threaded I/O pipeline
+    rwOnce  sync.Once
+    rdReqCh chan readReq
+    wrReqCh chan writeReq
+    quitCh  chan struct{}
+}
+
+type readReq struct {
+    buf []byte
+    ret chan readRes
+}
+type readRes struct {
+    n   int
+    addr *net.UDPAddr
+    err error
+}
+type writeReq struct {
+    b   []byte
+    addr *net.UDPAddr
+    ret chan writeRes
+}
+type writeRes struct {
+    n   int
+    err error
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
-	if raw == nil {
-		return nil // ラッパーの「非存在」を素直に表現
-	}
-	return &ElStackUdpConn{ElStackUdpConn: raw}
+    if raw == nil {
+        return nil // ラッパーの「非存在」を素直に表現
+    }
+    c := &ElStackUdpConn{
+        ElStackUdpConn: raw,
+        rdReqCh:        make(chan readReq),
+        wrReqCh:        make(chan writeReq),
+        quitCh:         make(chan struct{}),
+    }
+    c.startIOLoop()
+    return c
 }
 
 func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
@@ -94,7 +133,14 @@ func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
     elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort() START")
-	n, udpAddr, err := c.ReadFromUDP(b)
+    rr := readReq{buf: b, ret: make(chan readRes, 1)}
+    select {
+    case c.rdReqCh <- rr:
+    case <-c.quitCh:
+        return 0, netip.AddrPort{}, fmt.Errorf("conn closed")
+    }
+    res := <-rr.ret
+    n, udpAddr, err := res.n, res.addr, res.err
     if err != nil {
         elLog.Debug("ElUDP ReadFromUDP error", "err", err)
     }
@@ -122,28 +168,52 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
     // netip.AddrPortをnet.UDPAddrに変換
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() START")
-	addr2 := net.UDPAddrFromAddrPort(addr)
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort()", "addr2", addr2)
-    // c.mu.Lock()
-    n, err = c.WriteToUDP(b, addr2)
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort()", "process", "c.WriteToUDP()", "n", n, "err", err)
-    // c.mu.Unlock()
+    elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() START")
+    addr2 := net.UDPAddrFromAddrPort(addr)
+    elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort()", "addr2", addr2)
+    wr := writeReq{b: b, addr: addr2, ret: make(chan writeRes, 1)}
+    select {
+    case c.wrReqCh <- wr:
+    case <-c.quitCh:
+        return 0, fmt.Errorf("conn closed")
+    }
+    wres := <-wr.ret
+    n, err = wres.n, wres.err
     if err != nil {
         elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
     }
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() 1")
+    elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() 1")
     return n, err
+}
+
+func (c *ElStackUdpConn) startIOLoop() {
+    c.rwOnce.Do(func() {
+        go func() {
+            for {
+                select {
+                case rr := <-c.rdReqCh:
+                    n, udpAddr, err := c.ReadFromUDP(rr.buf)
+                    rr.ret <- readRes{n: n, addr: udpAddr, err: err}
+                case wr := <-c.wrReqCh:
+                    n, err := c.WriteToUDP(wr.b, wr.addr)
+                    wr.ret <- writeRes{n: n, err: err}
+                case <-c.quitCh:
+                    return
+                }
+            }
+        }()
+    })
 }
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-	elLog.Debug("ElUDP Close called")
-	u := c.underlying()
-	if u == nil {
-		return nil
-	}
-	return u.Close()
+    elLog.Debug("ElUDP Close called")
+    u := c.underlying()
+    if u == nil {
+        return nil
+    }
+    close(c.quitCh)
+    return u.Close()
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
@@ -232,8 +302,8 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 		// *el_stack.ElStackUdpConn型をラッパー用の型であるElStackUdpConnに変換
 		d.conn = wrap(conn)
 
-		// // 即時送信テスト: discoveryのPingと同形式のパケットを 10.0.12.10:30310 へ送信
-		// // エラーは致命ではないため、ログ出力のみに留める
+		// 即時送信テスト: discoveryのPingと同形式のパケットを 10.0.12.10:30310 へ送信
+		// エラーは致命ではないため、ログ出力のみに留める
 		// func() {
 		// 	defer func() { recover() }()
 		// 	if d.srv == nil || d.srv.PrivateKey == nil {
