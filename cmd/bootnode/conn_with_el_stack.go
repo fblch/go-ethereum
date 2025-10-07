@@ -5,30 +5,39 @@ package main
 // #include <el_stack.h>
 
 import (
-    "fmt"
-    "net"
-    "net/netip"
-    "os"
-    "strconv"
-    "sync"
+	"fmt"
+	"net"
+	"net/netip"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"el_stack"
 
 	"github.com/ethereum/go-ethereum/log"
-    "github.com/ethereum/go-ethereum/p2p/discover/v4wire"
 )
 
 var elLog = log.Root().New("cmp", "p2p/el_stack")
 
+type temporarySocketTimeoutError struct {
+	error
+}
+
+func (temporarySocketTimeoutError) Temporary() bool { return true }
+
+func (temporarySocketTimeoutError) Timeout() bool { return true }
+
 func CheckEnvDefinition(keys []string) bool {
-    allPresent := true
-    for _, key := range keys {
-        if _, ok := os.LookupEnv(key); !ok {
-            elLog.Debug("Missing required env", "key", key)
-            allPresent = false
-        }
-    }
-    return allPresent
+	allPresent := true
+	for _, key := range keys {
+		if _, ok := os.LookupEnv(key); !ok {
+			elLog.Debug("Missing required env", "key", key)
+			allPresent = false
+		}
+	}
+	return allPresent
 }
 
 // 環境変数から値取得
@@ -71,46 +80,27 @@ func readFileOrEmpty(path string) []byte {
 	return b
 }
 
+// ElStackUdpConn wraps el_stack.ElStackUdpConn and serializes all IO via
+// a single actor goroutine. This guarantees that Read and Write are never
+// executed concurrently against el_stack, which requires mutual exclusion.
+//
+// It also prioritizes writes: before starting a blocking read it drains any
+// queued write requests. Once a read is in progress, it cannot be preempted,
+// but this scheme avoids launching a read while there is pending write work.
 type ElStackUdpConn struct {
-    *el_stack.ElStackUdpConn
-    mu sync.Mutex
-    rwOnce  sync.Once
-    rdReqCh chan readReq
-    wrReqCh chan writeReq
-    quitCh  chan struct{}
-}
-
-type readReq struct {
-    buf []byte
-    ret chan readRes
-}
-type readRes struct {
-    n   int
-    addr *net.UDPAddr
-    err error
-}
-type writeReq struct {
-    b   []byte
-    addr *net.UDPAddr
-    ret chan writeRes
-}
-type writeRes struct {
-    n   int
-    err error
+	*el_stack.ElStackUdpConn
+	mu   sync.Mutex
+	once sync.Once
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
-    if raw == nil {
-        return nil // ラッパーの「非存在」を素直に表現
-    }
-    c := &ElStackUdpConn{
-        ElStackUdpConn: raw,
-        rdReqCh:        make(chan readReq),
-        wrReqCh:        make(chan writeReq),
-        quitCh:         make(chan struct{}),
-    }
-    c.startIOLoop()
-    return c
+	if raw == nil {
+		return nil // ラッパーの「非存在」を素直に表現
+	}
+	c := &ElStackUdpConn{
+		ElStackUdpConn: raw,
+	}
+	return c
 }
 
 func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
@@ -121,84 +111,47 @@ func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-    elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort() START")
-    rr := readReq{buf: b, ret: make(chan readRes, 1)}
-    select {
-    case c.rdReqCh <- rr:
-    case <-c.quitCh:
-        return 0, netip.AddrPort{}, fmt.Errorf("conn closed")
-    }
-    res := <-rr.ret
-    n, udpAddr, err := res.n, res.addr, res.err
-    if err != nil {
-        elLog.Debug("ElUDP ReadFromUDP error", "err", err)
-    }
-    // 返ってきたudpAddrがnilの場合、空のnetip.AddrPor{}を返す
-    if udpAddr == nil {
-	    elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort() 1")
-        return n, netip.AddrPort{}, err
-    }
-    // 先頭のヘクスダンプと簡易デコード
-    if n > 0 {
-        preview := n
-        if preview > 256 {
-            preview = 256
-        }
-        if pkt, _, _, derr := v4wire.Decode(b[:n]); derr == nil && pkt != nil {
-            elLog.Debug("ElUDP ReadFromUDP decoded", "kind", pkt.Name())
-        }
-    }
-	elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort() 2")
-	return n, udpAddr.AddrPort(), err
+	elLog.Debug("ElUDP sync: read", "len", len(b))
+	// Set read deadline and ensure reset after read.
+	_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
+	n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
+	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "n", n)
+	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "udpaddr", udpAddr)
+	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "uerr", uerr)
+	_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
+	if uerr != nil {
+		elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort ERROR", "err", uerr)
+		if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
+			elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort uerr exchange to Temporary Error")
+			uerr = temporarySocketTimeoutError{error: uerr}
+		}
+		return n, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.LocalAddr(), Addr: nil, Err: uerr}
+	}
+	if udpAddr == nil {
+		return n, netip.AddrPort{}, nil
+	}
+	return n, udpAddr.AddrPort(), nil
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-    elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() START")
-    // netip.AddrPortをnet.UDPAddrに変換
-    addr2 := net.UDPAddrFromAddrPort(addr)
-    wr := writeReq{b: b, addr: addr2, ret: make(chan writeRes, 1)}
-    select {
-    case c.wrReqCh <- wr:
-    case <-c.quitCh:
-        return 0, fmt.Errorf("conn closed")
-    }
-    wres := <-wr.ret
-    n, err = wres.n, wres.err
-    if err != nil {
-        elLog.Debug("ElUDP WriteToUDP error", "err", err, "to", addr.String(), "n", n)
-    }
-    elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort() 1")
-    return n, err
-}
-
-func (c *ElStackUdpConn) startIOLoop() {
-    c.rwOnce.Do(func() {
-        go func() {
-            for {
-                select {
-                case rr := <-c.rdReqCh:
-                    n, udpAddr, err := c.ReadFromUDP(rr.buf)
-                    rr.ret <- readRes{n: n, addr: udpAddr, err: err}
-                case wr := <-c.wrReqCh:
-                    n, err := c.WriteToUDP(wr.b, wr.addr)
-                    wr.ret <- writeRes{n: n, err: err}
-                case <-c.quitCh:
-                    return
-                }
-            }
-        }()
-    })
+	elLog.Debug("ElUDP sync: write", "len", len(b), "to", addr.String())
+	n, uerr := c.ElStackUdpConn.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
+	if uerr != nil {
+		return n, &net.OpError{Op: "write", Net: "udp", Source: c.LocalAddr(), Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
+	}
+	return n, nil
 }
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-    elLog.Debug("ElUDP Close called")
-    u := c.underlying()
-    if u == nil {
-        return nil
-    }
-    close(c.quitCh)
-    return u.Close()
+	elLog.Debug("ElUDP Close called")
+	var cerr error
+	c.once.Do(func() {
+		if u := c.underlying(); u != nil {
+			cerr = u.Close()
+		}
+	})
+	return cerr
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
@@ -217,13 +170,18 @@ func (c *ElStackUdpConn) LocalAddr() net.Addr {
 	return a
 }
 
+// no actor loop needed in mutex-serialized implementation
+
+// tempTimeoutErr is a transient read timeout used to shorten lock holding time.
+// no temp timeout error in mutex-only scheme
+
 // WisteriaVpnEventDelegate 実装
 type vpnDelegate struct {
-    core *el_stack.ElStackCore
-    conn *ElStackUdpConn // *el_stack.ElStackUdpConn wrapper
-    done chan struct{}
-    // preferred UDP bind port provided by server (0 means auto)
-    preferPort int
+	core *el_stack.ElStackCore
+	conn *ElStackUdpConn // *el_stack.ElStackUdpConn wrapper
+	done chan struct{}
+	// preferred UDP bind port provided by server (0 means auto)
+	preferPort int
 }
 
 func (d *vpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
@@ -247,7 +205,7 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 		// BIND_ADDRが"auto"または未設定なら、付与されたIPv4の最初のアドレスに:0でバインド
 		bindCfg := getEnvOrDefault("BIND_ADDR", "auto")
 		bindAddr := bindCfg
-        if bindCfg == "auto" {
+		if bindCfg == "auto" {
 			// ipAddrsの中からIPv4を優先して選ぶ
 			chosen := ""
 			for _, ip := range ipAddrs {
@@ -259,17 +217,17 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 			if chosen == "" && len(ipAddrs) > 0 {
 				chosen = ipAddrs[0] // IPv4が無ければ最初のもの
 			}
-            if chosen == "" {
-                fmt.Println("No IP assigned by VPN; cannot bind UDP")
-                elLog.Debug("No VPN IP available for UDP bind")
-                return
-            }
-            port := 0
-            if d.preferPort > 0 {
-                port = d.preferPort
-            }
-            bindAddr = fmt.Sprintf("%s:%d", chosen, port)
-        }
+			if chosen == "" {
+				fmt.Println("No IP assigned by VPN; cannot bind UDP")
+				elLog.Debug("No VPN IP available for UDP bind")
+				return
+			}
+			port := 0
+			if d.preferPort > 0 {
+				port = d.preferPort
+			}
+			bindAddr = fmt.Sprintf("%s:%d", chosen, port)
+		}
 		fmt.Println("Binding UDP via el_stack to:", bindAddr)
 		elLog.Debug("ElUDP Binding", "bind", bindAddr)
 		socket, err2 := d.core.UdpBind(bindAddr)
@@ -329,15 +287,15 @@ func ListenElUDP(conn chan *ElStackUdpConn, preferPort int) {
 	productName := getEnvOrDefault("PRODUCT_NAME", "go-udp-server")
 	productVersion := getEnvOrDefault("PRODUCT_VERSION", "0.1.0")
 	productPlatform := getEnvOrDefault("OS", "Linux")
-	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert, 1400)
 
-	core := el_stack.NewElStackCore(accountCfg, vpnCfg, prodCfg)
-    delegate := &vpnDelegate{
-        core:       core,
-        done:       make(chan struct{}, 1),
-        preferPort: preferPort,
-    }
-	err := core.Start(delegate)
+	core := el_stack.NewElStackCore(prodCfg)
+	delegate := &vpnDelegate{
+		core:       core,
+		done:       make(chan struct{}, 1),
+		preferPort: preferPort,
+	}
+	err := core.Start(delegate, vpnCfg, accountCfg)
 	if err != nil {
 		fmt.Println("start failed:", err)
 		return
