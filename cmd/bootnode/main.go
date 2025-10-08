@@ -18,21 +18,22 @@
 package main
 
 import (
-    "crypto/ecdsa"
-    "flag"
-    "fmt"
-    "net"
-    "net/netip"
-    "os"
-    "time"
+	"crypto/ecdsa"
+	"flag"
+	"fmt"
+	"net"
 
-    "github.com/ethereum/go-ethereum/cmd/utils"
-    "github.com/ethereum/go-ethereum/crypto"
-    "github.com/ethereum/go-ethereum/log"
-    "github.com/ethereum/go-ethereum/p2p/discover"
-    "github.com/ethereum/go-ethereum/p2p/enode"
-    "github.com/ethereum/go-ethereum/p2p/nat"
-    "github.com/ethereum/go-ethereum/p2p/netutil"
+	// "net/netip"
+	"os"
+	"time"
+
+	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/nat"
+	"github.com/ethereum/go-ethereum/p2p/netutil"
 )
 
 func main() {
@@ -103,59 +104,49 @@ func main() {
 		}
 	}
 
-    // Ensure listen address parses, and capture preferred port for el_stack binding.
-    var preferPort int
-    addrForParse := *listenAddr
-    if addrForParse == "" {
-        addrForParse = ":0"
-    }
-    udpAddr, err := net.ResolveUDPAddr("udp", addrForParse)
-    if err != nil {
-        utils.Fatalf("-ResolveUDPAddr: %v", err)
-    }
-    preferPort = udpAddr.Port
+	// Ensure listen address parses, and capture preferred port for el_stack binding.
+	// var preferPort int
+	addrForParse := *listenAddr
+	if addrForParse == "" {
+		addrForParse = ":0"
+	}
+	udpAddr, err := net.ResolveUDPAddr("udp", addrForParse)
+	if err != nil {
+		utils.Fatalf("-ResolveUDPAddr: %v", err)
+	}
+	// preferPort = udpAddr.Port
 
-    // Try el_stack first; fall back to std UDP if unavailable.
-    var conn discover.UDPConn
-    if c, err := trySetupElUDPListening(preferPort, 5*time.Second); err == nil {
-        conn = c
-        log.Root().Debug("bootnode: using el_stack UDP")
-    } else {
-        log.Root().Debug("bootnode: el_stack unavailable, falling back to std UDP", "err", err)
-        // Resolve and bind a standard UDP socket
-        addr, err := net.ResolveUDPAddr("udp", *listenAddr)
-        if err != nil {
-            utils.Fatalf("-ResolveUDPAddr: %v", err)
-        }
-        usock, err := net.ListenUDP("udp", addr)
-        if err != nil {
-            utils.Fatalf("-ListenUDP: %v", err)
-        }
-        conn = &stdUDPConn{UDPConn: usock}
-    }
-    defer conn.Close()
+	// Try el_stack first; fall back to std UDP if unavailable.
+	var conn discover.UDPConn
+	if CheckEnvDefinition() {
+		_ = SetupELVpnDelegate()
+		conn, _ = ListenELUDP("udp", udpAddr)
+	} else {
+		conn, _ = net.ListenUDP("udp", udpAddr)
+	}
+	defer conn.Close()
 
 	db, _ := enode.OpenDB("")
 	ln := enode.NewLocalNode(db, nodeKey)
 
-    listenerAddr := conn.LocalAddr().(*net.UDPAddr)
-    // Ensure ENR reflects the actual bound UDP endpoint.
-    if listenerAddr != nil {
-        ln.SetStaticIP(listenerAddr.IP)
-        ln.SetFallbackUDP(listenerAddr.Port)
-    }
-    if natm != nil && !listenerAddr.IP.IsLoopback() {
-        natAddr := doPortMapping(natm, ln, listenerAddr)
-        if natAddr != nil {
-            listenerAddr = natAddr
-        }
+	listenerAddr := conn.LocalAddr().(*net.UDPAddr)
+	// Ensure ENR reflects the actual bound UDP endpoint.
+	if listenerAddr != nil {
+		ln.SetStaticIP(listenerAddr.IP)
+		ln.SetFallbackUDP(listenerAddr.Port)
+	}
+	if natm != nil && !listenerAddr.IP.IsLoopback() {
+		natAddr := doPortMapping(natm, ln, listenerAddr)
+		if natAddr != nil {
+			listenerAddr = natAddr
+		}
 	}
 
 	printNotice(&nodeKey.PublicKey, *listenerAddr)
-    cfg := discover.Config{
-        PrivateKey:  nodeKey,
-        NetRestrict: restrictList,
-    }
+	cfg := discover.Config{
+		PrivateKey:  nodeKey,
+		NetRestrict: restrictList,
+	}
 	if *runv5 {
 		if _, err := discover.ListenV5(conn, ln, cfg); err != nil {
 			utils.Fatalf("%v", err)
@@ -167,47 +158,6 @@ func main() {
 	}
 
 	select {}
-}
-
-// stdUDPConn adapts *net.UDPConn to the discover.UDPConn interface.
-type stdUDPConn struct{
-    *net.UDPConn
-}
-
-func (c *stdUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-    n, udpAddr, err := c.ReadFromUDP(b)
-    if udpAddr == nil {
-        return n, netip.AddrPort{}, err
-    }
-    return n, udpAddr.AddrPort(), err
-}
-
-func (c *stdUDPConn) WriteToUDPAddrPort(b []byte, ap netip.AddrPort) (n int, err error) {
-    n, err = c.WriteToUDP(b, net.UDPAddrFromAddrPort(ap))
-    return n, err
-}
-
-// trySetupElUDPListening attempts to start el_stack-based UDP listening. It returns
-// a connection or an error if el_stack is not configured or didn't become ready
-// within the given timeout.
-func trySetupElUDPListening(preferPort int, timeout time.Duration) (discover.UDPConn, error) {
-    // Ensure required env vars are present; otherwise skip el_stack.
-    required := []string{"ACCOUNT", "PASSWORD", "SERVER_HOST", "SERVER_SERV", "ANTI_OVERLAP"}
-    if !CheckEnvDefinition(required) {
-        return nil, fmt.Errorf("missing el_stack envs")
-    }
-
-    connCh := make(chan *ElStackUdpConn, 1)
-    go ListenElUDP(connCh, preferPort)
-    select {
-    case c := <-connCh:
-        if c == nil {
-            return nil, fmt.Errorf("el_stack returned nil conn")
-        }
-        return c, nil
-    case <-time.After(timeout):
-        return nil, fmt.Errorf("el_stack setup timeout after %s", timeout)
-    }
 }
 
 func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {

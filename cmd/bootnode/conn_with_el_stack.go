@@ -4,6 +4,8 @@ package main
 // #cgo LDFLAGS: -L../../el-stack-rs/target/release -lel_stack
 // #include <el_stack.h>
 
+import "C"
+
 import (
 	"fmt"
 	"net"
@@ -17,6 +19,7 @@ import (
 	"el_stack"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 )
 
 var elLog = log.Root().New("cmp", "p2p/el_stack")
@@ -29,8 +32,9 @@ func (temporarySocketTimeoutError) Temporary() bool { return true }
 
 func (temporarySocketTimeoutError) Timeout() bool { return true }
 
-func CheckEnvDefinition(keys []string) bool {
+func CheckEnvDefinition() bool {
 	allPresent := true
+	keys := []string{"ACCOUNT", "PASSWORD", "SERVER_HOST", "SERVER_SERV", "ANTI_OVERLAP"}
 	for _, key := range keys {
 		if _, ok := os.LookupEnv(key); !ok {
 			elLog.Debug("Missing required env", "key", key)
@@ -85,12 +89,22 @@ func readFileOrEmpty(path string) []byte {
 // executed concurrently against el_stack, which requires mutual exclusion.
 //
 // It also prioritizes writes: before starting a blocking read it drains any
-// queued write requests. Once a read is in progress, it cannot be preempted,
-// but this scheme avoids launching a read while there is pending write work.
+// queued write requests. Once a read is in progress, it cannot be preempted
+// (the underlying API doesn't expose deadlines here), but this scheme avoids
+// launching a read while there is pending write work.
 type ElStackUdpConn struct {
 	*el_stack.ElStackUdpConn
-	mu   sync.Mutex
 	once sync.Once
+}
+
+func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+	elLog.Debug("ListenELUDP", "addr", addr)
+	c, err := el_stack.NewElStackUdpConn(network, addr)
+	if err != nil {
+		return &ElStackUdpConn{}, err
+	}
+	conn := wrap(c)
+	return conn, nil
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
@@ -122,8 +136,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 	if uerr != nil {
 		elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort ERROR", "err", uerr)
 		if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
-			elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort uerr exchange to Temporary Error")
-			uerr = temporarySocketTimeoutError{error: uerr}
+			return 0, netip.AddrPort{}, nil
 		}
 		return n, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.LocalAddr(), Addr: nil, Err: uerr}
 	}
@@ -134,6 +147,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
+	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort START")
 	elLog.Debug("ElUDP sync: write", "len", len(b), "to", addr.String())
 	n, uerr := c.ElStackUdpConn.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
@@ -170,101 +184,28 @@ func (c *ElStackUdpConn) LocalAddr() net.Addr {
 	return a
 }
 
-// no actor loop needed in mutex-serialized implementation
-
-// tempTimeoutErr is a transient read timeout used to shorten lock holding time.
-// no temp timeout error in mutex-only scheme
-
 // WisteriaVpnEventDelegate 実装
 type vpnDelegate struct {
-	core *el_stack.ElStackCore
-	conn *ElStackUdpConn // *el_stack.ElStackUdpConn wrapper
-	done chan struct{}
-	// preferred UDP bind port provided by server (0 means auto)
-	preferPort int
+	linkedCh chan struct{}
 }
 
 func (d *vpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
-	fmt.Println("Status:", status)
 	elLog.Debug("VPN Status", "status", status)
 }
 
 func (d *vpnDelegate) OnConnectionError(msg string) {
-	fmt.Println("Connection error:", msg)
 	elLog.Debug("VPN Connection error", "msg", msg)
 }
 
 func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
-	fmt.Println("IP:", ipAddrs)
-	fmt.Println("DNS:", dnsAddrs)
-	fmt.Println("Routes:", routes)
-	elLog.Debug("VPN LinkedParams", "ips", ipAddrs, "dns", dnsAddrs, "routes", routes)
+	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "ips", ipAddrs)
+	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "dns", dnsAddrs)
+	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "routes", routes)
 
-	go func() {
-		// UDPソケットを取得
-		// BIND_ADDRが"auto"または未設定なら、付与されたIPv4の最初のアドレスに:0でバインド
-		bindCfg := getEnvOrDefault("BIND_ADDR", "auto")
-		bindAddr := bindCfg
-		if bindCfg == "auto" {
-			// ipAddrsの中からIPv4を優先して選ぶ
-			chosen := ""
-			for _, ip := range ipAddrs {
-				if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
-					chosen = ip
-					break
-				}
-			}
-			if chosen == "" && len(ipAddrs) > 0 {
-				chosen = ipAddrs[0] // IPv4が無ければ最初のもの
-			}
-			if chosen == "" {
-				fmt.Println("No IP assigned by VPN; cannot bind UDP")
-				elLog.Debug("No VPN IP available for UDP bind")
-				return
-			}
-			port := 0
-			if d.preferPort > 0 {
-				port = d.preferPort
-			}
-			bindAddr = fmt.Sprintf("%s:%d", chosen, port)
-		}
-		fmt.Println("Binding UDP via el_stack to:", bindAddr)
-		elLog.Debug("ElUDP Binding", "bind", bindAddr)
-		socket, err2 := d.core.UdpBind(bindAddr)
-		if err2 != nil {
-			fmt.Println("Udp bind failed:", err2)
-			elLog.Debug("ElUDP Bind failed", "err", err2)
-			return
-		}
-
-		conn := el_stack.NewElStackUdpConn(socket)
-		// *el_stack.ElStackUdpConn型をラッパー用の型であるElStackUdpConnに変換
-		d.conn = wrap(conn)
-		elLog.Debug("ElUDP conn ready, signaling done")
-		d.done <- struct{}{}
-		// defer conn.Close()
-
-		// for {
-		// 	buf := make([]byte, 1500)
-		// 	n, from, err := conn.ReadFromUDP(buf)
-		// 	if err != nil {
-		// 		fmt.Println("Udp RecvFrom failed:", err)
-		// 		break
-		// 	}
-		// 	fmt.Println("recv from: ", from)
-		// 	fmt.Println("recved: ", buf[:n])
-
-		// 	_, err = conn.WriteToUDP(buf[:n], from)
-		// 	if err != nil {
-		// 		fmt.Println("Udp SendTo failed:", err)
-		// 		break
-		// 	}
-		// 	fmt.Println("sent: ", n)
-		// }
-	}()
+	d.linkedCh <- struct{}{}
 }
 
-func ListenElUDP(conn chan *ElStackUdpConn, preferPort int) {
+func SetupELVpnDelegate() *vpnDelegate {
 	// 環境変数から各種値を取得
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
@@ -287,23 +228,17 @@ func ListenElUDP(conn chan *ElStackUdpConn, preferPort int) {
 	productName := getEnvOrDefault("PRODUCT_NAME", "go-udp-server")
 	productVersion := getEnvOrDefault("PRODUCT_VERSION", "0.1.0")
 	productPlatform := getEnvOrDefault("OS", "Linux")
-	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert, 1400)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert, 1280)
 
-	core := el_stack.NewElStackCore(prodCfg)
+	el_stack.Initialize(prodCfg)
 	delegate := &vpnDelegate{
-		core:       core,
-		done:       make(chan struct{}, 1),
-		preferPort: preferPort,
+		linkedCh: make(chan struct{}, 1),
 	}
-	err := core.Start(delegate, vpnCfg, accountCfg)
+	err := el_stack.Start(delegate, vpnCfg, accountCfg)
 	if err != nil {
-		fmt.Println("start failed:", err)
-		return
+		elLog.Error("SetupELVpnDelegate ERROR", "err", err)
+		return &vpnDelegate{}
 	}
-	defer core.Stop()
-
-	<-delegate.done
-	conn <- delegate.conn
-
-	select {}
+	<-delegate.linkedCh
+	return delegate
 }
