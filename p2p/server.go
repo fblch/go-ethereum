@@ -410,7 +410,7 @@ func (srv *Server) Start() (err error) {
 	// check use el_stack
 	if CheckEnvDefinition() {
 		srv.vpnDelegate = SetupELVpnDelegate()
-		// srv.listenFunc = ListenELTCP
+		srv.listenFunc = ListenELTCP
 		srv.listenUDPFunc = ListenELUDP
 	}
 
@@ -615,7 +615,12 @@ func (srv *Server) MaxDialedConns() (limit int) {
 
 func (srv *Server) setupListening() error {
 	// Launch the listener.
-	listener, err := srv.listenFunc("tcp", srv.ListenAddr)
+	listenAddr := srv.ListenAddr
+	// if it is allocated IP address via vpn, insert IP address before listenAddr(it is port number)
+	if srv.vpnDelegate.ipAddr != "" {
+		listenAddr = srv.vpnDelegate.ipAddr + listenAddr
+	}
+	listener, err := srv.listenFunc("tcp", listenAddr)
 	if err != nil {
 		return err
 	}

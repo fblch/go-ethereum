@@ -184,6 +184,11 @@ func (c *ElStackUdpConn) LocalAddr() net.Addr {
 	return a
 }
 
+// el経由の処理を本ファイルにまとめるためのラッパ関数
+func ListenELTCP(network, addr string) (net.Listener, error) {
+	return el_stack.NewElStackTcpListener(network, addr)
+}
+
 // WisteriaVpnEventDelegate 実装
 type vpnDelegate struct {
 	linkedCh chan struct{}
