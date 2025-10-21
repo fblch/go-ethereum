@@ -411,6 +411,7 @@ func (srv *Server) Start() (err error) {
 	if CheckEnvDefinition() {
 		srv.vpnDelegate = SetupELVpnDelegate()
 		srv.listenFunc = ListenELTCP
+		srv.Dialer = &ElStackTcpDialer{}
 		srv.listenUDPFunc = ListenELUDP
 	}
 
