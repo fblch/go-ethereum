@@ -93,18 +93,22 @@ func readFileOrEmpty(path string) []byte {
 // (the underlying API doesn't expose deadlines here), but this scheme avoids
 // launching a read while there is pending write work.
 type ElStackUdpConn struct {
-	*el_stack.ElStackUdpConn
-	once sync.Once
+	ElStackUdpConn *el_stack.ElStackUdpConn
+	localAddr      net.Addr
+	once           sync.Once
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	elLog.Debug("ListenELUDP", "addr", addr)
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
+		elLog.Error("UDP Bind FAILED", "err", err)
 		return &ElStackUdpConn{}, err
 	}
-	conn := wrap(c)
-	return conn, nil
+	localAddr := c.LocalAddr()
+	// conn := wrap(c)
+	// return conn, nil
+	return &ElStackUdpConn{ElStackUdpConn: c, localAddr: localAddr}, nil
 }
 
 func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
