@@ -67,13 +67,11 @@ func (it *lookup) run() []*enode.Node {
 // advance advances the lookup until any new nodes have been found.
 // It returns false when the lookup has ended.
 func (it *lookup) advance() bool {
-	it.tab.log.Debug("(*lookup).advance() START")
 	for it.startQueries() {
 		select {
 		case nodes := <-it.replyCh:
 			it.replyBuffer = it.replyBuffer[:0]
 			for _, n := range nodes {
-				it.tab.log.Debug("(*lookup).advance()", "addr", n.IPAddr())
 				if n != nil && !it.seen[n.ID()] {
 					it.seen[n.ID()] = true
 					it.result.push(n, bucketSize)
@@ -82,14 +80,12 @@ func (it *lookup) advance() bool {
 			}
 			it.queries--
 			if len(it.replyBuffer) > 0 {
-				it.tab.log.Debug("(*lookup).advance() 1")
 				return true
 			}
 		case <-it.cancelCh:
 			it.shutdown()
 		}
 	}
-	it.tab.log.Debug("(*lookup).advance() 2")
 	return false
 }
 
@@ -103,7 +99,6 @@ func (it *lookup) shutdown() {
 }
 
 func (it *lookup) startQueries() bool {
-	it.tab.log.Debug("(*lookup).startQueries() START")
 	if it.queryfunc == nil {
 		return false
 	}
@@ -121,7 +116,6 @@ func (it *lookup) startQueries() bool {
 		}
 		it.queries = 1
 		it.replyCh <- closest.entries
-		it.tab.log.Debug("(*lookup).startQueries() 1")
 		return true
 	}
 
@@ -131,12 +125,10 @@ func (it *lookup) startQueries() bool {
 		if !it.asked[n.ID()] {
 			it.asked[n.ID()] = true
 			it.queries++
-			it.tab.log.Debug("(*lookup).startQueries()", "addr", n.IPAddr())
 			go it.query(n, it.replyCh)
 		}
 	}
 	// The lookup ends when no more nodes can be asked.
-	it.tab.log.Debug("(*lookup).startQueries() 2")
 	return it.queries > 0
 }
 
@@ -154,7 +146,6 @@ func (it *lookup) slowdown(d time.Duration) {
 }
 
 func (it *lookup) query(n *enode.Node, reply chan<- []*enode.Node) {
-	it.tab.log.Debug("(*lookup).query() START")
 	// ADDED by Jakub Pajek (reduce disc traffic)
 	it.slowdown(1 * time.Second)
 	r, err := it.queryfunc(n)

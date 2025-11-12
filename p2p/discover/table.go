@@ -244,7 +244,6 @@ func (tab *Table) refresh() <-chan struct{} {
 // contain unverified nodes. However, if there are no verified nodes at all, the result
 // will contain unverified nodes.
 func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *nodesByDistance {
-	tab.log.Debug("(*Table).findnodeByID() START")
 	tab.mutex.Lock()
 	defer tab.mutex.Unlock()
 
@@ -256,7 +255,6 @@ func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *
 	for _, b := range &tab.buckets {
 		// tab.log.Debug("findnodeByID", "b", b)
 		for _, n := range b.entries {
-			tab.log.Debug("(*Table).findnodeByID()", "n", n.IPAddr())
 			nodes.push(n.Node, nresults)
 			// MODIFIED by Jakub Pajek (mobile connectivity)
 			// WAN bootnodes can not correctly perform a liveness check of mobile nodes
@@ -271,10 +269,8 @@ func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *
 	}
 
 	if preferLive && len(liveNodes.entries) > 0 {
-		tab.log.Debug("(*Table).findnodeByID() 1")
 		return liveNodes
 	}
-	tab.log.Debug("(*Table).findnodeByID() 2")
 	return nodes
 }
 
@@ -354,7 +350,6 @@ func (tab *Table) addInboundNode(n *enode.Node) bool {
 }
 
 func (tab *Table) trackRequest(n *enode.Node, success bool, foundNodes []*enode.Node) {
-	tab.log.Debug("(*Table).trackRequest() START")
 	op := trackRequestOp{n, foundNodes, success}
 	select {
 	case tab.trackRequestCh <- op:
@@ -525,15 +520,12 @@ func (tab *Table) removeIP(b *bucket, ip netip.Addr) {
 // handleAddNode adds the node in the request to the table, if there is space.
 // The caller must hold tab.mutex.
 func (tab *Table) handleAddNode(req addNodeOp) bool {
-	tab.log.Debug("(*Table).handleAddNode() START")
 	if req.node.ID() == tab.self().ID() {
-		tab.log.Debug("(*Table).handleAddNode() 1")
 		return false
 	}
 	// For nodes from inbound contact, there is an additional safety measure: if the table
 	// is still initializing the node is not added.
 	if req.isInbound && !tab.isInitDone() {
-		tab.log.Debug("(*Table).handleAddNode() 2")
 		return false
 	}
 
@@ -543,18 +535,15 @@ func (tab *Table) handleAddNode(req addNodeOp) bool {
 	n, _ := tab.bumpInBucket(b, req.node, req.isInbound)
 	if n != nil {
 		// Already in bucket.
-		tab.log.Debug("(*Table).handleAddNode() 3")
 		return false
 	}
 	if len(b.entries) >= bucketSize {
 		// Bucket full, maybe add as replacement.
 		tab.addReplacement(b, req.node)
-		tab.log.Debug("(*Table).handleAddNode() 4")
 		return false
 	}
 	if !tab.addIP(b, req.node.IPAddr()) {
 		// Can't add: IP limit reached.
-		tab.log.Debug("(*Table).handleAddNode() 5")
 		return false
 	}
 
@@ -567,7 +556,6 @@ func (tab *Table) handleAddNode(req addNodeOp) bool {
 	b.entries = append(b.entries, wn)
 	b.replacements = deleteNode(b.replacements, wn.ID())
 	tab.nodeAdded(b, wn)
-	tab.log.Debug("(*Table).handleAddNode() 6")
 	return true
 }
 
@@ -645,12 +633,10 @@ func (tab *Table) deleteInBucket(b *bucket, id enode.ID) *tableNode {
 // bumpInBucket updates a node record if it exists in the bucket.
 // The second return value reports whether the node's endpoint (IP/port) was updated.
 func (tab *Table) bumpInBucket(b *bucket, newRecord *enode.Node, isInbound bool) (n *tableNode, endpointChanged bool) {
-	tab.log.Debug("(*Table).bumpInBucket() START")
 	i := slices.IndexFunc(b.entries, func(elem *tableNode) bool {
 		return elem.ID() == newRecord.ID()
 	})
 	if i == -1 {
-		tab.log.Debug("(*Table).bumpInBucket() 1")
 		return nil, false // not in bucket
 	}
 	n = b.entries[i]
@@ -660,10 +646,6 @@ func (tab *Table) bumpInBucket(b *bucket, newRecord *enode.Node, isInbound bool)
 	// this check also ensures found discv4 nodes (which always have seq=0) can't be
 	// updated.
 	if newRecord.Seq() <= n.Seq() && !isInbound {
-		tab.log.Debug("(*Table).bumpInBucket()", "newRecord.Seq", newRecord.Seq())
-		tab.log.Debug("(*Table).bumpInBucket()", "n.Seq", n.Seq())
-		tab.log.Debug("(*Table).bumpInBucket()", "isInbound", isInbound)
-		tab.log.Debug("(*Table).bumpInBucket() 2")
 		return n, false
 	}
 
@@ -675,7 +657,6 @@ func (tab *Table) bumpInBucket(b *bucket, newRecord *enode.Node, isInbound bool)
 		if !tab.addIP(b, newRecord.IPAddr()) {
 			// It doesn't fit with the limit, put the previous record back.
 			tab.addIP(b, n.IPAddr())
-			tab.log.Debug("(*Table).bumpInBucket() 3")
 			return n, false
 		}
 	}
@@ -685,10 +666,8 @@ func (tab *Table) bumpInBucket(b *bucket, newRecord *enode.Node, isInbound bool)
 	if ipchanged || portchanged {
 		// Ensure node is revalidated quickly for endpoint changes.
 		tab.revalidation.nodeEndpointChanged(tab, n)
-		tab.log.Debug("(*Table).bumpInBucket() 4")
 		return n, true
 	}
-	tab.log.Debug("(*Table).bumpInBucket() 5")
 	return n, false
 }
 
