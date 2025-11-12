@@ -94,7 +94,7 @@ func readFileOrEmpty(path string) []byte {
 // launching a read while there is pending write work.
 type ElStackUdpConn struct {
 	ElStackUdpConn *el_stack.ElStackUdpConn
-	localAddr      net.Addr
+	laddr          net.Addr
 	once           sync.Once
 }
 
@@ -106,19 +106,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 		return &ElStackUdpConn{}, err
 	}
 	localAddr := c.LocalAddr()
-	// conn := wrap(c)
-	// return conn, nil
-	return &ElStackUdpConn{ElStackUdpConn: c, localAddr: localAddr}, nil
-}
-
-func wrap(raw *el_stack.ElStackUdpConn) *ElStackUdpConn {
-	if raw == nil {
-		return nil // ラッパーの「非存在」を素直に表現
-	}
-	c := &ElStackUdpConn{
-		ElStackUdpConn: raw,
-	}
-	return c
+	return &ElStackUdpConn{ElStackUdpConn: c, laddr: localAddr}, nil
 }
 
 func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
@@ -129,33 +117,27 @@ func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	elLog.Debug("ElUDP sync: read", "len", len(b))
 	// Set read deadline and ensure reset after read.
-	_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
-	n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "n", n)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "udpaddr", udpAddr)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "uerr", uerr)
-	_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
-	if uerr != nil {
-		elLog.Debug("(*ElStackUdpConn).ReadFromUDPAddrPort ERROR", "err", uerr)
-		if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
-			return 0, netip.AddrPort{}, nil
+	for {
+		_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
+		_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
+
+		if uerr != nil {
+			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
+				time.Sleep(400 * time.Millisecond)
+				continue
+			}
+			return 0, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
 		}
-		return n, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.LocalAddr(), Addr: nil, Err: uerr}
+		return n, udpAddr.AddrPort(), nil
 	}
-	if udpAddr == nil {
-		return n, netip.AddrPort{}, nil
-	}
-	return n, udpAddr.AddrPort(), nil
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort START")
-	elLog.Debug("ElUDP sync: write", "len", len(b), "to", addr.String())
 	n, uerr := c.ElStackUdpConn.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
-		return n, &net.OpError{Op: "write", Net: "udp", Source: c.LocalAddr(), Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
+		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
 	}
 	return n, nil
 }
@@ -173,19 +155,7 @@ func (c *ElStackUdpConn) Close() error {
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
-	u := c.underlying()
-	if u == nil {
-		elLog.Debug("ElUDP LocalAddr", "addr", "<nil>")
-		return nil
-	}
-	a := u.LocalAddr()
-	elLog.Debug("ElUDP LocalAddr", "addr", func() string {
-		if a != nil {
-			return a.String()
-		}
-		return "<nil>"
-	}())
-	return a
+	return c.laddr
 }
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
@@ -207,9 +177,7 @@ func (d *vpnDelegate) OnConnectionError(msg string) {
 }
 
 func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "ips", ipAddrs)
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "dns", dnsAddrs)
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "routes", routes)
+	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 
 	d.linkedCh <- struct{}{}
 }

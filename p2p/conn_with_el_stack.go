@@ -101,12 +101,11 @@ func readFileOrEmpty(path string) []byte {
 // launching a read while there is pending write work.
 type ElStackUdpConn struct {
 	ElStackUdpConn *el_stack.ElStackUdpConn
-	laddr      net.Addr
+	laddr          net.Addr
 	once           sync.Once
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
-	elLog.Debug("ListenELUDP", "addr", addr)
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
 		elLog.Error("UDP Bind FAILED", "err", err)
@@ -124,30 +123,24 @@ func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	elLog.Debug("ElUDP sync: read", "len", len(b))
 	// Set read deadline and ensure reset after read.
-	_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-	n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "n", n)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "udpaddr", udpAddr)
-	elLog.Debug("(ElStackUdpConn).ReadFromUDPAddrPort result", "uerr", uerr)
-	_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
-	if uerr != nil {
-		elLog.Error("(*ElStackUdpConn).ReadFromUDPAddrPort ERROR", "err", uerr)
-		if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
-			return 0, netip.AddrPort{}, nil
+	for {
+		_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
+		_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
+
+		if uerr != nil {
+			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
+				time.Sleep(400 * time.Millisecond)
+				continue
+			}
+			return 0, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
 		}
-		return n, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
+		return n, udpAddr.AddrPort(), nil
 	}
-	if udpAddr == nil {
-		return n, netip.AddrPort{}, nil
-	}
-	return n, udpAddr.AddrPort(), nil
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	elLog.Debug("(*ElStackUdpConn).WriteToUDPAddrPort START")
-	elLog.Debug("ElUDP sync: write", "len", len(b), "to", addr.String())
 	n, uerr := c.ElStackUdpConn.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
 		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
@@ -171,16 +164,13 @@ func (c *ElStackUdpConn) LocalAddr() net.Addr { return c.laddr }
 
 type ElStackTcpListener struct {
 	inner net.Listener
-	// laddr net.Addr
 }
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
 func ListenELTCP(network, addr string) (net.Listener, error) {
-	// return el_stack.NewElStackTcpListener(network, addr)
 	ln, err := el_stack.NewElStackTcpListener(network, addr)
 	listener := &ElStackTcpListener{
 		inner: ln,
-		// laddr: ln.Addr(),
 	}
 	return listener, err
 }
@@ -201,8 +191,6 @@ func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
 
 func (ln *ElStackTcpListener) Close() error   { return ln.inner.Close() }
 func (ln *ElStackTcpListener) Addr() net.Addr { return ln.inner.Addr() }
-
-// func (ln *ElStackTcpListener) localAddr() net.Addr { return ln.laddr }
 
 type ElStackTcpDialer struct{}
 
@@ -259,9 +247,11 @@ func (*ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, 
 }
 
 type ElStackTcpConn struct {
-	inner net.Conn
-	laddr net.Addr
-	raddr net.Addr
+	inner     net.Conn
+	laddr     net.Addr
+	raddr     net.Addr
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
@@ -273,34 +263,17 @@ func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
 }
 
 // net.Conn interface 実装
-func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
-	start := time.Now()
-	elLog.Trace("ElStackTcpConn Read wait", "peer", c.raddr, "len", len(b))
-	n, err = c.inner.Read(b)
-	if err != nil {
-		elLog.Warn("ElStackTcpConn Read error", "peer", c.raddr, "err", err, "elapsed", time.Since(start))
-		return n, err
-	}
-	elLog.Trace("ElStackTcpConn Read done", "peer", c.raddr, "n", n, "elapsed", time.Since(start))
-	return n, nil
-}
-
-func (c *ElStackTcpConn) Write(b []byte) (n int, err error) {
-	start := time.Now()
-	elLog.Trace("ElStackTcpConn Write start", "peer", c.raddr, "len", len(b))
-	n, err = c.inner.Write(b)
-	if err != nil {
-		elLog.Warn("ElStackTcpConn Write error", "peer", c.raddr, "err", err, "elapsed", time.Since(start))
-		return n, err
-	}
-	elLog.Trace("ElStackTcpConn Write done", "peer", c.raddr, "n", n, "elapsed", time.Since(start))
-	return n, nil
-}
+func (c *ElStackTcpConn) Read(b []byte) (n int, err error)  { return c.inner.Read(b) }
+func (c *ElStackTcpConn) Write(b []byte) (n int, err error) { return c.inner.Write(b) }
 
 func (c *ElStackTcpConn) Close() error {
-	elLog.Trace("ElStackTcpConn Close", "peer", c.raddr)
-	return c.inner.Close()
+	c.closeOnce.Do(func() {
+		elLog.Trace("ElStackTcpConn Close", "peer", c.raddr)
+		c.closeErr = c.inner.Close()
+	})
+	return c.closeErr
 }
+
 func (c *ElStackTcpConn) LocalAddr() net.Addr                { return c.laddr }
 func (c *ElStackTcpConn) RemoteAddr() net.Addr               { return c.raddr }
 func (c *ElStackTcpConn) SetDeadline(t time.Time) error      { return c.inner.SetDeadline(t) }
@@ -322,12 +295,8 @@ func (d *vpnDelegate) OnConnectionError(msg string) {
 }
 
 func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "ips", ipAddrs)
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "dns", dnsAddrs)
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "routes", routes)
-
+	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 	ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
-	elLog.Debug("(*vpnDelegate).OnLinkedParams()", "ip", ipAddr)
 	d.ipAddr = ipAddr
 	d.linkedCh <- struct{}{}
 }

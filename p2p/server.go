@@ -649,7 +649,6 @@ func (srv *Server) setupListening() error {
 // func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	listenAddr := srv.ListenAddr
-	srv.log.Debug("(*Server).setupUDPListening", "listenAddr", listenAddr)
 
 	// Use an alternate listening address for UDP if
 	// a custom discovery address is configured.
@@ -658,10 +657,8 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	}
 	if srv.vpnDelegate.ipAddr != "" {
 		_, port, _ := net.SplitHostPort(listenAddr)
-		srv.log.Debug("(*Server).setupUDPListening", "port", port)
 		listenAddr = srv.vpnDelegate.ipAddr + ":" + port
 	}
-	srv.log.Debug("(*Server).setupUDPListening", "listenAddr", listenAddr)
 
 	addr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
@@ -819,6 +816,10 @@ running:
 		p := <-srv.delpeer
 		p.log.Trace("<-delpeer (spindown)")
 		delete(peers, p.ID())
+	}
+	// stop func for el_stack
+	if srv.vpnDelegate != nil {
+		StopElStack()
 	}
 }
 
