@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -121,7 +122,7 @@ type Server struct {
 	inboundHistory expHeap
 
 	// ADDED by Hinata AWAIISHIMA for el_stack
-	vpnDelegate   *vpnDelegate
+	vpnDelegate   *elstack.VpnDelegate
 	listenUDPFunc func(network string, addr *net.UDPAddr) (discover.UDPConn, error)
 }
 
@@ -408,11 +409,11 @@ func (srv *Server) Start() (err error) {
 	}
 
 	// check use el_stack
-	if CheckEnvDefinition() {
-		srv.vpnDelegate = SetupELVpnDelegate()
-		srv.listenFunc = ListenELTCP
-		srv.Dialer = &ElStackTcpDialer{}
-		srv.listenUDPFunc = ListenELUDP
+	if elstack.CheckEnvDefinition() {
+		srv.vpnDelegate = elstack.SetupELVpnDelegate()
+		srv.listenFunc = elstack.ListenELTCP
+		srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+		srv.listenUDPFunc = elstack.ListenELUDP
 	}
 
 	// static fields
@@ -618,8 +619,8 @@ func (srv *Server) setupListening() error {
 	// Launch the listener.
 	listenAddr := srv.ListenAddr
 	// if it is allocated IP address via vpn, insert IP address before listenAddr(it is port number)
-	if srv.vpnDelegate.ipAddr != "" {
-		listenAddr = srv.vpnDelegate.ipAddr + listenAddr
+	if addr := srv.vpnDelegate.IPAddr(); addr != "" {
+		listenAddr = addr + listenAddr
 	}
 	listener, err := srv.listenFunc("tcp", listenAddr)
 	if err != nil {
@@ -655,9 +656,9 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	if srv.DiscAddr != "" {
 		listenAddr = srv.DiscAddr
 	}
-	if srv.vpnDelegate.ipAddr != "" {
+	if addr := srv.vpnDelegate.IPAddr(); addr != "" {
 		_, port, _ := net.SplitHostPort(listenAddr)
-		listenAddr = srv.vpnDelegate.ipAddr + ":" + port
+		listenAddr = addr + ":" + port
 	}
 
 	addr, err := net.ResolveUDPAddr("udp", listenAddr)

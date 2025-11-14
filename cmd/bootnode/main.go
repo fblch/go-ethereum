@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -118,9 +119,9 @@ func main() {
 
 	// Try el_stack first; fall back to std UDP if unavailable.
 	var conn discover.UDPConn
-	if CheckEnvDefinition() {
-		_ = SetupELVpnDelegate()
-		conn, _ = ListenELUDP("udp", udpAddr)
+	if elstack.CheckEnvDefinition() {
+		_ = elstack.SetupELVpnDelegate()
+		conn, _ = elstack.ListenELUDP("udp", udpAddr)
 	} else {
 		conn, _ = net.ListenUDP("udp", udpAddr)
 	}
