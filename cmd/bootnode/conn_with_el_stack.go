@@ -93,9 +93,10 @@ func readFileOrEmpty(path string) []byte {
 // (the underlying API doesn't expose deadlines here), but this scheme avoids
 // launching a read while there is pending write work.
 type ElStackUdpConn struct {
-	ElStackUdpConn *el_stack.ElStackUdpConn
-	laddr          net.Addr
-	once           sync.Once
+	inner     *el_stack.ElStackUdpConn
+	laddr     net.Addr
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
@@ -106,22 +107,15 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 		return &ElStackUdpConn{}, err
 	}
 	localAddr := c.LocalAddr()
-	return &ElStackUdpConn{ElStackUdpConn: c, laddr: localAddr}, nil
-}
-
-func (c *ElStackUdpConn) underlying() *el_stack.ElStackUdpConn {
-	if c == nil { // ラッパー自体が nil のときに備える
-		return nil
-	}
-	return c.ElStackUdpConn
+	return &ElStackUdpConn{inner: c, laddr: localAddr}, nil
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
 	// Set read deadline and ensure reset after read.
 	for {
-		_ = c.ElStackUdpConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-		n, udpAddr, uerr := c.ElStackUdpConn.ReadFromUDP(b)
-		_ = c.ElStackUdpConn.SetReadDeadline(time.Time{})
+		_ = c.inner.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, udpAddr, uerr := c.inner.ReadFromUDP(b)
+		_ = c.inner.SetReadDeadline(time.Time{})
 
 		if uerr != nil {
 			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
@@ -135,7 +129,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	n, uerr := c.ElStackUdpConn.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
+	n, uerr := c.inner.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
 		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
 	}
@@ -144,19 +138,15 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-	elLog.Debug("ElUDP Close called")
-	var cerr error
-	c.once.Do(func() {
-		if u := c.underlying(); u != nil {
-			cerr = u.Close()
-		}
-	})
-	return cerr
+	if c.inner != nil {
+		c.closeOnce.Do(func() {
+			c.closeErr = c.inner.Close()
+		})
+	}
+	return c.closeErr
 }
 
-func (c *ElStackUdpConn) LocalAddr() net.Addr {
-	return c.laddr
-}
+func (c *ElStackUdpConn) LocalAddr() net.Addr { return c.laddr }
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
 func ListenELTCP(network, addr string) (net.Listener, error) {
