@@ -31,14 +31,8 @@ import (
 
 var elLog = log.Root().New("cmp", "p2p/el_stack")
 
-type temporarySocketTimeoutError struct {
-	error
-}
-
-func (temporarySocketTimeoutError) Temporary() bool { return true }
-
-func (temporarySocketTimeoutError) Timeout() bool { return true }
-
+// CheckEnvDefinition ensures all VPN related env vars exist so we know whether
+// to fall back to the standard net stack or bootstrap el_stack.
 func CheckEnvDefinition() bool {
 	allPresent := true
 	keys := []string{"ACCOUNT", "PASSWORD", "SERVER_HOST", "SERVER_SERV", "ANTI_OVERLAP"}
@@ -91,14 +85,6 @@ func readFileOrEmpty(path string) []byte {
 	return b
 }
 
-// ElStackUdpConn wraps el_stack.ElStackUdpConn and serializes all IO via
-// a single actor goroutine. This guarantees that Read and Write are never
-// executed concurrently against el_stack, which requires mutual exclusion.
-//
-// It also prioritizes writes: before starting a blocking read it drains any
-// queued write requests. Once a read is in progress, it cannot be preempted
-// (the underlying API doesn't expose deadlines here), but this scheme avoids
-// launching a read while there is pending write work.
 type ElStackUdpConn struct {
 	inner     *el_stack.ElStackUdpConn
 	laddr     net.Addr
@@ -124,6 +110,8 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 		_ = c.inner.SetReadDeadline(time.Time{})
 
 		if uerr != nil {
+			// el_stack signals a timeout via the string below; treat it as a retryable
+			// condition instead of bubbling an opaque error up the stack.
 			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
 				time.Sleep(400 * time.Millisecond)
 				continue
@@ -137,6 +125,8 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
 	n, uerr := c.inner.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
+		// Wrap the el_stack error so callers still observe the familiar net.Error
+		// surface that the discovery stack already knows how to handle.
 		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
 	}
 	return n, nil
@@ -146,6 +136,8 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 func (c *ElStackUdpConn) Close() error {
 	if c.inner != nil {
 		c.closeOnce.Do(func() {
+			// Make Close idempotent because geth can close the socket from multiple
+			// goroutines during shutdown.
 			c.closeErr = c.inner.Close()
 		})
 	}
@@ -168,6 +160,8 @@ func ListenELTCP(network, addr string) (net.Listener, error) {
 }
 
 // net.Listener interface 実装
+// Accept proxies the el_stack listener while adding timing logs so we can
+// diagnose stalls similar to the Go stdlib listener.
 func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
 	start := time.Now()
 	elLog.Trace("ElStackTcpListener waiting on Accept", "laddr", ln.Addr())
@@ -212,6 +206,8 @@ func (*ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, 
 
 	go func() {
 		defer close(resCh)
+		// Run the potentially long el_stack dial in its own goroutine so the
+		// context timeout can cancel it without blocking the caller.
 		c, err := el_stack.NewElStackTcpConn("tcp", addr.String())
 		if err != nil {
 			resCh <- dialResult{err: err}
@@ -295,6 +291,8 @@ func (d *vpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 
 func SetupELVpnDelegate() *vpnDelegate {
 	// 環境変数から各種値を取得
+	// We intentionally panic on missing required values earlier so failures are
+	// loud during startup rather than surfacing deep in the networking stack.
 	caCertPath := getEnvOrDefault("CA_FILE", "/etc/ssl/certs/ca-certificates.crt")
 	caCert := readFileOrEmpty(caCertPath)
 
@@ -329,9 +327,4 @@ func SetupELVpnDelegate() *vpnDelegate {
 	}
 	<-delegate.linkedCh
 	return delegate
-}
-
-// wrapper for el_stack.Stop()
-func StopElStack() {
-	el_stack.Stop()
 }
