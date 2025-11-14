@@ -817,10 +817,6 @@ running:
 		p.log.Trace("<-delpeer (spindown)")
 		delete(peers, p.ID())
 	}
-	// stop func for el_stack
-	if srv.vpnDelegate != nil {
-		StopElStack()
-	}
 }
 
 func (srv *Server) postHandshakeChecks(peers map[enode.ID]*Peer, inboundCount int, c *conn) error {
