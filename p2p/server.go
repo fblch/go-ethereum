@@ -409,8 +409,8 @@ func (srv *Server) Start() (err error) {
 	}
 
 	// check use el_stack
-	if elstack.CheckEnvDefinition() {
-		srv.vpnDelegate = elstack.SetupELVpnDelegate()
+	if srv.vpnDelegate, err = elstack.SetupELVpnDelegate(); err == nil {
+		srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
 		srv.listenFunc = elstack.ListenELTCP
 		srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 		srv.listenUDPFunc = elstack.ListenELUDP
@@ -618,10 +618,6 @@ func (srv *Server) MaxDialedConns() (limit int) {
 func (srv *Server) setupListening() error {
 	// Launch the listener.
 	listenAddr := srv.ListenAddr
-	// if it is allocated IP address via vpn, insert IP address before listenAddr(it is port number)
-	if addr := srv.vpnDelegate.IPAddr(); addr != "" {
-		listenAddr = addr + listenAddr
-	}
 	listener, err := srv.listenFunc("tcp", listenAddr)
 	if err != nil {
 		return err
@@ -655,10 +651,6 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	// a custom discovery address is configured.
 	if srv.DiscAddr != "" {
 		listenAddr = srv.DiscAddr
-	}
-	if addr := srv.vpnDelegate.IPAddr(); addr != "" {
-		_, port, _ := net.SplitHostPort(listenAddr)
-		listenAddr = addr + ":" + port
 	}
 
 	addr, err := net.ResolveUDPAddr("udp", listenAddr)
@@ -818,6 +810,10 @@ running:
 		p.log.Trace("<-delpeer (spindown)")
 		delete(peers, p.ID())
 	}
+	// Stop elstack if it used connections via el_stack 
+	// if srv.vpnDelegate != nil {
+	// 	elstack.StopElStack()
+	// }
 }
 
 func (srv *Server) postHandshakeChecks(peers map[enode.ID]*Peer, inboundCount int, c *conn) error {

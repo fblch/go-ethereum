@@ -119,8 +119,7 @@ func main() {
 
 	// Try el_stack first; fall back to std UDP if unavailable.
 	var conn discover.UDPConn
-	if elstack.CheckEnvDefinition() {
-		_ = elstack.SetupELVpnDelegate()
+	if _, err := elstack.SetupELVpnDelegate(); err == nil {
 		conn, _ = elstack.ListenELUDP("udp", udpAddr)
 	} else {
 		conn, _ = net.ListenUDP("udp", udpAddr)
