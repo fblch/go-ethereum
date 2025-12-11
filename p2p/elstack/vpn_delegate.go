@@ -81,6 +81,7 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 }
 
 func SetupELVpnDelegate() (*VpnDelegate, error) {
+	elLog.Info("SetupVpnDelegate START")
 	// 環境変数から各種値を取得
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
@@ -90,12 +91,14 @@ func SetupELVpnDelegate() (*VpnDelegate, error) {
 	// accountName := getEnvOrPanic("ACCOUNT")
 	accountName, err := getEnv("ACCOUNT")
 	if err != nil {
+		elLog.Error("SetupVpnDelegate ERROR 1")
 		return nil, err
 	}
 
 	// accountPassword := getEnvOrPanic("PASSWORD")
 	accountPassword, err := getEnv("PASSWORD")
 	if err != nil {
+		elLog.Error("SetupVpnDelegate ERROR 2")
 		return nil, err
 	}
 
@@ -124,11 +127,13 @@ func SetupELVpnDelegate() (*VpnDelegate, error) {
 
 	vpnKeepAliveSec, err := getEnvUint64OrDefault("KEEPALIVE_INTERVAL", 60)
 	if err != nil {
+		elLog.Error("SetupVpnDelegate ERROR 3")
 		return nil, err
 	}
 
 	vpnTimeoutSec, err := getEnvUint64OrDefault("RECV_TIMEOUT", 180)
 	if err != nil {
+		elLog.Error("SetupVpnDelegate ERROR 4")
 		return nil, err
 	}
 
