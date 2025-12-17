@@ -51,6 +51,14 @@ func main() {
 		runv5       = flag.Bool("v5", false, "run a v5 topic discovery bootnode")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-5)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
+		// ADDED by Hinata AWAIISHIMA (el settings)
+		elUse         = flag.Bool("el.use", false, "enable emotion link support")
+		elServerCert  = flag.String("el.servercert", "", "emotion link server certificate path")
+		elAccount     = flag.String("el.account", "", "emotion link account")
+		elPassword    = flag.String("el.password", "", "emotion link account password")
+		elServerHost  = flag.String("el.serverhost", "", "emotion link server host")
+		elServerServ  = flag.String("el.serverserv", "", "emotion link server service name")
+		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap setting")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -61,6 +69,11 @@ func main() {
 	glogger.Verbosity(log.Lvl(*verbosity))
 	glogger.Vmodule(*vmodule)
 	log.Root().SetHandler(glogger)
+
+	// Touch EL flags so they can be traced if needed (currently not applied to bootnode logic).
+	if *elUse || *elServerCert != "" || *elAccount != "" || *elPassword != "" || *elServerHost != "" || *elServerServ != "" || *elAntiOverlap != "" {
+		log.Info("EL flags provided (bootnode currently ignores them)", "use", *elUse, "serverhost", *elServerHost, "serverserv", *elServerServ)
+	}
 
 	natm, err := nat.Parse(*natdesc)
 	if err != nil {
@@ -119,8 +132,11 @@ func main() {
 
 	// Try el_stack first; fall back to std UDP if unavailable.
 	var conn discover.UDPConn
-	if _, err := elstack.SetupELVpnDelegate(); err == nil {
-		conn, _ = elstack.ListenELUDP("udp", udpAddr)
+	if *elUse {
+		_, err := elstack.SetupELVpnDelegate(*elServerCert, *elAccount, *elPassword, *elServerHost, *elServerServ, *elAntiOverlap)
+		if err == nil {
+			conn, _ = elstack.ListenELUDP("udp", udpAddr)
+		}
 	} else {
 		conn, _ = net.ListenUDP("udp", udpAddr)
 	}

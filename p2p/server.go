@@ -409,11 +409,28 @@ func (srv *Server) Start() (err error) {
 	}
 
 	// check use el_stack
-	if srv.vpnDelegate, err = elstack.SetupELVpnDelegate(); err == nil {
-		srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
-		srv.listenFunc = elstack.ListenELTCP
-		srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
-		srv.listenUDPFunc = elstack.ListenELUDP
+	// if srv.vpnDelegate, err = elstack.SetupELVpnDelegate(); err == nil {
+	// 	srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
+	// 	srv.listenFunc = elstack.ListenELTCP
+	// 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+	// 	srv.listenUDPFunc = elstack.ListenELUDP
+	// }
+	
+	if srv.UseEl {
+		srv.vpnDelegate, err = elstack.SetupELVpnDelegate(
+			srv.ElCertPath, 
+			srv.ElAccount, 
+			srv.ElPassword, 
+			srv.ElHost, 
+			srv.ElPort, 
+			srv.ElAntiOverlap,
+		)
+		if err == nil {
+			srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
+			srv.listenFunc = elstack.ListenELTCP
+			srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+			srv.listenUDPFunc = elstack.ListenELUDP
+		}		
 	}
 
 	// static fields

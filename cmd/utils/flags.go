@@ -67,6 +67,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -899,6 +900,38 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 
+	// ADDED by Hinata AWAIISHIMA
+	// Emotion Link settings
+	UseELFlag = &cli.BoolFlag{
+		Name:     "el.use",
+		Value:    false,
+		Category: flags.NetworkingCategory,
+	}
+	ELServerCertFlag = &cli.StringFlag{
+		Name:     "el.cert",
+		Category: flags.NetworkingCategory,
+	}
+	ELAccountFlag = &cli.StringFlag{
+		Name:     "el.account",
+		Category: flags.NetworkingCategory,
+	}
+	ELPasswordFlag = &cli.StringFlag{
+		Name:     "el.password",
+		Category: flags.NetworkingCategory,
+	}
+	ELHostFlag = &cli.StringFlag{
+		Name:     "el.host",
+		Category: flags.NetworkingCategory,
+	}
+	ELServFlag = &cli.StringFlag{
+		Name:     "el.serv",
+		Category: flags.NetworkingCategory,
+	}
+	ELAntiOverlapFlag = &cli.StringFlag{
+		Name:     "el.antioverlap",
+		Category: flags.NetworkingCategory,
+	}
+
 	// Console
 	JSpathFlag = &flags.DirectoryFlag{
 		Name:     "jspath",
@@ -1192,6 +1225,40 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+func setEL(ctx *cli.Context, cfg *p2p.Config) {
+	if cfg.ElConfig == nil {
+		cfg.ElConfig = &elstack.ElConfig{}
+	}
+	if ctx.IsSet(UseELFlag.Name) {
+		cfg.UseEl = ctx.Bool(UseELFlag.Name)
+		cfg.ElConfig.UseEl = cfg.UseEl
+	}
+	if elServerCert := ctx.String(ELServerCertFlag.Name); elServerCert != "" {
+		cfg.ElCertPath = elServerCert
+		cfg.ElConfig.CertPath = elServerCert
+	}
+	if elAccount := ctx.String(ELAccountFlag.Name); elAccount != "" {
+		cfg.ElAccount = elAccount
+		cfg.ElConfig.AccountName = elAccount
+	}
+	if elAccountPassword := ctx.String(ELPasswordFlag.Name); elAccountPassword != "" {
+		cfg.ElPassword = elAccountPassword
+		cfg.ElConfig.AccountPassword = elAccountPassword
+	}
+	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
+		cfg.ElHost = elServerHost
+		cfg.ElConfig.VpnHost = elServerHost
+	}
+	if elServerServ := ctx.String(ELServFlag.Name); elServerServ != "" {
+		cfg.ElPort = elServerServ
+		cfg.ElConfig.VpnServ = elServerServ
+	}
+	if elAntiOverlap := ctx.String(ELAntiOverlapFlag.Name); elAntiOverlap != "" {
+		cfg.ElAntiOverlap = elAntiOverlap
+		cfg.ElConfig.AntiOverlap = elAntiOverlap
+	}
+}
+
 // SplitAndTrim splits input separated by a comma
 // and trims excessive white space from the substrings.
 func SplitAndTrim(input string) (ret []string) {
@@ -1454,6 +1521,7 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setListenAddress(ctx, cfg)
 	setBootstrapNodes(ctx, cfg)
 	setBootstrapNodesV5(ctx, cfg)
+	setEL(ctx, cfg)
 
 	lightClient := ctx.String(SyncModeFlag.Name) == "light"
 	lightServer := (ctx.Int(LightServeFlag.Name) != 0)

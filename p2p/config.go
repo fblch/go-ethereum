@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -124,6 +125,27 @@ type Config struct {
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:"-"`
+
+	// ADDED by Hinata AWAIISHIMA (el settings)
+	UseEl bool
+
+	ElAccount string
+
+	ElPassword string
+
+	ElCertPath string
+
+	ElHost string
+
+	ElPort string
+
+	ElAntiOverlap string
+	// ADDED by Hinata AWAIISHIMA
+
+	// ADDED by Hinata AWAIISHIMA BEG
+	// configurations for emotion link
+	ElConfig *elstack.ElConfig
+	// ADDED by Hinata AWAIISHIMA END
 
 	clock mclock.Clock
 }
