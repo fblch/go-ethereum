@@ -1,12 +1,12 @@
 package elstack
 
 // ElConfig holds Emotion Link configuration propagated from CLI flags.
-type ElConfig struct {
+type ELConfig struct {
 	UseEl           bool
 	CertPath        string
-	AccountName     string
-	AccountPassword string
-	VpnHost         string
-	VpnServ         string
+	Account     string
+	Password string
+	Host         string
+	Port         string
 	AntiOverlap     string
 }

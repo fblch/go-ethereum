@@ -165,7 +165,7 @@ var (
 		utils.ELAntiOverlapFlag,
 		utils.ELServerCertFlag,
 		utils.ELHostFlag,
-		utils.ELServFlag,
+		utils.ELPortFlag,
 		// ADDED by Hinata AWAIISHIMA END(el settings)
 		configFileFlag,
 	}, utils.NetworkFlags, utils.DatabasePathFlags)

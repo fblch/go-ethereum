@@ -416,14 +416,14 @@ func (srv *Server) Start() (err error) {
 	// 	srv.listenUDPFunc = elstack.ListenELUDP
 	// }
 	
-	if srv.UseEl {
+	if srv.ELConfig.UseEl {
 		srv.vpnDelegate, err = elstack.SetupELVpnDelegate(
-			srv.ElCertPath, 
-			srv.ElAccount, 
-			srv.ElPassword, 
-			srv.ElHost, 
-			srv.ElPort, 
-			srv.ElAntiOverlap,
+			srv.ELConfig.CertPath, 
+			srv.ELConfig.Account, 
+			srv.ELConfig.Password, 
+			srv.ELConfig.Host, 
+			srv.ELConfig.Port, 
+			srv.ELConfig.AntiOverlap,
 		)
 		if err == nil {
 			srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
