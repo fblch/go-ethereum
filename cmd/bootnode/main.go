@@ -133,8 +133,16 @@ func main() {
 	// Try el_stack first; fall back to std UDP if unavailable.
 	var conn discover.UDPConn
 	if *elUse {
-		_, err := elstack.SetupELVpnDelegate(*elServerCert, *elAccount, *elPassword, *elServerHost, *elServerServ, *elAntiOverlap)
-		if err == nil {
+		elCfg := &elstack.ELConfig{
+			CertPath: *elServerCert,
+			Account: *elAccount,
+			Password: *elPassword,
+			Host: *elServerHost,
+			Port: *elServerServ,
+			AntiOverlap: *elAntiOverlap,
+		}
+		vpnDelegate := elstack.SetupELVpnDelegate(elCfg)
+		if vpnDelegate != nil {
 			conn, _ = elstack.ListenELUDP("udp", udpAddr)
 		}
 	} else {
