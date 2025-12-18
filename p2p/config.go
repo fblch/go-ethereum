@@ -128,7 +128,7 @@ type Config struct {
 
 	// ADDED by Hinata AWAIISHIMA
 	// configurations for emotion link
-	ELConfig *elstack.ELConfig
+	EL *elstack.ELConfig
 
 	clock mclock.Clock
 }

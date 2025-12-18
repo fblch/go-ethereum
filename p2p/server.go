@@ -408,30 +408,7 @@ func (srv *Server) Start() (err error) {
 		srv.log.Warn("P2P server will be useless, neither dialing nor listening")
 	}
 
-	// check use el_stack
-	// if srv.vpnDelegate, err = elstack.SetupELVpnDelegate(); err == nil {
-	// 	srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
-	// 	srv.listenFunc = elstack.ListenELTCP
-	// 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
-	// 	srv.listenUDPFunc = elstack.ListenELUDP
-	// }
-	
-	if srv.ELConfig.UseEl {
-		srv.vpnDelegate, err = elstack.SetupELVpnDelegate(
-			srv.ELConfig.CertPath, 
-			srv.ELConfig.Account, 
-			srv.ELConfig.Password, 
-			srv.ELConfig.Host, 
-			srv.ELConfig.Port, 
-			srv.ELConfig.AntiOverlap,
-		)
-		if err == nil {
-			srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
-			srv.listenFunc = elstack.ListenELTCP
-			srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
-			srv.listenUDPFunc = elstack.ListenELUDP
-		}		
-	}
+	srv.setupELVpnDelegate()	// ADDED by Hinata AWAIISHIMA
 
 	// static fields
 	if srv.PrivateKey == nil {
@@ -827,10 +804,6 @@ running:
 		p.log.Trace("<-delpeer (spindown)")
 		delete(peers, p.ID())
 	}
-	// Stop elstack if it used connections via el_stack 
-	// if srv.vpnDelegate != nil {
-	// 	elstack.StopElStack()
-	// }
 }
 
 func (srv *Server) postHandshakeChecks(peers map[enode.ID]*Peer, inboundCount int, c *conn) error {
