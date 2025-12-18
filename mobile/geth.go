@@ -50,6 +50,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -191,6 +192,31 @@ type NodeConfig struct {
 	// CliqueSnapshotCacheCount is the maximal number of recent snapshots
 	// to keep in clique snapshot cache (default: 128).
 	CliqueSnapshotCacheCount int
+
+	// ADDED by Hinata AWAIISHIMA BEG
+	// ELUse is the bool flag that the client uses emotion-link connections or not
+	ELUse bool
+
+	// ELAccount is the name of the client's emotion-link account
+	ELAccount string
+
+	// ELPassword is the pass of the client's emotion-link account
+	ELPassword string
+
+	// ELCertPath is the cert file path of the emotion-link server to connect
+	ELCertPath string
+
+	// ELHost is the emotion-link host server name
+	ELHost string
+
+	// ELPort is the emotion-link port of host server
+	// This value is a number, but when setting it, it needs to be a string.
+	ELPort string
+
+	// ELAntiOverlap blocks Duplicating of the connection from same client
+	// This value is a number, but when setting it, it needs to be a string.
+	ELAntiOverlap string
+	// ADDED by Hinata AWAIISHIMA END
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -222,6 +248,8 @@ var defaultNodeConfig = &NodeConfig{
 	CliqueSnapshotCacheSize:  128,
 	CliqueSnapshotCacheCount: 128,
 	// ADDED by Jakub Pajek END
+	// ADDED by Hinata AWAIISHIMA
+	ELUse: false,
 }
 
 // NewNodeConfig creates a new node option set, initialized to the default values.
@@ -338,6 +366,10 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	} else if config.CliqueSnapshotCacheCount == 0 {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
+	// ADDED by Hinata AWAIISHIMA
+	if !config.ELUse && (config.ELAccount != "" || config.ELPassword != "" || config.ELCertPath != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
+		return nil, errors.New("invalid config: ELUse and other EL settings have to use same time")
+	}
 
 	natif, err := nat.Parse(config.NAT)
 	if err != nil {
@@ -372,6 +404,16 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			// MODIFIED by Jakub Pajek END
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
 			MaxPeers:         config.MaxPeers,
+			// ADDED by Hinata AWAIISHIMA
+			EL: &elstack.ELConfig{
+				Use: config.ELUse,
+				CertPath: config.ELCertPath,
+				Account: config.ELAccount,
+				Password: config.ELPassword,
+				Host: config.ELHost,
+				Port: config.ELPort,
+				AntiOverlap: config.ELAntiOverlap,
+			},
 		},
 	}
 
