@@ -1226,29 +1226,29 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 }
 
 func setEL(ctx *cli.Context, cfg *p2p.Config) {
-	if cfg.ELConfig == nil {
-		cfg.ELConfig = &elstack.ELConfig{}
+	if cfg.EL == nil {
+		cfg.EL = &elstack.ELConfig{}
 	}
 	if ctx.IsSet(UseELFlag.Name) {
-		cfg.ELConfig.UseEl = ctx.Bool(UseELFlag.Name)
+		cfg.EL.Use = ctx.Bool(UseELFlag.Name)
 	}
 	if elServerCert := ctx.String(ELServerCertFlag.Name); elServerCert != "" {
-		cfg.ELConfig.CertPath = elServerCert
+		cfg.EL.CertPath = elServerCert
 	}
 	if elAccount := ctx.String(ELAccountFlag.Name); elAccount != "" {
-		cfg.ELConfig.Account = elAccount
+		cfg.EL.Account = elAccount
 	}
 	if elAccountPassword := ctx.String(ELPasswordFlag.Name); elAccountPassword != "" {
-		cfg.ELConfig.Password = elAccountPassword
+		cfg.EL.Password = elAccountPassword
 	}
 	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
-		cfg.ELConfig.Host = elServerHost
+		cfg.EL.Host = elServerHost
 	}
 	if elServerServ := ctx.String(ELPortFlag.Name); elServerServ != "" {
-		cfg.ELConfig.Port = elServerServ
+		cfg.EL.Port = elServerServ
 	}
 	if elAntiOverlap := ctx.String(ELAntiOverlapFlag.Name); elAntiOverlap != "" {
-		cfg.ELConfig.AntiOverlap = elAntiOverlap
+		cfg.EL.AntiOverlap = elAntiOverlap
 	}
 }
 
