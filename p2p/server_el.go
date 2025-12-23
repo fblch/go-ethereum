@@ -11,8 +11,7 @@ func (srv *Server) setupELVpnDelegate() {
 		return
 	}
 	if vpnDelegate := elstack.SetupELVpnDelegate(srv.EL); vpnDelegate != nil {
-		srv.vpnDelegate = vpnDelegate
-		srv.ListenAddr = srv.vpnDelegate.IPAddr() + srv.ListenAddr
+		srv.ListenAddr = vpnDelegate.IPAddr() + srv.ListenAddr
 		srv.listenFunc = elstack.ListenELTCP
 		srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 		srv.listenUDPFunc = elstack.ListenELUDP

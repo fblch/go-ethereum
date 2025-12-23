@@ -60,7 +60,7 @@ func readFileOrEmpty(path string) []byte {
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
 	ipAddr   string
-	linkedCh chan struct{}
+	linkedCh chan bool
 }
 
 func (d *VpnDelegate) IPAddr() string { return d.ipAddr }
@@ -71,13 +71,14 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
+	d.linkedCh <- false
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 	ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
 	d.ipAddr = ipAddr
-	d.linkedCh <- struct{}{}
+	d.linkedCh <- true
 }
 
 // func SetupELVpnDelegate(cfg *ELConfig) (*VpnDelegate, error) {
@@ -241,15 +242,22 @@ func SetupELVpnDelegate(cfg *ELConfig) *VpnDelegate {
 
 	el_stack.Initialize(prodCfg)
 	delegate := &VpnDelegate{
-		linkedCh: make(chan struct{}, 1),
+		linkedCh: make(chan bool, 1),
 	}
 
 	if err := el_stack.Start(delegate, vpnCfg, accountCfg); err != nil {
 		elLog.Error("SetupELVpnDelegate ERROR", "err", err)
 		return nil
 	}
-	<-delegate.linkedCh
-	return delegate
+
+	switch <-delegate.linkedCh {
+	case false: // failed to connect to el-server
+		elLog.Error("el_stack.Stop() called")
+		el_stack.Stop()
+		return nil
+	default:
+		return delegate
+	}
 }
 
 func StopElStack() {

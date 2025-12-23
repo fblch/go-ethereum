@@ -38,7 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -122,7 +121,6 @@ type Server struct {
 	inboundHistory expHeap
 
 	// ADDED by Hinata AWAIISHIMA for el_stack
-	vpnDelegate   *elstack.VpnDelegate
 	listenUDPFunc func(network string, addr *net.UDPAddr) (discover.UDPConn, error)
 }
 
