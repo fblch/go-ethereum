@@ -1,10 +1,13 @@
 package elstack
 
 import (
-	"el_stack"
+	// "el_stack"
+
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 )
 
 // // 環境変数から値取得
@@ -59,8 +62,8 @@ func readFileOrEmpty(path string) []byte {
 
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
-	ipAddr   string
-	linkedCh chan bool
+	ipAddr string
+	linked    chan bool
 }
 
 func (d *VpnDelegate) IPAddr() string { return d.ipAddr }
@@ -71,14 +74,14 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	d.linkedCh <- false
+	d.linked <- false
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 	ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
 	d.ipAddr = ipAddr
-	d.linkedCh <- true
+	d.linked <- true
 }
 
 // func SetupELVpnDelegate(cfg *ELConfig) (*VpnDelegate, error) {
@@ -188,11 +191,11 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 // 	return delegate, nil
 // }
 
-func SetupELVpnDelegate(cfg *ELConfig) *VpnDelegate {
+func SetupEL(cfg *ELConfig) (string, error) {
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
-	elLog.Info("SetupELVpnDelegate arg", "cfg.Account", cfg.Account)
-	elLog.Info("SetupELVpnDelegate arg", "cfg.Password", cfg.Password)
+	elLog.Info("SetupEL arg", "cfg.Account", cfg.Account)
+	elLog.Info("SetupEL arg", "cfg.Password", cfg.Password)
 
 	certPath := cfg.CertPath
 	if certPath == "" {
@@ -201,11 +204,11 @@ func SetupELVpnDelegate(cfg *ELConfig) *VpnDelegate {
 	caCert := readFileOrEmpty(certPath)
 
 	if cfg.Account == "" {
-		return nil
+		return "", fmt.Errorf("EL Account is not set")
 	}
 
 	if cfg.Password == "" {
-		return nil
+		return "", fmt.Errorf("EL Password is not set")
 	}
 
 	vpnHost := cfg.Host
@@ -242,22 +245,28 @@ func SetupELVpnDelegate(cfg *ELConfig) *VpnDelegate {
 
 	el_stack.Initialize(prodCfg)
 	delegate := &VpnDelegate{
-		linkedCh: make(chan bool, 1),
+		linked: make(chan bool, 1),
 	}
 
 	if err := el_stack.Start(delegate, vpnCfg, accountCfg); err != nil {
-		elLog.Error("SetupELVpnDelegate ERROR", "err", err)
-		return nil
+		elLog.Error("SetupEL ERROR", "err", err)
+		return "", err
 	}
 
-	switch <-delegate.linkedCh {
-	case false: // failed to connect to el-server
+	stats := <- delegate.linked
+	if !stats {
 		elLog.Error("el_stack.Stop() called")
 		el_stack.Stop()
-		return nil
-	default:
-		return delegate
+		return "", fmt.Errorf("failed to connect to EL server")
 	}
+	if delegate.ipAddr == "" {
+		err := fmt.Errorf("set no ipAddr to vpnDelegate")
+		elLog.Error("SetupEL", "err", err)
+		el_stack.Stop()
+		return "", err
+	}
+
+	return delegate.ipAddr, nil
 }
 
 func StopElStack() {

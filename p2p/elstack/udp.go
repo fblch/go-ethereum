@@ -1,7 +1,7 @@
 package elstack
 
 import (
-	"el_stack"
+	// "el_stack"
 	"net"
 	"net/netip"
 	"strings"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack"	// if you copied el_stack directory directly below elstack directory, use it.
 )
 
 type ElStackUdpConn struct {

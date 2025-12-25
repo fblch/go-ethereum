@@ -342,6 +342,10 @@ func (srv *Server) Stop() {
 
 // sharedUDPConn implements a shared connection. Write sends messages to the underlying connection while read returns
 // messages that were found unprocessable and sent to the unhandled channel by the primary listener.
+// MODIFIED by Hinata AWAIISHIMA
+// sharedUDPConn only handled net.UDPConn.
+// sharedUDPConn cloudn't handle original UDP Connection struct because net.UDPConn is not interfece but struct.
+// To changed to handle discover.UDPConn interface and can handle original UDP connection structs that is implemented discover.UDPConn interface.
 type sharedUDPConn struct {
 	under     discover.UDPConn
 	unhandled chan discover.ReadPacket
@@ -366,6 +370,7 @@ func (s *sharedUDPConn) Close() error {
 	return nil
 }
 
+// ADDED by Hinata AWAIISHIMA
 // WriteToUDPAddrPort forwards write calls to the underlying UDPConn with diagnostics.
 func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
 	if s.under == nil {
@@ -374,6 +379,7 @@ func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, 
 	return s.under.WriteToUDPAddrPort(b, addr)
 }
 
+// ADDED by Hinata AWAIISHIMA
 // LocalAddr forwards to the underlying UDPConn.
 func (s *sharedUDPConn) LocalAddr() net.Addr {
 	if s.under == nil {
@@ -406,8 +412,6 @@ func (srv *Server) Start() (err error) {
 		srv.log.Warn("P2P server will be useless, neither dialing nor listening")
 	}
 
-	srv.setupELVpnDelegate()	// ADDED by Hinata AWAIISHIMA
-
 	// static fields
 	if srv.PrivateKey == nil {
 		return errors.New("Server.PrivateKey must be set to a non-nil key")
@@ -418,6 +422,8 @@ func (srv *Server) Start() (err error) {
 	if srv.listenFunc == nil {
 		srv.listenFunc = net.Listen
 	}
+	// ADDED by Hinata AWAIISHIMA
+	// Server has listenUDPFunc as same as listenFunc for TCP
 	if srv.listenUDPFunc == nil {
 		srv.listenUDPFunc = ListenUDP
 	}
@@ -435,24 +441,21 @@ func (srv *Server) Start() (err error) {
 	if err := srv.setupLocalNode(); err != nil {
 		return err
 	}
-	srv.log.Debug("Server.Start: setupPortMapping")
 	srv.setupPortMapping()
+	srv.setupEL()	// ADDED by Hinata AWAIISHIMA
 
 	if srv.ListenAddr != "" {
-		srv.log.Debug("Server.Start: setupListening", "addr", srv.ListenAddr)
 		if err := srv.setupListening(); err != nil {
 			// ADDED by Jakub Pajek (failed p2p server start fix)
 			srv.nodedb.Close()
 			return err
 		}
 	}
-	srv.log.Debug("Server.Start: setupDiscovery")
 	if err := srv.setupDiscovery(); err != nil {
 		// ADDED by Jakub Pajek (failed p2p server start fix)
 		srv.nodedb.Close()
 		return err
 	}
-	srv.log.Debug("Server.Start: setupDialScheduler")
 	srv.setupDialScheduler()
 
 	srv.loopWG.Add(1)
@@ -460,6 +463,7 @@ func (srv *Server) Start() (err error) {
 	return nil
 }
 
+// ADDED by Hinata AWAIISHIMA
 // function of wrapper to return discover.UDPConn interface
 func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return net.ListenUDP(network, addr)
@@ -492,7 +496,6 @@ func (srv *Server) setupLocalNode() error {
 }
 
 func (srv *Server) setupDiscovery() error {
-	srv.log.Debug("setupDiscovery: begin", "NoDiscovery", srv.NoDiscovery, "V4", srv.Config.DiscoveryV4, "V5", srv.Config.DiscoveryV5, "BootV4", len(srv.BootstrapNodes), "BootV5", len(srv.BootstrapNodesV5))
 	srv.discmix = enode.NewFairMix(discmixTimeout)
 
 	// Don't listen on UDP endpoint if DHT is disabled.
@@ -500,14 +503,14 @@ func (srv *Server) setupDiscovery() error {
 		return nil
 	}
 
+	// ADDED by Hinata AWAIISHIMA BEG
 	var conn discover.UDPConn
 	var err error
+	// ADDED by Hinata AWAIISHIMA END
 	conn, err = srv.setupUDPListening()
 	if err != nil {
-		srv.log.Error("UDP Listen failed", "err", err)
+		return err
 	}
-	// Log the concrete type of the chosen UDPConn
-	srv.log.Debug("setupDiscovery: conn type", "type", fmt.Sprintf("%T", conn))
 
 	var (
 		sconn     discover.UDPConn = conn
@@ -517,9 +520,7 @@ func (srv *Server) setupDiscovery() error {
 	// connection, so v5 can read unhandled messages from v4.
 	if srv.Config.DiscoveryV4 && srv.Config.DiscoveryV5 {
 		unhandled = make(chan discover.ReadPacket, 100)
-		srv.log.Debug("setupDiscovery: enabling shared UDP for v5")
 		sconn = &sharedUDPConn{under: conn, unhandled: unhandled}
-		srv.log.Debug("setupDiscovery: sconn type", "type", fmt.Sprintf("%T", sconn))
 	}
 
 	// Start discovery services.
@@ -551,7 +552,6 @@ func (srv *Server) setupDiscovery() error {
 		if err != nil {
 			return err
 		}
-		srv.log.Debug("setupDiscovery: discv5 up")
 	}
 
 	// Add protocol-specific discovery sources.
@@ -562,7 +562,6 @@ func (srv *Server) setupDiscovery() error {
 			added[proto.Name] = true
 		}
 	}
-	srv.log.Debug("setupDiscovery: done")
 	return nil
 }
 
@@ -609,8 +608,7 @@ func (srv *Server) MaxDialedConns() (limit int) {
 
 func (srv *Server) setupListening() error {
 	// Launch the listener.
-	listenAddr := srv.ListenAddr
-	listener, err := srv.listenFunc("tcp", listenAddr)
+	listener, err := srv.listenFunc("tcp", srv.ListenAddr)
 	if err != nil {
 		return err
 	}
@@ -635,6 +633,8 @@ func (srv *Server) setupListening() error {
 	return nil
 }
 
+// MODIFIED by Hinata AWAIISHIMA
+// Change the return value type to use this method with el_stack UDPConn
 // func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	listenAddr := srv.ListenAddr
@@ -649,27 +649,22 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	if err != nil {
 		return nil, err
 	}
+	// MODIFIED by Hinata AWAIISHIMA
+	// Because modified Server struct that it has listenUDPFunc field as same as TCP's listenFunc
 	// conn, err := net.ListenUDP("udp", addr)
 	conn, err := srv.listenUDPFunc("udp", addr)
 	if err != nil {
 		return nil, err
 	}
-	laddr, ok := conn.LocalAddr().(*net.UDPAddr)
-	if !ok || laddr == nil {
-		defer conn.Close()
-		return nil, fmt.Errorf("unexpected UDP local address type %T", conn.LocalAddr())
-	}
-	if ip := laddr.IP; ip != nil && !ip.IsUnspecified() {
-		srv.localnode.SetStaticIP(ip)
-	}
+	laddr := conn.LocalAddr().(*net.UDPAddr)
 	srv.localnode.SetFallbackUDP(laddr.Port)
 	srv.log.Debug("UDP listener up", "addr", laddr)
-	// Always request NAT mapping for discovery UDP when using el_stack.
-	// The NAT loop will no-op if NAT is not configured.
-	srv.portMappingRegister <- &portMapping{
-		protocol: "UDP",
-		name:     "ethereum peer discovery",
-		port:     laddr.Port,
+	if !laddr.IP.IsLoopback() && !laddr.IP.IsPrivate() {
+		srv.portMappingRegister <- &portMapping{
+			protocol: "UDP",
+			name:     "ethereum peer discovery",
+			port:     laddr.Port,
+		}
 	}
 
 	return conn, nil
@@ -924,7 +919,6 @@ func (srv *Server) checkInboundConn(remoteIP netip.Addr) error {
 // or the handshakes have failed.
 func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *enode.Node) error {
 	c := &conn{fd: fd, flags: flags, cont: make(chan error)}
-	srv.log.Debug("SetupConn: begin", "remote", fd.RemoteAddr(), "flags", flags)
 	if dialDest == nil {
 		c.transport = srv.newTransport(fd, nil)
 	} else {
@@ -933,18 +927,15 @@ func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *enode.Node) 
 
 	err := srv.setupConn(c, dialDest)
 	if err != nil {
-		srv.log.Debug("SetupConn: error", "err", err)
 		if !c.is(inboundConn) {
 			markDialError(err)
 		}
 		c.close(err)
 	}
-	srv.log.Debug("SetupConn: end", "err", err)
 	return err
 }
 
 func (srv *Server) setupConn(c *conn, dialDest *enode.Node) error {
-	clog := srv.log.New("stage", "setupConn")
 	// Prevent leftover pending conns from entering the handshake.
 	srv.lock.Lock()
 	running := srv.running
@@ -964,19 +955,17 @@ func (srv *Server) setupConn(c *conn, dialDest *enode.Node) error {
 	}
 
 	// Run the RLPx handshake.
-	clog.Trace("encHandshake: start")
 	remotePubkey, err := c.doEncHandshake(srv.PrivateKey)
 	if err != nil {
 		srv.log.Trace("Failed RLPx handshake", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)
 		return fmt.Errorf("%w: %v", errEncHandshakeError, err)
 	}
-	clog.Trace("encHandshake: ok")
 	if dialDest != nil {
 		c.node = dialDest
 	} else {
 		c.node = nodeFromConn(remotePubkey, c.fd)
 	}
-	clog = srv.log.New("id", c.node.ID(), "addr", c.fd.RemoteAddr(), "conn", c.flags)
+	clog := srv.log.New("id", c.node.ID(), "addr", c.fd.RemoteAddr(), "conn", c.flags)
 	err = srv.checkpoint(c, srv.checkpointPostHandshake)
 	if err != nil {
 		clog.Trace("Rejected peer", "err", err)

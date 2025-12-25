@@ -2,11 +2,12 @@ package elstack
 
 import (
 	"context"
-	"el_stack"
+	// "el_stack"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack"	// if you copied el_stack directory directly below elstack directory, use it.
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
