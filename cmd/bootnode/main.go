@@ -118,20 +118,8 @@ func main() {
 		}
 	}
 
-	// Ensure listen address parses, and capture preferred port for el_stack binding.
-	// var preferPort int
-	addrForParse := *listenAddr
-	if addrForParse == "" {
-		addrForParse = ":0"
-	}
-	udpAddr, err := net.ResolveUDPAddr("udp", addrForParse)
-	if err != nil {
-		utils.Fatalf("-ResolveUDPAddr: %v", err)
-	}
-	// preferPort = udpAddr.Port
-
-	// Try el_stack first; fall back to std UDP if unavailable.
-	var conn discover.UDPConn
+	// ADDED by Hinata AWAIISHIMA BEG
+	listenUDPFunc := ListenUDP
 	if *elUse {
 		elCfg := &elstack.ELConfig{
 			CertPath: *elServerCert,
@@ -141,12 +129,20 @@ func main() {
 			Port: *elServerServ,
 			AntiOverlap: *elAntiOverlap,
 		}
-		vpnDelegate := elstack.SetupELVpnDelegate(elCfg)
-		if vpnDelegate != nil {
-			conn, _ = elstack.ListenELUDP("udp", udpAddr)
+		if ipStr, err := elstack.SetupEL(elCfg); err != nil{
+			*listenAddr = ipStr + *listenAddr
+			listenUDPFunc = elstack.ListenELUDP
 		}
-	} else {
-		conn, _ = net.ListenUDP("udp", udpAddr)
+	}
+	// ADDED by Hinata AWAIISHIMA END
+
+	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
+	if err != nil {
+		utils.Fatalf("-ResolveUDPAddr: %v", err)
+	}
+	conn, err := listenUDPFunc("udp", addr)
+	if err != nil {
+		utils.Fatalf("-ListenUDP: %v", err)
 	}
 	defer conn.Close()
 
@@ -154,11 +150,6 @@ func main() {
 	ln := enode.NewLocalNode(db, nodeKey)
 
 	listenerAddr := conn.LocalAddr().(*net.UDPAddr)
-	// Ensure ENR reflects the actual bound UDP endpoint.
-	if listenerAddr != nil {
-		ln.SetStaticIP(listenerAddr.IP)
-		ln.SetFallbackUDP(listenerAddr.Port)
-	}
 	if natm != nil && !listenerAddr.IP.IsLoopback() {
 		natAddr := doPortMapping(natm, ln, listenerAddr)
 		if natAddr != nil {
@@ -182,6 +173,12 @@ func main() {
 	}
 
 	select {}
+}
+
+// ADDED by Hinata AWAIISHIMA
+// function of wrapper to return discover.UDPConn interface
+func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+	return net.ListenUDP(network, addr)
 }
 
 func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
