@@ -193,30 +193,35 @@ type NodeConfig struct {
 	// to keep in clique snapshot cache (default: 128).
 	CliqueSnapshotCacheCount int
 
-	// ADDED by Hinata AWAIISHIMA BEG
+	// ADDED by Hinata AWAIISHIMA
 	// ELUse is the bool flag that the client uses emotion-link connections or not
 	ELUse bool
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELAccount is the name of the client's emotion-link account
 	ELAccount string
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELPassword is the pass of the client's emotion-link account
 	ELPassword string
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELCertPath is the cert file path of the emotion-link server to connect
 	ELCertPath string
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELHost is the emotion-link host server name
 	ELHost string
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELPort is the emotion-link port of host server
 	// This value is a number, but when setting it, it needs to be a string.
 	ELPort string
 
+	// ADDED by Hinata AWAIISHIMA
 	// ELAntiOverlap blocks Duplicating of the connection from same client
 	// This value is a number, but when setting it, it needs to be a string.
 	ELAntiOverlap string
-	// ADDED by Hinata AWAIISHIMA END
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
