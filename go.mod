@@ -1,6 +1,6 @@
 module github.com/ethereum/go-ethereum
 
-go 1.22.2
+go 1.22.12
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.3.0
@@ -143,6 +143,6 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-require el_stack v0.0.0-00010101000000-000000000000
+// require el_stack v0.0.0-00010101000000-000000000000
 
-replace el_stack => ../el-stack-rs/golang/el_stack
+// replace el_stack => ../el-stack-rs/golang/el_stack
