@@ -33,6 +33,15 @@ ios:
 	@echo "Import \"$(GOBIN)/Geth.framework\" to use the library."
 # ADDED by Jakub Pajek END (revert mobile nuke)
 
+# ADDED by Hinata AWAIISHIMA BEG
+eldroid:
+	gomobile bind \
+    -ldflags "-s -w" \
+    --target android/arm64 -androidapi 21 \
+    --javapkg org.ethereum \
+    -v github.com/ethereum/go-ethereum/mobile
+# ADDED by Hinata AWAIISHIMA END
+
 test: all
 	$(GORUN) build/ci.go test
 
