@@ -63,7 +63,7 @@ func readFileOrEmpty(path string) []byte {
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
 	ipAddr string
-	linked    chan bool
+	linked chan bool
 }
 
 func (d *VpnDelegate) IPAddr() string { return d.ipAddr }
@@ -196,6 +196,8 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	// loud during startup rather than surfacing deep in the networking stack.
 	elLog.Info("SetupEL arg", "cfg.Account", cfg.Account)
 	elLog.Info("SetupEL arg", "cfg.Password", cfg.Password)
+	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
+	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
 
 	certPath := cfg.CertPath
 	if certPath == "" {
@@ -253,7 +255,7 @@ func SetupEL(cfg *ELConfig) (string, error) {
 		return "", err
 	}
 
-	stats := <- delegate.linked
+	stats := <-delegate.linked
 	if !stats {
 		elLog.Error("el_stack.Stop() called")
 		el_stack.Stop()
