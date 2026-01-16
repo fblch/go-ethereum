@@ -2,17 +2,20 @@ package elstack
 
 import (
 	"context"
+	"fmt"
+
 	// "el_stack"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack"	// if you copied el_stack directory directly below elstack directory, use it.
+	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 type ElStackTcpListener struct {
 	inner net.Listener
+	close chan struct{}
 }
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
@@ -20,27 +23,45 @@ func ListenELTCP(network, addr string) (net.Listener, error) {
 	ln, err := el_stack.NewElStackTcpListener(network, addr)
 	listener := &ElStackTcpListener{
 		inner: ln,
+		close: make(chan struct{}),
 	}
 	return listener, err
 }
 
 // net.Listener interface 実装
 // Accept proxies the el_stack listener while adding timing logs so we can
-// diagnose stalls similar to the Go stdlib listener.
 func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
-	start := time.Now()
-	elLog.Trace("ElStackTcpListener waiting on Accept", "laddr", ln.Addr())
-	c, err := ln.inner.Accept()
-	if err != nil {
-		elLog.Warn("ElStackTcpListener Accept failed", "err", err, "elapsed", time.Since(start))
+	connChan := make(chan net.Conn)
+	errChan := make(chan error)
+
+	go ln.accept(connChan, errChan)
+
+	select {
+	case c := <-connChan:
+		conn := newElStackTcpConn(c)
+		return conn, nil
+	case err := <-errChan:
 		return nil, err
+	case <-ln.close:
+		elLog.Debug("(ElStackTcpListener).Accept() STOP", "reason", "listener closed")
+		return nil, fmt.Errorf("ElStackTcpListener is already closed")
 	}
-	elLog.Trace("ElStackTcpListener Accept success", "raddr", c.RemoteAddr(), "elapsed", time.Since(start))
-	conn := newElStackTcpConn(c)
-	return conn, nil
 }
 
-func (ln *ElStackTcpListener) Close() error   { return ln.inner.Close() }
+func (ln *ElStackTcpListener) accept(conn chan net.Conn, err chan error) {
+	c, e := ln.inner.Accept()
+	if e != nil {
+		err <- e
+	}
+	conn <- c
+}
+
+func (ln *ElStackTcpListener) Close() error {
+	err := ln.inner.Close()
+	ln.close <- struct{}{}
+	return err
+}
+
 func (ln *ElStackTcpListener) Addr() net.Addr { return ln.inner.Addr() }
 
 type ElStackTcpDialer struct {
