@@ -14,8 +14,9 @@ import (
 )
 
 type ElStackTcpListener struct {
-	inner net.Listener
-	close chan struct{}
+	inner     net.Listener
+	close     chan struct{}
+	closeOnce sync.Once
 }
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
@@ -31,34 +32,35 @@ func ListenELTCP(network, addr string) (net.Listener, error) {
 // net.Listener interface 実装
 // Accept proxies the el_stack listener while adding timing logs so we can
 func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
-	connChan := make(chan net.Conn)
-	errChan := make(chan error)
+	type acceptResult struct {
+		conn net.Conn
+		err  error
+	}
+	resCh := make(chan acceptResult, 1)
 
-	go ln.accept(connChan, errChan)
+	go func() {
+		c, err := ln.inner.Accept()
+		resCh <- acceptResult{conn: c, err: err}
+	}()
 
 	select {
-	case c := <-connChan:
-		conn := newElStackTcpConn(c)
-		return conn, nil
-	case err := <-errChan:
-		return nil, err
+	case res := <-resCh:
+		if res.err != nil {
+			return nil, res.err
+		}
+		return newElStackTcpConn(res.conn), nil
 	case <-ln.close:
 		elLog.Debug("(ElStackTcpListener).Accept() STOP", "reason", "listener closed")
 		return nil, fmt.Errorf("ElStackTcpListener is already closed")
 	}
 }
 
-func (ln *ElStackTcpListener) accept(conn chan net.Conn, err chan error) {
-	c, e := ln.inner.Accept()
-	if e != nil {
-		err <- e
-	}
-	conn <- c
-}
-
 func (ln *ElStackTcpListener) Close() error {
-	err := ln.inner.Close()
-	ln.close <- struct{}{}
+	var err error
+	ln.closeOnce.Do(func() {
+		err = ln.inner.Close()
+		close(ln.close)
+	})
 	return err
 }
 
