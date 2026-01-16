@@ -251,6 +251,7 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	}
 
 	if err := el_stack.Start(delegate, vpnCfg, accountCfg); err != nil {
+		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
 		return "", err
 	}
