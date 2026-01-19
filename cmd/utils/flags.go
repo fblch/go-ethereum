@@ -919,6 +919,18 @@ var (
 		Name:     "el.password",
 		Category: flags.NetworkingCategory,
 	}
+	ELVCFlag = &cli.StringFlag{
+		Name:     "el.vc",
+		Category: flags.NetworkingCategory,
+	}
+	ELVCPrivKeyFlag = &cli.StringFlag{
+		Name:     "el.vcPrivKey",
+		Category: flags.NetworkingCategory,
+	}
+	ELIssuerPubkeyFlag = &cli.StringFlag{
+		Name:     "el.issuerPubkey",
+		Category: flags.NetworkingCategory,
+	}
 	ELHostFlag = &cli.StringFlag{
 		Name:     "el.host",
 		Category: flags.NetworkingCategory,
@@ -1225,6 +1237,8 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+// ADDED by Hinata AWAIISHIMA
+// setEL creates a config structure for emotion-link in p2p.Config
 func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if cfg.EL == nil {
 		cfg.EL = &elstack.ELConfig{}
@@ -1240,6 +1254,15 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	}
 	if elAccountPassword := ctx.String(ELPasswordFlag.Name); elAccountPassword != "" {
 		cfg.EL.Password = elAccountPassword
+	}
+	if elVC := ctx.String(ELVCFlag.Name); elVC != "" {
+		cfg.EL.VC = elVC
+	}
+	if elVCPrivKey := ctx.String(ELVCPrivKeyFlag.Name); elVCPrivKey != "" {
+		cfg.EL.VCPrivKey = elVCPrivKey
+	}
+	if elIssuerPubkey := ctx.String(ELIssuerPubkeyFlag.Name); elIssuerPubkey != "" {
+		cfg.EL.IssuerPubkey = elIssuerPubkey
 	}
 	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
 		cfg.EL.Host = elServerHost

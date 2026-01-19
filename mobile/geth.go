@@ -206,6 +206,18 @@ type NodeConfig struct {
 	ELPassword string
 
 	// ADDED by Hinata AWAIISHIMA
+	// ELVC is the client verifiable credential of emotion-link
+	ELVC string
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELVCPrivKey is the privatekey of VC holder
+	ELPrivKey string
+
+	// ADDED by Hinata AWAIISHIMA
+	// IssuerPubkey is the VC Issuer's publickey
+	IssuerPubkey string
+
+	// ADDED by Hinata AWAIISHIMA
 	// ELCertPath is the cert file path of the emotion-link server to connect
 	ELCertPath string
 
@@ -411,12 +423,12 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			MaxPeers:         config.MaxPeers,
 			// ADDED by Hinata AWAIISHIMA
 			EL: &elstack.ELConfig{
-				Use: config.ELUse,
-				CertPath: config.ELCertPath,
-				Account: config.ELAccount,
-				Password: config.ELPassword,
-				Host: config.ELHost,
-				Port: config.ELPort,
+				Use:         config.ELUse,
+				CertPath:    config.ELCertPath,
+				Account:     config.ELAccount,
+				Password:    config.ELPassword,
+				Host:        config.ELHost,
+				Port:        config.ELPort,
 				AntiOverlap: config.ELAntiOverlap,
 			},
 		},
