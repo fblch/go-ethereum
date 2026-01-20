@@ -56,6 +56,21 @@ func getEnvUint64OrDefault(key string, def uint64) (uint64, error) {
 	return val, nil
 }
 
+func readRequiredFile(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("required file path is empty")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read required file %s: %w", path, err)
+	}
+	val := strings.TrimSpace(string(content))
+	if val == "" {
+		return "", fmt.Errorf("required file %s is empty", path)
+	}
+	return val, nil
+}
+
 // ファイルを読み込み
 func readFileOrEmpty(path string) []byte {
 	b, err := os.ReadFile(path)
@@ -151,23 +166,26 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
 	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
 
+	vc, err := readRequiredFile(cfg.VC)
+	if err != nil {
+		return "", err
+	}
+
+	vcPrivKey, err := readRequiredFile(cfg.VCPrivKey)
+	if err != nil {
+		return "", err
+	}
+
+	issuerPubkey, err := readRequiredFile(cfg.IssuerPubkey)
+	if err != nil {
+		return "", err
+	}
+
 	certPath := cfg.CertPath
 	if certPath == "" {
 		certPath = "/etc/ssl/certs/ca-certificates.crt"
 	}
 	caCert := readFileOrEmpty(certPath)
-
-	if cfg.VC == "" {
-		return "", fmt.Errorf("EL VC is not set")
-	}
-
-	if cfg.VCPrivKey == "" {
-		return "", fmt.Errorf("EL VC Private-Key is not set")
-	}
-
-	if cfg.IssuerPubkey == "" {
-		return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
-	}
 
 	vpnHost := cfg.Host
 	if vpnHost == "" {
@@ -187,8 +205,6 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	vpnKeepAliveSec := uint64(60)
 	vpnTimeoutSec := uint64(180)
 
-	accountCfg := el_stack.NewElStackAccountConfig(cfg.Account, cfg.Password)
-
 	vpnCfg := el_stack.NewElStackVpnConfig(
 		vpnHost, vpnPort, antiOverlap,
 		vpnTimeoutSec, vpnKeepAliveSec,
@@ -201,12 +217,20 @@ func SetupEL(cfg *ELConfig) (string, error) {
 
 	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert, 1280)
 
-	el_stack.Initialize(prodCfg)
+	defaultBurstSize := uint64(1024)
+	defaultTCPBuffer := uint64(16384)
+	defaultUDPBuffer := uint64(8192)
+	defaultMetaDataSize := uint64(32)
+	buffCfg := el_stack.NewElStackSocketBufferConfig(defaultBurstSize, &defaultTCPBuffer, &defaultUDPBuffer, &defaultMetaDataSize)
+
+	el_stack.Initialize(prodCfg, buffCfg)
 	delegate := &VpnDelegate{
 		linked: make(chan bool, 1),
 	}
 
-	if err := el_stack.Start(delegate, vpnCfg, accountCfg); err != nil {
+	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
+
+	if err := el_stack.Start(delegate, vpnCfg, vcCfg, nil); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
 		return "", err
