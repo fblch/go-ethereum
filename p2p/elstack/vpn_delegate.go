@@ -80,8 +80,8 @@ func (d *VpnDelegate) OnConnectionError(msg string) {
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
-	// ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
 	ipAddr := ipAddrs[0][:strings.Index(ipAddrs[0], "/")]
+	elLog.Info("get ip address", "address", ipAddr)
 	d.ipAddr = ipAddr
 	d.linked <- true
 }
@@ -106,17 +106,17 @@ func SetupEL(cfg *ELConfig) (string, error) {
 		return "", fmt.Errorf("EL Password is not set")
 	}
 
-	if cfg.VC == "" {
-		return "", fmt.Errorf("EL VC is not set")
-	}
+	// if cfg.VC == "" {
+	// 	return "", fmt.Errorf("EL VC is not set")
+	// }
 
-	if cfg.VCPrivKey == "" {
-		return "", fmt.Errorf("EL VC Private-Key is not set")
-	}
+	// if cfg.VCPrivKey == "" {
+	// 	return "", fmt.Errorf("EL VC Private-Key is not set")
+	// }
 
-	if cfg.IssuerPubkey == "" {
-		return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
-	}
+	// if cfg.IssuerPubkey == "" {
+	// 	return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
+	// }
 
 	vpnHost := cfg.Host
 	if vpnHost == "" {
