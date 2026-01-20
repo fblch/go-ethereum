@@ -3,8 +3,12 @@ package elstack
 import (
 	// "el_stack"
 
+	"crypto/rand"
+	"errors"
 	"fmt"
+	"math/big"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -61,6 +65,61 @@ func readFileOrEmpty(path string) []byte {
 	return b
 }
 
+func isAlphaNumeric32(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func randomAlphaNumeric32() (string, error) {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	buf := make([]byte, 32)
+	max := big.NewInt(int64(len(letters)))
+	for i := 0; i < len(buf); i++ {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("generate random antiOverlap: %w", err)
+		}
+		buf[i] = letters[n.Int64()]
+	}
+	return string(buf), nil
+}
+
+func loadOrCreateAntiOverlap(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("antiOverlap path is not set")
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("read antiOverlap file: %w", err)
+	}
+
+	val := strings.TrimSpace(string(content))
+	if !isAlphaNumeric32(val) {
+		val, err = randomAlphaNumeric32()
+		if err != nil {
+			return "", err
+		}
+
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return "", fmt.Errorf("create antiOverlap directory: %w", err)
+		}
+		if err := os.WriteFile(path, []byte(val), 0o600); err != nil {
+			return "", fmt.Errorf("write antiOverlap file: %w", err)
+		}
+	}
+	return val, nil
+}
+
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
 	ipAddr string
@@ -98,39 +157,31 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	}
 	caCert := readFileOrEmpty(certPath)
 
-	if cfg.Account == "" {
-		return "", fmt.Errorf("EL Account is not set")
+	if cfg.VC == "" {
+		return "", fmt.Errorf("EL VC is not set")
 	}
 
-	if cfg.Password == "" {
-		return "", fmt.Errorf("EL Password is not set")
+	if cfg.VCPrivKey == "" {
+		return "", fmt.Errorf("EL VC Private-Key is not set")
 	}
 
-	// if cfg.VC == "" {
-	// 	return "", fmt.Errorf("EL VC is not set")
-	// }
-
-	// if cfg.VCPrivKey == "" {
-	// 	return "", fmt.Errorf("EL VC Private-Key is not set")
-	// }
-
-	// if cfg.IssuerPubkey == "" {
-	// 	return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
-	// }
+	if cfg.IssuerPubkey == "" {
+		return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
+	}
 
 	vpnHost := cfg.Host
 	if vpnHost == "" {
-		vpnHost = "ec2-57-181-8-159.ap-northeast-1.compute.amazonaws.com"
+		return "", fmt.Errorf("EL server hostname is not set")
 	}
 
 	vpnPort := cfg.Port
 	if vpnPort == "" {
-		vpnPort = "443"
+		return "", fmt.Errorf("EL server port is not set")
 	}
 
-	antiOverlap := cfg.AntiOverlap
-	if antiOverlap == "" {
-		antiOverlap = "12345678901234567890123456789012"
+	antiOverlap, err := loadOrCreateAntiOverlap(cfg.AntiOverlap)
+	if err != nil {
+		return "", err
 	}
 
 	vpnKeepAliveSec := uint64(60)
