@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 )
@@ -79,7 +80,8 @@ func (d *VpnDelegate) OnConnectionError(msg string) {
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
-	ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
+	// ipAddr := ipAddrs[0][:len(ipAddrs[0])-3] // trim subnet
+	ipAddr := ipAddrs[0][:strings.Index(ipAddrs[0], "/")]
 	d.ipAddr = ipAddr
 	d.linked <- true
 }
@@ -87,8 +89,6 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 func SetupEL(cfg *ELConfig) (string, error) {
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
-	elLog.Info("SetupEL arg", "cfg.Account", cfg.Account)
-	elLog.Info("SetupEL arg", "cfg.Password", cfg.Password)
 	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
 	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
 
@@ -104,6 +104,18 @@ func SetupEL(cfg *ELConfig) (string, error) {
 
 	if cfg.Password == "" {
 		return "", fmt.Errorf("EL Password is not set")
+	}
+
+	if cfg.VC == "" {
+		return "", fmt.Errorf("EL VC is not set")
+	}
+
+	if cfg.VCPrivKey == "" {
+		return "", fmt.Errorf("EL VC Private-Key is not set")
+	}
+
+	if cfg.IssuerPubkey == "" {
+		return "", fmt.Errorf("EL VC Issuer Public-Key is not set")
 	}
 
 	vpnHost := cfg.Host
