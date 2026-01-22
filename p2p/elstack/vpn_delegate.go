@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -109,39 +110,73 @@ func randomAlphaNumeric32() (string, error) {
 }
 
 func loadOrCreateAntiOverlap(path string) (string, error) {
-	if path == "" {
+	val := strings.TrimSpace(path)
+	if val == "" {
 		return "", fmt.Errorf("antiOverlap path is not set")
 	}
 
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(val)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("read antiOverlap file: %w", err)
 	}
 
-	val := strings.TrimSpace(string(content))
-	if !isAlphaNumeric32(val) {
-		val, err = randomAlphaNumeric32()
+	token := strings.TrimSpace(string(content))
+	if !isAlphaNumeric32(token) {
+		token, err = randomAlphaNumeric32()
 		if err != nil {
 			return "", err
 		}
 
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(val), 0o755); err != nil {
 			return "", fmt.Errorf("create antiOverlap directory: %w", err)
 		}
-		if err := os.WriteFile(path, []byte(val), 0o600); err != nil {
+		if err := os.WriteFile(val, []byte(token), 0o600); err != nil {
 			return "", fmt.Errorf("write antiOverlap file: %w", err)
 		}
 	}
-	return val, nil
+	return token, nil
 }
 
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
-	ipAddr string
-	linked chan bool
+	Addr    net.IP
+	Err     error
+	updates chan VpnDelegate
 }
 
-func (d *VpnDelegate) IPAddr() string { return d.ipAddr }
+var (
+	ErrELConfigNil = errors.New("EL config is nil")
+	ErrELDisabled  = errors.New("EL is disabled")
+)
+
+// ValidateELConfig checks that required fields are present before starting EL.
+func ValidateELConfig(cfg *ELConfig) error {
+	if cfg == nil {
+		return ErrELConfigNil
+	}
+	if !cfg.Use {
+		return ErrELDisabled
+	}
+	if strings.TrimSpace(cfg.VC) == "" {
+		return fmt.Errorf("VC content is empty")
+	}
+	if strings.TrimSpace(cfg.VCPrivKey) == "" {
+		return fmt.Errorf("VCPrivKey content is empty")
+	}
+	if strings.TrimSpace(cfg.IssuerPubkey) == "" {
+		return fmt.Errorf("IssuerPubkey content is empty")
+	}
+	if strings.TrimSpace(cfg.Host) == "" {
+		return fmt.Errorf("EL server hostname is not set")
+	}
+	if strings.TrimSpace(cfg.Port) == "" {
+		return fmt.Errorf("EL server port is not set")
+	}
+	if _, err := loadOrCreateAntiOverlap(cfg.AntiOverlap); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 	elLog.Debug("VPN Status", "status", status)
@@ -149,37 +184,41 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	d.linked <- false
+	if d.updates != nil {
+		d.updates <- VpnDelegate{Err: fmt.Errorf(msg)}
+	}
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 	ipAddr := ipAddrs[0][:strings.Index(ipAddrs[0], "/")]
 	elLog.Info("get ip address", "address", ipAddr)
-	d.ipAddr = ipAddr
-	d.linked <- true
+	if d.updates == nil {
+		return
+	}
+	addr := net.ParseIP(ipAddr)
+	if addr == nil {
+		d.updates <- VpnDelegate{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)}
+		return
+	}
+	d.updates <- VpnDelegate{Addr: addr}
 }
 
-func SetupEL(cfg *ELConfig) (string, error) {
+func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
+	if err := ValidateELConfig(cfg); err != nil {
+		if updates != nil {
+			updates <- VpnDelegate{Err: err}
+		}
+		return
+	}
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
 	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
 	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
 
-	vc, err := readRequiredFile(cfg.VC)
-	if err != nil {
-		return "", err
-	}
-
-	vcPrivKey, err := readRequiredFile(cfg.VCPrivKey)
-	if err != nil {
-		return "", err
-	}
-
-	issuerPubkey, err := readRequiredFile(cfg.IssuerPubkey)
-	if err != nil {
-		return "", err
-	}
+	vc := strings.TrimSpace(cfg.VC)
+	vcPrivKey := strings.TrimSpace(cfg.VCPrivKey)
+	issuerPubkey := strings.TrimSpace(cfg.IssuerPubkey)
 
 	certPath := cfg.CertPath
 	if certPath == "" {
@@ -188,18 +227,14 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	caCert := readFileOrEmpty(certPath)
 
 	vpnHost := cfg.Host
-	if vpnHost == "" {
-		return "", fmt.Errorf("EL server hostname is not set")
-	}
-
 	vpnPort := cfg.Port
-	if vpnPort == "" {
-		return "", fmt.Errorf("EL server port is not set")
-	}
 
 	antiOverlap, err := loadOrCreateAntiOverlap(cfg.AntiOverlap)
 	if err != nil {
-		return "", err
+		if updates != nil {
+			updates <- VpnDelegate{Err: err}
+		}
+		return
 	}
 
 	vpnKeepAliveSec := uint64(60)
@@ -225,7 +260,7 @@ func SetupEL(cfg *ELConfig) (string, error) {
 
 	el_stack.Initialize(prodCfg, buffCfg)
 	delegate := &VpnDelegate{
-		linked: make(chan bool, 1),
+		updates: updates,
 	}
 
 	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
@@ -233,27 +268,20 @@ func SetupEL(cfg *ELConfig) (string, error) {
 	if err := el_stack.Start(delegate, vpnCfg, vcCfg, nil); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
-		return "", err
+		if updates != nil {
+			updates <- VpnDelegate{Err: err}
+		}
+		return
 	}
 
-	stats := <-delegate.linked
-	if !stats {
-		elLog.Error("el_stack.Stop() called")
-		el_stack.Stop()
-		return "", fmt.Errorf("failed to connect to EL server")
+	if quit != nil {
+		go func() {
+			<-quit
+			elLog.Trace("StopElStack by quit signal")
+			el_stack.Stop()
+			if updates != nil {
+				close(updates)
+			}
+		}()
 	}
-	if delegate.ipAddr == "" {
-		err := fmt.Errorf("set no ipAddr to vpnDelegate")
-		elLog.Error("SetupEL", "err", err)
-		el_stack.Stop()
-		return "", err
-	}
-
-	return delegate.ipAddr, nil
-}
-
-func StopElStack() {
-	elLog.Trace("StopElStack START")
-	el_stack.Stop()
-	elLog.Trace("StopElStack DONE")
 }

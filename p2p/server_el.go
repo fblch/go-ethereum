@@ -1,30 +1,44 @@
 package p2p
 
 import (
-	"net"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
 
 func (srv *Server) setupEL() {
-	if srv.EL == nil {
+	if err := elstack.ValidateELConfig(srv.EL); err != nil {
+		if errors.Is(err, elstack.ErrELDisabled) || errors.Is(err, elstack.ErrELConfigNil) {
+			return
+		}
+		srv.log.Error("EL config invalid", "err", err)
 		return
 	}
-	if !srv.EL.Use {
-		return
-	}
-	if ipAddr, err := elstack.SetupEL(srv.EL); err == nil {
-		if ipAddr != "" {
-			ip := net.ParseIP(ipAddr)
-			if ip == nil {
-				srv.log.Error("invalid IP", "str", ipAddr)
+
+	updates := make(chan elstack.VpnDelegate, 1)
+	baseListen := srv.ListenAddr
+	go elstack.SetupEL(srv.EL, updates, srv.quit)
+
+	go func() {
+		for {
+			select {
+			case upd := <-updates:
+				if upd.Err != nil {
+					srv.log.Info("setupEL failed", "reason", upd.Err)
+					continue
+				}
+				if upd.Addr == nil {
+					srv.log.Info("setupEL missing IP")
+					continue
+				}
+				srv.localnode.SetStaticIP(upd.Addr) // update staticIP to el_stack IPAddr
+				srv.ListenAddr = upd.Addr.String() + baseListen
+				srv.listenFunc = elstack.ListenELTCP
+				srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+				srv.listenUDPFunc = elstack.ListenELUDP
+			case <-srv.quit:
 				return
 			}
-			srv.localnode.SetStaticIP(ip) // update staticIP to el_stack IPAddr
-			srv.ListenAddr = ipAddr + srv.ListenAddr
-			srv.listenFunc = elstack.ListenELTCP
-			srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
-			srv.listenUDPFunc = elstack.ListenELUDP
 		}
-	}
+	}()
 }

@@ -9,7 +9,7 @@ type ELConfig struct {
 	Account      string
 	Password     string
 
-	// configs for VC 
+	// configs for VC (contents, not file paths)
 	VC           string
 	VCPrivKey    string
 	IssuerPubkey string
