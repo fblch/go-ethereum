@@ -31,7 +31,7 @@ func (srv *Server) setupEL() error {
 	if first.Addr == nil {
 		return fmt.Errorf("EL setup returned nil IP")
 	}
-	srv.applyELBindings(first.Addr, baseListen)
+	srv.applyELBindings(first.Addr, baseListen, false)
 
 	// Continue to watch for subsequent updates asynchronously.
 	go func() {
@@ -49,7 +49,7 @@ func (srv *Server) setupEL() error {
 					srv.log.Info("setupEL missing IP")
 					continue
 				}
-				srv.applyELBindings(upd.Addr, baseListen)
+				srv.applyELBindings(upd.Addr, baseListen, true)
 			case <-srv.quit:
 				return
 			}
@@ -58,12 +58,16 @@ func (srv *Server) setupEL() error {
 	return nil
 }
 
-func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
+func (srv *Server) applyELBindings(addr net.IP, baseListen string, restart bool) {
 	srv.localnode.SetStaticIP(addr) // update staticIP to el_stack IPAddr
 	srv.ListenAddr = addr.String() + baseListen
 	srv.listenFunc = elstack.ListenELTCP
 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 	srv.listenUDPFunc = elstack.ListenELUDP
+
+	if !restart {
+		return
+	}
 
 	// If listeners/discovery are already running, close and rebind on EL.
 	listening := srv.listener != nil || srv.discv4 != nil || srv.discv5 != nil
