@@ -31,7 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/elstack"
+	// "github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -120,20 +120,20 @@ func main() {
 
 	// ADDED by Hinata AWAIISHIMA BEG
 	listenUDPFunc := ListenUDP
-	if *elUse {
-		elCfg := &elstack.ELConfig{
-			CertPath: *elServerCert,
-			Account: *elAccount,
-			Password: *elPassword,
-			Host: *elServerHost,
-			Port: *elServerServ,
-			AntiOverlap: *elAntiOverlap,
-		}
-		if ipStr, err := elstack.SetupEL(elCfg); err != nil{
-			*listenAddr = ipStr + *listenAddr
-			listenUDPFunc = elstack.ListenELUDP
-		}
-	}
+	// if *elUse {
+	// 	elCfg := &elstack.ELConfig{
+	// 		CertPath: *elServerCert,
+	// 		Account: *elAccount,
+	// 		Password: *elPassword,
+	// 		Host: *elServerHost,
+	// 		Port: *elServerServ,
+	// 		AntiOverlap: *elAntiOverlap,
+	// 	}
+	// 	if ipStr, err := elstack.SetupEL(elCfg); err != nil{
+	// 		*listenAddr = ipStr + *listenAddr
+	// 		listenUDPFunc = elstack.ListenELUDP
+	// 	}
+	// }
 	// ADDED by Hinata AWAIISHIMA END
 
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
