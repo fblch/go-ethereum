@@ -924,11 +924,11 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 	ELVCPrivKeyFlag = &cli.StringFlag{
-		Name:     "el.vcPrivKey",
+		Name:     "el.vcprivkey",
 		Category: flags.NetworkingCategory,
 	}
 	ELIssuerPubkeyFlag = &cli.StringFlag{
-		Name:     "el.issuerPubkey",
+		Name:     "el.issuerpubkey",
 		Category: flags.NetworkingCategory,
 	}
 	ELHostFlag = &cli.StringFlag{
@@ -1255,14 +1255,14 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if elAccountPassword := ctx.String(ELPasswordFlag.Name); elAccountPassword != "" {
 		cfg.EL.Password = elAccountPassword
 	}
-	if elVC := ctx.String(ELVCFlag.Name); elVC != "" {
-		cfg.EL.VC = elVC
+	if ctx.IsSet(ELVCFlag.Name) {
+		cfg.EL.VC = readELSecretFile(ctx, ELVCFlag)
 	}
-	if elVCPrivKey := ctx.String(ELVCPrivKeyFlag.Name); elVCPrivKey != "" {
-		cfg.EL.VCPrivKey = elVCPrivKey
+	if ctx.IsSet(ELVCPrivKeyFlag.Name) {
+		cfg.EL.VCPrivKey = readELSecretFile(ctx, ELVCPrivKeyFlag)
 	}
-	if elIssuerPubkey := ctx.String(ELIssuerPubkeyFlag.Name); elIssuerPubkey != "" {
-		cfg.EL.IssuerPubkey = elIssuerPubkey
+	if ctx.IsSet(ELIssuerPubkeyFlag.Name) {
+		cfg.EL.IssuerPubkey = readELSecretFile(ctx, ELIssuerPubkeyFlag)
 	}
 	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
 		cfg.EL.Host = elServerHost
@@ -1273,6 +1273,22 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if elAntiOverlap := ctx.String(ELAntiOverlapFlag.Name); elAntiOverlap != "" {
 		cfg.EL.AntiOverlap = elAntiOverlap
 	}
+}
+
+func readELSecretFile(ctx *cli.Context, flag *cli.StringFlag) string {
+	path := ctx.Path(flag.Name)
+	if path == "" {
+		return ""
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		Fatalf("Failed to read %s: %v", flag.Name, err)
+	}
+	value := strings.TrimSpace(string(content))
+	if value == "" {
+		Fatalf("%s is empty", flag.Name)
+	}
+	return value
 }
 
 // SplitAndTrim splits input separated by a comma
