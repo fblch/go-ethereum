@@ -237,8 +237,8 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 		return
 	}
 
-	vpnKeepAliveSec := uint64(60)
-	vpnTimeoutSec := uint64(180)
+	vpnKeepAliveSec := uint64(10)
+	vpnTimeoutSec := uint64(30)
 
 	vpnCfg := el_stack.NewElStackVpnConfig(
 		vpnHost, vpnPort, antiOverlap,
