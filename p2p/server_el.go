@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
@@ -33,6 +35,24 @@ func (srv *Server) setupEL() error {
 	}
 	srv.applyELBindings(first.Addr, baseListen, false)
 
+	var restartInFlight atomic.Bool
+	restart := func() {
+		if !restartInFlight.CompareAndSwap(false, true) {
+			return
+		}
+		go func() {
+			defer restartInFlight.Store(false)
+			select {
+			case <-srv.quit:
+				return
+			default:
+			}
+			time.Sleep(2 * time.Second)
+			elstack.StopElStack()
+			elstack.SetupEL(srv.EL, updates, srv.quit)
+		}()
+	}
+
 	// Continue to watch for subsequent updates asynchronously.
 	go func() {
 		for {
@@ -43,6 +63,7 @@ func (srv *Server) setupEL() error {
 				}
 				if upd.Err != nil {
 					srv.log.Info("setupEL failed", "reason", upd.Err)
+					restart()
 					continue
 				}
 				if upd.Addr == nil {

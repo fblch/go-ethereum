@@ -285,3 +285,18 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 		}()
 	}
 }
+
+// StopElStack stops the EL stack.
+func StopElStack() {
+	elLog.Trace("StopElStack START")
+	el_stack.Stop()
+	elLog.Trace("StopElStack DONE")
+}
+
+// StopElStackSafe stops the EL stack and closes the updates channel if provided.
+func StopElStackSafe(updates chan VpnDelegate) {
+	StopElStack()
+	if updates != nil {
+		close(updates)
+	}
+}
