@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
@@ -33,87 +31,14 @@ func (srv *Server) setupEL() error {
 	if first.Addr == nil {
 		return fmt.Errorf("EL setup returned nil IP")
 	}
-	srv.applyELBindings(first.Addr, baseListen, false)
-
-	var restartInFlight atomic.Bool
-	restart := func() {
-		if !restartInFlight.CompareAndSwap(false, true) {
-			return
-		}
-		go func() {
-			defer restartInFlight.Store(false)
-			select {
-			case <-srv.quit:
-				return
-			default:
-			}
-			time.Sleep(2 * time.Second)
-			elstack.StopElStack()
-			elstack.SetupEL(srv.EL, updates, srv.quit)
-		}()
-	}
-
-	// Continue to watch for subsequent updates asynchronously.
-	go func() {
-		for {
-			select {
-			case upd, ok := <-updates:
-				if !ok {
-					return
-				}
-				if upd.Err != nil {
-					srv.log.Info("setupEL failed", "reason", upd.Err)
-					restart()
-					continue
-				}
-				if upd.Addr == nil {
-					srv.log.Info("setupEL missing IP")
-					continue
-				}
-				srv.applyELBindings(upd.Addr, baseListen, true)
-			case <-srv.quit:
-				return
-			}
-		}
-	}()
+	srv.applyELBindings(first.Addr, baseListen)
 	return nil
 }
 
-func (srv *Server) applyELBindings(addr net.IP, baseListen string, restart bool) {
+func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
 	srv.localnode.SetStaticIP(addr) // update staticIP to el_stack IPAddr
 	srv.ListenAddr = addr.String() + baseListen
 	srv.listenFunc = elstack.ListenELTCP
 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 	srv.listenUDPFunc = elstack.ListenELUDP
-
-	if !restart {
-		return
-	}
-
-	// If listeners/discovery are already running, close and rebind on EL.
-	listening := srv.listener != nil || srv.discv4 != nil || srv.discv5 != nil
-	if listening {
-		if srv.listener != nil {
-			srv.listener.Close()
-			srv.listener = nil
-		}
-		if srv.discv4 != nil {
-			srv.discv4.Close()
-			srv.discv4 = nil
-		}
-		if srv.discv5 != nil {
-			srv.discv5.Close()
-			srv.discv5 = nil
-		}
-	}
-
-	// If the server has a listen address, ensure listeners are (re)started with EL bindings.
-	if srv.ListenAddr != "" {
-		if err := srv.setupListening(); err != nil {
-			srv.log.Error("failed to (re)bind EL listener", "err", err)
-		}
-	}
-	if err := srv.setupDiscovery(); err != nil {
-		srv.log.Error("failed to (re)start discovery with EL", "err", err)
-	}
 }

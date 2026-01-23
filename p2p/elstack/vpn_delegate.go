@@ -144,6 +144,24 @@ type VpnDelegate struct {
 	updates chan VpnDelegate
 }
 
+// sendUpdate delivers a delegate update without blocking callers. If the channel
+// is full or already closed, the update is dropped.
+func sendUpdate(updates chan VpnDelegate, v VpnDelegate) {
+	if updates == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			elLog.Debug("drop EL update", "reason", r)
+		}
+	}()
+	select {
+	case updates <- v:
+	default:
+		elLog.Debug("drop EL update", "reason", "channel full")
+	}
+}
+
 var (
 	ErrELConfigNil = errors.New("EL config is nil")
 	ErrELDisabled  = errors.New("EL is disabled")
@@ -184,9 +202,7 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	if d.updates != nil {
-		d.updates <- VpnDelegate{Err: fmt.Errorf(msg)}
-	}
+	sendUpdate(d.updates, VpnDelegate{Err: fmt.Errorf(msg)})
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
@@ -198,17 +214,15 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	}
 	addr := net.ParseIP(ipAddr)
 	if addr == nil {
-		d.updates <- VpnDelegate{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)}
+		sendUpdate(d.updates, VpnDelegate{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)})
 		return
 	}
-	d.updates <- VpnDelegate{Addr: addr}
+	sendUpdate(d.updates, VpnDelegate{Addr: addr})
 }
 
 func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	if err := ValidateELConfig(cfg); err != nil {
-		if updates != nil {
-			updates <- VpnDelegate{Err: err}
-		}
+		sendUpdate(updates, VpnDelegate{Err: err})
 		return
 	}
 	// We intentionally panic on missing required values earlier so failures are
@@ -231,9 +245,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 
 	antiOverlap, err := loadOrCreateAntiOverlap(cfg.AntiOverlap)
 	if err != nil {
-		if updates != nil {
-			updates <- VpnDelegate{Err: err}
-		}
+		sendUpdate(updates, VpnDelegate{Err: err})
 		return
 	}
 
@@ -268,9 +280,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	if err := el_stack.Start(delegate, vpnCfg, vcCfg, nil); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
-		if updates != nil {
-			updates <- VpnDelegate{Err: err}
-		}
+		sendUpdate(updates, VpnDelegate{Err: err})
 		return
 	}
 
