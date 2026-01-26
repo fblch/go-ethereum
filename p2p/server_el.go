@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
@@ -16,22 +15,13 @@ func (srv *Server) setupEL() error {
 		return err
 	}
 
-	updates := make(chan elstack.VpnDelegate, 1)
 	baseListen := srv.ListenAddr
-	elstack.SetupEL(srv.EL, updates, srv.quit) // initial sync (returns immediately if config invalid)
-
 	// Wait synchronously for the first result to align bindings before listeners start.
-	first, ok := <-updates
-	if !ok {
-		return fmt.Errorf("EL setup terminated before initial link")
+	addr, err := elstack.StartAndWait(srv.EL, srv.quit)
+	if err != nil {
+		return err
 	}
-	if first.Err != nil {
-		return first.Err
-	}
-	if first.Addr == nil {
-		return fmt.Errorf("EL setup returned nil IP")
-	}
-	srv.applyELBindings(first.Addr, baseListen)
+	srv.applyELBindings(addr, baseListen)
 	return nil
 }
 

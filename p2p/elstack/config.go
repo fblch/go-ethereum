@@ -2,12 +2,8 @@ package elstack
 
 // ElConfig holds Emotion Link configuration propagated from CLI flags.
 type ELConfig struct {
-	Use          bool
-	CertPath     string
-
-	// configs for accout-password
-	Account      string
-	Password     string
+	Use      bool
+	CertPath string
 
 	// configs for VC (contents, not file paths)
 	VC           string
@@ -15,7 +11,7 @@ type ELConfig struct {
 	IssuerPubkey string
 
 	// configs of EL-Server
-	Host         string
-	Port         string
-	AntiOverlap  string
+	Host        string
+	Port        string
+	AntiOverlap string
 }
