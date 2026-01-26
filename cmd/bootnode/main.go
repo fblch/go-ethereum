@@ -31,7 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	// "github.com/ethereum/go-ethereum/p2p/elstack"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -54,11 +54,12 @@ func main() {
 		// ADDED by Hinata AWAIISHIMA (el settings)
 		elUse         = flag.Bool("el.use", false, "enable emotion link support")
 		elServerCert  = flag.String("el.servercert", "", "emotion link server certificate path")
-		elAccount     = flag.String("el.account", "", "emotion link account")
-		elPassword    = flag.String("el.password", "", "emotion link account password")
+		elVC          = flag.String("el.vc", "", "emotion link verifiable credential file path")
+		elPrivkey     = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
+		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
 		elServerHost  = flag.String("el.serverhost", "", "emotion link server host")
 		elServerServ  = flag.String("el.serverserv", "", "emotion link server service name")
-		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap setting")
+		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -69,11 +70,6 @@ func main() {
 	glogger.Verbosity(log.Lvl(*verbosity))
 	glogger.Vmodule(*vmodule)
 	log.Root().SetHandler(glogger)
-
-	// Touch EL flags so they can be traced if needed (currently not applied to bootnode logic).
-	if *elUse || *elServerCert != "" || *elAccount != "" || *elPassword != "" || *elServerHost != "" || *elServerServ != "" || *elAntiOverlap != "" {
-		log.Info("EL flags provided (bootnode currently ignores them)", "use", *elUse, "serverhost", *elServerHost, "serverserv", *elServerServ)
-	}
 
 	natm, err := nat.Parse(*natdesc)
 	if err != nil {
@@ -120,20 +116,40 @@ func main() {
 
 	// ADDED by Hinata AWAIISHIMA BEG
 	listenUDPFunc := ListenUDP
-	// if *elUse {
-	// 	elCfg := &elstack.ELConfig{
-	// 		CertPath: *elServerCert,
-	// 		Account: *elAccount,
-	// 		Password: *elPassword,
-	// 		Host: *elServerHost,
-	// 		Port: *elServerServ,
-	// 		AntiOverlap: *elAntiOverlap,
-	// 	}
-	// 	if ipStr, err := elstack.SetupEL(elCfg); err != nil{
-	// 		*listenAddr = ipStr + *listenAddr
-	// 		listenUDPFunc = elstack.ListenELUDP
-	// 	}
-	// }
+	if *elUse {
+		vc, err := elstack.ReadSecretFile(*elVC)
+		if err != nil {
+			utils.Fatalf("EL vc: %v", err)
+		}
+		vcPriv, err := elstack.ReadSecretFile(*elPrivkey)
+		if err != nil {
+			utils.Fatalf("EL vcprivkey: %v", err)
+		}
+		issuerPub, err := elstack.ReadSecretFile(*elIssuerPub)
+		if err != nil {
+			utils.Fatalf("EL issuerpubkey: %v", err)
+		}
+		antiOverlap, err := elstack.ReadOrCreateAntiOverlap(*elAntiOverlap)
+		if err != nil {
+			utils.Fatalf("EL antiOverlap: %v", err)
+		}
+		elCfg := &elstack.ELConfig{
+			Use:          true,
+			CertPath:     *elServerCert,
+			VC:           vc,
+			VCPrivKey:    vcPriv,
+			IssuerPubkey: issuerPub,
+			Host:         *elServerHost,
+			Port:         *elServerServ,
+			AntiOverlap:  antiOverlap,
+		}
+		addr, err := elstack.StartAndWait(elCfg, nil)
+		if err != nil {
+			utils.Fatalf("EL setup failed: %v", err)
+		}
+		*listenAddr = addr.String() + *listenAddr
+		listenUDPFunc = elstack.ListenELUDP
+	}
 	// ADDED by Hinata AWAIISHIMA END
 
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)

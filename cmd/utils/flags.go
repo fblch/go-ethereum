@@ -911,14 +911,6 @@ var (
 		Name:     "el.cert",
 		Category: flags.NetworkingCategory,
 	}
-	ELAccountFlag = &cli.StringFlag{
-		Name:     "el.account",
-		Category: flags.NetworkingCategory,
-	}
-	ELPasswordFlag = &cli.StringFlag{
-		Name:     "el.password",
-		Category: flags.NetworkingCategory,
-	}
 	ELVCFlag = &cli.StringFlag{
 		Name:     "el.vc",
 		Category: flags.NetworkingCategory,
@@ -1249,20 +1241,26 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if elServerCert := ctx.String(ELServerCertFlag.Name); elServerCert != "" {
 		cfg.EL.CertPath = elServerCert
 	}
-	if elAccount := ctx.String(ELAccountFlag.Name); elAccount != "" {
-		cfg.EL.Account = elAccount
-	}
-	if elAccountPassword := ctx.String(ELPasswordFlag.Name); elAccountPassword != "" {
-		cfg.EL.Password = elAccountPassword
-	}
 	if ctx.IsSet(ELVCFlag.Name) {
-		cfg.EL.VC = readELSecretFile(ctx, ELVCFlag)
+		value, err := elstack.ReadSecretFile(ctx.Path(ELVCFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read VC: %v", err)
+		}
+		cfg.EL.VC = value
 	}
 	if ctx.IsSet(ELVCPrivKeyFlag.Name) {
-		cfg.EL.VCPrivKey = readELSecretFile(ctx, ELVCPrivKeyFlag)
+		value, err := elstack.ReadSecretFile(ctx.Path(ELVCPrivKeyFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read VCPrivKey: %v", err)
+		}
+		cfg.EL.VCPrivKey = value
 	}
 	if ctx.IsSet(ELIssuerPubkeyFlag.Name) {
-		cfg.EL.IssuerPubkey = readELSecretFile(ctx, ELIssuerPubkeyFlag)
+		value, err := elstack.ReadSecretFile(ctx.Path(ELIssuerPubkeyFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read IssuerPubkey: %v", err)
+		}
+		cfg.EL.IssuerPubkey = value
 	}
 	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
 		cfg.EL.Host = elServerHost
@@ -1270,25 +1268,14 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if elServerServ := ctx.String(ELPortFlag.Name); elServerServ != "" {
 		cfg.EL.Port = elServerServ
 	}
-	if elAntiOverlap := ctx.String(ELAntiOverlapFlag.Name); elAntiOverlap != "" {
-		cfg.EL.AntiOverlap = elAntiOverlap
+	if ctx.IsSet(ELAntiOverlapFlag.Name) {
+		path := ctx.Path(ELAntiOverlapFlag.Name)
+		token, err := elstack.ReadOrCreateAntiOverlap(path)
+		if err != nil {
+			Fatalf("Failed to prepare AntiOverlap: %v", err)
+		}
+		cfg.EL.AntiOverlap = token
 	}
-}
-
-func readELSecretFile(ctx *cli.Context, flag *cli.StringFlag) string {
-	path := ctx.Path(flag.Name)
-	if path == "" {
-		return ""
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		Fatalf("Failed to read %s: %v", flag.Name, err)
-	}
-	value := strings.TrimSpace(string(content))
-	if value == "" {
-		Fatalf("%s is empty", flag.Name)
-	}
-	return value
 }
 
 // SplitAndTrim splits input separated by a comma
