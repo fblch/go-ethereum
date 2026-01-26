@@ -198,23 +198,15 @@ type NodeConfig struct {
 	ELUse bool
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELAccount is the name of the client's emotion-link account
-	ELAccount string
-
-	// ADDED by Hinata AWAIISHIMA
-	// ELPassword is the pass of the client's emotion-link account
-	ELPassword string
-
-	// ADDED by Hinata AWAIISHIMA
 	// ELVC is the client verifiable credential of emotion-link
 	ELVC string
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELVCPrivKey is the privatekey of VC holder
-	ELPrivKey string
+	// ELPrivkey is the private key string of the VC holder
+	ELPrivkey string
 
 	// ADDED by Hinata AWAIISHIMA
-	// IssuerPubkey is the VC Issuer's publickey
+	// IssuerPubkey is the VC Issuer's public key string
 	IssuerPubkey string
 
 	// ADDED by Hinata AWAIISHIMA
@@ -384,7 +376,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
 	// ADDED by Hinata AWAIISHIMA
-	if !config.ELUse && (config.ELAccount != "" || config.ELPassword != "" || config.ELCertPath != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
+	if !config.ELUse && (config.ELVC != "" || config.ELPrivkey != "" || config.IssuerPubkey != "" || config.ELCertPath != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
 		return nil, errors.New("invalid config: ELUse and other EL settings have to use same time")
 	}
 
@@ -423,13 +415,14 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			MaxPeers:         config.MaxPeers,
 			// ADDED by Hinata AWAIISHIMA
 			EL: &elstack.ELConfig{
-				Use:         config.ELUse,
-				CertPath:    config.ELCertPath,
-				Account:     config.ELAccount,
-				Password:    config.ELPassword,
-				Host:        config.ELHost,
-				Port:        config.ELPort,
-				AntiOverlap: config.ELAntiOverlap,
+				Use:          config.ELUse,
+				CertPath:     config.ELCertPath,
+				VC:           config.ELVC,
+				VCPrivKey:    config.ELPrivkey,
+				IssuerPubkey: config.IssuerPubkey,
+				Host:         config.ELHost,
+				Port:         config.ELPort,
+				AntiOverlap:  config.ELAntiOverlap,
 			},
 		},
 	}
