@@ -53,12 +53,12 @@ func main() {
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA (el settings)
 		elUse         = flag.Bool("el.use", false, "enable emotion link support")
-		elServerCert  = flag.String("el.servercert", "", "emotion link server certificate path")
+		elServerCert  = flag.String("el.cert", "", "emotion link server certificate path")
 		elVC          = flag.String("el.vc", "", "emotion link verifiable credential file path")
 		elPrivkey     = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
 		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
-		elServerHost  = flag.String("el.serverhost", "", "emotion link server host")
-		elServerServ  = flag.String("el.serverserv", "", "emotion link server service name")
+		elServerHost  = flag.String("el.host", "", "emotion link server host")
+		elServerServ  = flag.String("el.port", "", "emotion link server service name")
 		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
 
 		nodeKey *ecdsa.PrivateKey
@@ -117,6 +117,10 @@ func main() {
 	// ADDED by Hinata AWAIISHIMA BEG
 	listenUDPFunc := ListenUDP
 	if *elUse {
+		cert, err := elstack.ReadCertFile(*elServerCert)
+		if err != nil {
+			utils.Fatalf("EL cert: %v", err)
+		}
 		vc, err := elstack.ReadSecretFile(*elVC)
 		if err != nil {
 			utils.Fatalf("EL vc: %v", err)
@@ -136,6 +140,7 @@ func main() {
 		elCfg := &elstack.ELConfig{
 			Use:          true,
 			CertPath:     *elServerCert,
+			Cert:         cert,
 			VC:           vc,
 			VCPrivKey:    vcPriv,
 			IssuerPubkey: issuerPub,

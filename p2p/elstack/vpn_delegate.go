@@ -69,15 +69,6 @@ func readRequiredFile(path string) (string, error) {
 	return val, nil
 }
 
-// ファイルを読み込み
-func readFileOrEmpty(path string) []byte {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}
-	}
-	return b
-}
-
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
 	Addr    net.IP
@@ -171,20 +162,14 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
 	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
 
-	vc := strings.TrimSpace(cfg.VC)
-	vcPrivKey := strings.TrimSpace(cfg.VCPrivKey)
-	issuerPubkey := strings.TrimSpace(cfg.IssuerPubkey)
-
-	certPath := cfg.CertPath
-	if certPath == "" {
-		certPath = "/etc/ssl/certs/ca-certificates.crt"
-	}
-	caCert := readFileOrEmpty(certPath)
+	vc := cfg.VC
+	vcPrivKey := cfg.VCPrivKey
+	issuerPubkey := cfg.IssuerPubkey
 
 	vpnHost := cfg.Host
 	vpnPort := cfg.Port
 
-	antiOverlap := strings.TrimSpace(cfg.AntiOverlap)
+	antiOverlap := cfg.AntiOverlap
 
 	vpnKeepAliveSec := uint64(10)
 	vpnTimeoutSec := uint64(30)
@@ -199,7 +184,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	productVersion := "0.1.0"
 	productPlatform := "Linux"
 
-	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, caCert, 1280)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.Cert, 1280)
 
 	defaultBurstSize := uint64(1024)
 	defaultTCPBuffer := uint64(16384)

@@ -1238,9 +1238,6 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if ctx.IsSet(UseELFlag.Name) {
 		cfg.EL.Use = ctx.Bool(UseELFlag.Name)
 	}
-	if elServerCert := ctx.String(ELServerCertFlag.Name); elServerCert != "" {
-		cfg.EL.CertPath = elServerCert
-	}
 	if ctx.IsSet(ELVCFlag.Name) {
 		value, err := elstack.ReadSecretFile(ctx.Path(ELVCFlag.Name))
 		if err != nil {
@@ -1275,6 +1272,15 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 			Fatalf("Failed to prepare AntiOverlap: %v", err)
 		}
 		cfg.EL.AntiOverlap = token
+	}
+	if cfg.EL.Use {
+		certPath := ctx.Path(ELServerCertFlag.Name)
+		cert, err := elstack.ReadCertFile(certPath)
+		if err != nil {
+			Fatalf("Failed to read EL certificate: %v", err)
+		}
+		cfg.EL.CertPath = certPath
+		cfg.EL.Cert = cert
 	}
 }
 

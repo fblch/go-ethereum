@@ -4,6 +4,7 @@ package elstack
 type ELConfig struct {
 	Use      bool
 	CertPath string
+	Cert     string
 
 	// configs for VC (contents, not file paths)
 	VC           string
