@@ -3,9 +3,7 @@ package elstack
 import (
 	"net"
 	"net/netip"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
@@ -28,24 +26,51 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return &ElStackUdpConn{inner: c, laddr: localAddr}, nil
 }
 
-func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	// Set read deadline and ensure reset after read.
-	for {
-		_ = c.inner.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-		n, udpAddr, uerr := c.inner.ReadFromUDP(b)
-		_ = c.inner.SetReadDeadline(time.Time{})
+// func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+// 	// Set read deadline and ensure reset after read.
+// 	for {
+// 		_ = c.inner.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+// 		n, udpAddr, uerr := c.inner.ReadFromUDP(b)
+// 		_ = c.inner.SetReadDeadline(time.Time{})
 
-		if uerr != nil {
-			// el_stack signals a timeout via the string below; treat it as a retryable
-			// condition instead of bubbling an opaque error up the stack.
-			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
-				time.Sleep(400 * time.Millisecond)
-				continue
-			}
-			return 0, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
-		}
-		return n, udpAddr.AddrPort(), nil
+// 		if uerr != nil {
+// 			// el_stack signals a timeout via the string below; treat it as a retryable
+// 			// condition instead of bubbling an opaque error up the stack.
+// 			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
+// 				time.Sleep(400 * time.Millisecond)
+// 				continue
+// 			}
+// 			return 0, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
+// 		}
+// 		return n, udpAddr.AddrPort(), nil
+// 	}
+// }
+
+func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	type readResult struct {
+		n    int
+		addr netip.AddrPort
+		err  error
 	}
+
+	resCh := make(chan readResult, 1)
+
+	go func() {
+		defer close(resCh)
+		n, udpAddr, err := c.inner.ReadFromUDP(b)
+		if err != nil {
+			resCh <- readResult{err: err}
+			return
+		}
+		resCh <- readResult{
+			n:    n,
+			addr: udpAddr.AddrPort(),
+			err:  nil,
+		}
+	}()
+
+	res := <-resCh
+	return res.n, res.addr, res.err
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
