@@ -210,8 +210,8 @@ type NodeConfig struct {
 	IssuerPubkey string
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELCertPath is the cert file path of the emotion-link server to connect
-	ELCertPath string
+	// ELCert is the ca certs to connect to the emotion-link server 
+	ELCert string
 
 	// ADDED by Hinata AWAIISHIMA
 	// ELHost is the emotion-link host server name
@@ -376,7 +376,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
 	// ADDED by Hinata AWAIISHIMA
-	if !config.ELUse && (config.ELVC != "" || config.ELPrivkey != "" || config.IssuerPubkey != "" || config.ELCertPath != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
+	if !config.ELUse && (config.ELVC != "" || config.ELPrivkey != "" || config.IssuerPubkey != "" || config.ELCert != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
 		return nil, errors.New("invalid config: ELUse and other EL settings have to use same time")
 	}
 
@@ -416,7 +416,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			// ADDED by Hinata AWAIISHIMA
 			EL: &elstack.ELConfig{
 				Use:          config.ELUse,
-				CertPath:     config.ELCertPath,
+				Cert:     config.ELCert,
 				VC:           config.ELVC,
 				VCPrivKey:    config.ELPrivkey,
 				IssuerPubkey: config.IssuerPubkey,

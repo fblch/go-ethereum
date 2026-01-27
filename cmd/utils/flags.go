@@ -1279,7 +1279,6 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		if err != nil {
 			Fatalf("Failed to read EL certificate: %v", err)
 		}
-		cfg.EL.CertPath = certPath
 		cfg.EL.Cert = cert
 	}
 }

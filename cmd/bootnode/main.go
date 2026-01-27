@@ -53,7 +53,7 @@ func main() {
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA (el settings)
 		elUse         = flag.Bool("el.use", false, "enable emotion link support")
-		elServerCert  = flag.String("el.cert", "", "emotion link server certificate path")
+		elServerCert  = flag.String("el.cert", "", "using server certificates")
 		elVC          = flag.String("el.vc", "", "emotion link verifiable credential file path")
 		elPrivkey     = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
 		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
@@ -139,7 +139,6 @@ func main() {
 		}
 		elCfg := &elstack.ELConfig{
 			Use:          true,
-			CertPath:     *elServerCert,
 			Cert:         cert,
 			VC:           vc,
 			VCPrivKey:    vcPriv,
