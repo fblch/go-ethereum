@@ -3,6 +3,7 @@ package elstack
 import (
 	"net"
 	"net/netip"
+	"os"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -14,16 +15,17 @@ type ElStackUdpConn struct {
 	laddr     net.Addr
 	closeOnce sync.Once
 	closeErr  error
+	closeCh   chan struct{}
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
 		elLog.Error("UDP Bind FAILED", "err", err)
-		return &ElStackUdpConn{}, err
+		return &ElStackUdpConn{closeCh: make(chan struct{})}, err
 	}
 	localAddr := c.LocalAddr()
-	return &ElStackUdpConn{inner: c, laddr: localAddr}, nil
+	return &ElStackUdpConn{inner: c, laddr: localAddr, closeCh: make(chan struct{})}, nil
 }
 
 // func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
@@ -69,8 +71,12 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 		}
 	}()
 
-	res := <-resCh
-	return res.n, res.addr, res.err
+	select {
+	case res := <-resCh:
+		return res.n, res.addr, res.err
+	case <-c.closeCh:
+		return 0, netip.AddrPort{}, os.ErrClosed
+	}
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
@@ -90,6 +96,9 @@ func (c *ElStackUdpConn) Close() error {
 			// Make Close idempotent because geth can close the socket from multiple
 			// goroutines during shutdown.
 			c.closeErr = c.inner.Close()
+			if c.closeCh != nil {
+				close(c.closeCh)
+			}
 		})
 	}
 	return c.closeErr
