@@ -28,26 +28,6 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return &ElStackUdpConn{inner: c, laddr: localAddr, closeCh: make(chan struct{})}, nil
 }
 
-// func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-// 	// Set read deadline and ensure reset after read.
-// 	for {
-// 		_ = c.inner.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-// 		n, udpAddr, uerr := c.inner.ReadFromUDP(b)
-// 		_ = c.inner.SetReadDeadline(time.Time{})
-
-// 		if uerr != nil {
-// 			// el_stack signals a timeout via the string below; treat it as a retryable
-// 			// condition instead of bubbling an opaque error up the stack.
-// 			if strings.Contains(uerr.Error(), "SocketError: UdpRecvTimeout") {
-// 				time.Sleep(400 * time.Millisecond)
-// 				continue
-// 			}
-// 			return 0, netip.AddrPort{}, &net.OpError{Op: "read", Net: "udp", Source: c.laddr, Addr: nil, Err: uerr}
-// 		}
-// 		return n, udpAddr.AddrPort(), nil
-// 	}
-// }
-
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
 	type readResult struct {
 		n    int
