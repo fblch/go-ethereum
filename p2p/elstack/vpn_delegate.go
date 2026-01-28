@@ -1,73 +1,13 @@
 package elstack
 
 import (
-	// "el_stack"
-
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 )
-
-// // 環境変数から値取得
-// func getEnvOrPanic(key string) string {
-// 	val, err := getEnv(key)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return val
-// }
-
-func getEnv(key string) (string, error) {
-	val, ok := os.LookupEnv(key)
-	if !ok {
-		return "", fmt.Errorf("environment variable %s is required", key)
-	}
-	return val, nil
-}
-
-// 環境変数から値取得
-func getEnvOrDefault(key string, def string) string {
-	val, ok := os.LookupEnv(key)
-	if !ok {
-		return def
-	}
-	return val
-}
-
-// uint64値を環境変数から取得
-// func getEnvUint64OrDefault(key string, def uint64) uint64 {
-func getEnvUint64OrDefault(key string, def uint64) (uint64, error) {
-	valStr, ok := os.LookupEnv(key)
-	if !ok {
-		return def, nil
-	}
-	val, err := strconv.ParseUint(valStr, 10, 64)
-	if err != nil {
-		// panic(fmt.Sprintf("Environment variable %s must be an unsigned integer: %v", key, err))
-		return 0, fmt.Errorf("environment variable %s must be an unsigned integer: %v", key, err)
-	}
-	return val, nil
-}
-
-func readRequiredFile(path string) (string, error) {
-	if path == "" {
-		return "", fmt.Errorf("required file path is empty")
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read required file %s: %w", path, err)
-	}
-	val := strings.TrimSpace(string(content))
-	if val == "" {
-		return "", fmt.Errorf("required file %s is empty", path)
-	}
-	return val, nil
-}
 
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
