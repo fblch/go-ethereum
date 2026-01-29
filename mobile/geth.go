@@ -210,7 +210,7 @@ type NodeConfig struct {
 	IssuerPubkey string
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELCert is the ca certs to connect to the emotion-link server 
+	// ELCert is the ca certs to connect to the emotion-link server
 	ELCert string
 
 	// ADDED by Hinata AWAIISHIMA
@@ -220,7 +220,7 @@ type NodeConfig struct {
 	// ADDED by Hinata AWAIISHIMA
 	// ELPort is the emotion-link port of host server
 	// This value is a number, but when setting it, it needs to be a string.
-	ELPort string
+	ELPort int
 
 	// ADDED by Hinata AWAIISHIMA
 	// ELAntiOverlap blocks Duplicating of the connection from same client
@@ -375,10 +375,79 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	} else if config.CliqueSnapshotCacheCount == 0 {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
-	// ADDED by Hinata AWAIISHIMA
-	if !config.ELUse && (config.ELVC != "" || config.ELPrivkey != "" || config.IssuerPubkey != "" || config.ELCert != "" || config.ELHost != "" || config.ELPort != "" || config.ELAntiOverlap != "") {
-		return nil, errors.New("invalid config: ELUse and other EL settings have to use same time")
+	// ADDED by Hinata AWAIISHIMA BEG
+	if !config.ELUse {
+		needsClear := false
+		if config.ELVC != "" {
+			log.Warn("invalid config combination: ELVC is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELPrivkey != "" {
+			log.Warn("invalid config combination: ELPrivkey is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.IssuerPubkey != "" {
+			log.Warn("invalid config combination: IssuerPubkey is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELCert != "" {
+			log.Warn("invalid config combination: ELCert is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELHost != "" {
+			log.Warn("invalid config combination: ELHost is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELPort != 0 {
+			log.Warn("invalid config combination: ELPort is not 0 but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELAntiOverlap != "" {
+			log.Warn("invalid config combination: ELAntiOverlap is not empty but ELUse is set false")
+			needsClear = true
+		}
+
+		if needsClear {
+			elstack.ClearELMobileConfig(
+				&config.ELUse, &config.ELCert, &config.ELVC, &config.ELPrivkey,
+				&config.IssuerPubkey, &config.ELHost, &config.ELPort, &config.ELAntiOverlap,
+			)
+		}
+	} else {
+		missing := false
+		if config.ELVC == "" {
+			log.Warn("invalid config combination: ELVC is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELPrivkey == "" {
+			log.Warn("invalid config combination: ELPrivkey is empty but ELUse is set true")
+			missing = true
+		}
+		if config.IssuerPubkey == "" {
+			log.Warn("invalid config combination: IssuerPubkey is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELHost == "" {
+			log.Warn("invalid config combination: ELHost is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELPort == 0 {
+			log.Warn("invalid config combination: ELPort is 0 but ELUse is set true")
+			missing = true
+		}
+		if config.ELAntiOverlap == "" {
+			log.Warn("invalid config combination: ELAntiOverlap is empty but ELUse is set true")
+			missing = true
+		}
+
+		if missing {
+			elstack.ClearELMobileConfig(
+				&config.ELUse, &config.ELCert, &config.ELVC, &config.ELPrivkey,
+				&config.IssuerPubkey, &config.ELHost, &config.ELPort, &config.ELAntiOverlap,
+			)
+		}
 	}
+	// ADDED by Hinata AWAIISHIMA END
 
 	natif, err := nat.Parse(config.NAT)
 	if err != nil {
@@ -416,12 +485,12 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			// ADDED by Hinata AWAIISHIMA
 			EL: &elstack.ELConfig{
 				Use:          config.ELUse,
-				Cert:     config.ELCert,
+				Cert:         config.ELCert,
 				VC:           config.ELVC,
 				VCPrivKey:    config.ELPrivkey,
 				IssuerPubkey: config.IssuerPubkey,
 				Host:         config.ELHost,
-				Port:         config.ELPort,
+				Port:         string(config.ELPort),
 				AntiOverlap:  config.ELAntiOverlap,
 			},
 		},
