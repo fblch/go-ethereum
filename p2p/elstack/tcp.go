@@ -22,6 +22,9 @@ type ElStackTcpListener struct {
 // el経由の処理を本ファイルにまとめるためのラッパ関数
 func ListenELTCP(network, addr string) (net.Listener, error) {
 	ln, err := el_stack.NewElStackTcpListener(network, addr)
+	if err != nil {
+		elLog.Error("ListenELTCP failed", "network", network, "addr", addr, "err", err)
+	}
 	listener := &ElStackTcpListener{
 		inner: ln,
 		close: make(chan struct{}),
@@ -46,6 +49,7 @@ func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
 	select {
 	case res := <-resCh:
 		if res.err != nil {
+			elLog.Error("ElStackTcpListener Accept failed", "err", res.err)
 			return nil, res.err
 		}
 		return newElStackTcpConn(res.conn), nil
@@ -117,6 +121,7 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 				_ = res.conn.Close()
 			}
 		}()
+		elLog.Error("ElStackTcpDialer Dial timeout", "node", dest.ID(), "addr", dest.IP(), "err", ctx.Err())
 		return nil, ctx.Err()
 	case res := <-resCh:
 		if res.err != nil {

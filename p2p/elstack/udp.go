@@ -41,6 +41,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 		defer close(resCh)
 		n, udpAddr, err := c.inner.ReadFromUDP(b)
 		if err != nil {
+			elLog.Error("ElStackUdpConn ReadFromUDP failed", "err", err)
 			resCh <- readResult{err: err}
 			return
 		}
