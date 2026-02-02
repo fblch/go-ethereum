@@ -908,11 +908,11 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 	ELHolderVCFlag = &cli.StringFlag{
-		Name:     "el.vc",
+		Name:     "el.holdervc",
 		Category: flags.NetworkingCategory,
 	}
 	ELHolderPrivKeyFlag = &cli.StringFlag{
-		Name:     "el.vcprivkey",
+		Name:     "el.holderprivkey",
 		Category: flags.NetworkingCategory,
 	}
 	ELAntiOverlapFlag = &cli.StringFlag{
@@ -924,15 +924,15 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 	ELServerAddrFlag = &cli.StringFlag{
-		Name:     "el.host",
+		Name:     "el.serveraddr",
 		Category: flags.NetworkingCategory,
 	}
 	ELServerPortFlag = &cli.IntFlag{
-		Name:     "el.port",
+		Name:     "el.serverport",
 		Category: flags.NetworkingCategory,
 	}
 	ELServerCertFlag = &cli.StringFlag{
-		Name:     "el.cert",
+		Name:     "el.servercert",
 		Category: flags.NetworkingCategory,
 	}
 
