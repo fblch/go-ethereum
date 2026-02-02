@@ -153,7 +153,6 @@ func ListenV4(c UDPConn, ln *enode.LocalNode, cfg Config) (*UDPv4, error) {
 	t.wg.Add(2)
 	go t.loop()
 	go t.readLoop(cfg.Unhandled)
-
 	return t, nil
 }
 
@@ -506,7 +505,6 @@ func (t *UDPv4) loop() {
 					p.errc <- errTimeout
 					plist.Remove(el)
 					contTimeouts++
-					t.log.Trace("loop: matcher timeout", "from", p.from, "ptype", p.ptype)
 				}
 			}
 			// If we've accumulated too many timeouts, do an NTP time sync check
