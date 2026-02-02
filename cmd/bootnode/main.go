@@ -119,7 +119,8 @@ func main() {
 	if *elUse {
 		cert, err := elstack.ReadCertFile(*elServerCert)
 		if err != nil {
-			utils.Fatalf("EL cert: %v", err)
+			log.Warn("boot without a specified cert file", "reason", err)
+			cert = ""
 		}
 		vc, err := elstack.ReadSecretFile(*elVC)
 		if err != nil {

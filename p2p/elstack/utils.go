@@ -22,7 +22,7 @@ func readFileOrEmpty(path string) []byte {
 // ReadCertFile loads a certificate file as string. Empty content is allowed.
 func ReadCertFile(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return "", fmt.Errorf("certificate file path is empty")
+		return "", nil
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
