@@ -194,9 +194,6 @@ func (p *Findnode) SetRequestID(id []byte) { p.ReqID = id }
 
 func (p *Findnode) AppendLogInfo(ctx []interface{}) []interface{} {
     ctx = append(ctx, "req", hexutil.Bytes(p.ReqID))
-    if len(p.Distances) > 0 {
-        ctx = append(ctx, "dist", p.Distances)
-    }
     if p.OpID != 0 {
         ctx = append(ctx, "opid", p.OpID)
     }

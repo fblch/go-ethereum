@@ -253,7 +253,6 @@ func (tab *Table) findnodeByID(target enode.ID, nresults int, preferLive bool) *
 	nodes := &nodesByDistance{target: target}
 	liveNodes := &nodesByDistance{target: target}
 	for _, b := range &tab.buckets {
-		// tab.log.Debug("findnodeByID", "b", b)
 		for _, n := range b.entries {
 			nodes.push(n.Node, nresults)
 			// MODIFIED by Jakub Pajek (mobile connectivity)
@@ -529,9 +528,7 @@ func (tab *Table) handleAddNode(req addNodeOp) bool {
 		return false
 	}
 
-	// tab.log.Debug("handleAddNode", "req.node.ID", req.node.ID())
 	b := tab.bucket(req.node.ID())
-	// tab.log.Debug("handleAddNode", "b", b)
 	n, _ := tab.bumpInBucket(b, req.node, req.isInbound)
 	if n != nil {
 		// Already in bucket.

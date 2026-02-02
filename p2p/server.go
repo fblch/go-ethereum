@@ -24,8 +24,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-
-	// "io" // no longer used after refactor of sharedUDPConn
 	"net"
 	"net/netip"
 	"sync"
@@ -396,10 +394,6 @@ func (srv *Server) Start() (err error) {
 	if srv.running {
 		return errors.New("server already running")
 	}
-	// debug
-	if srv.Logger != nil {
-		srv.Logger.Debug("Server.Start: begin")
-	}
 	srv.running = true
 	srv.log = srv.Logger
 	if srv.log == nil {
@@ -541,7 +535,6 @@ func (srv *Server) setupDiscovery() error {
 			return err
 		}
 		srv.discv4 = ntab
-		srv.log.Debug("setupDiscovery: discv4 up")
 		srv.discmix.AddSource(ntab.RandomNodes())
 	}
 	if srv.Config.DiscoveryV5 {
@@ -720,7 +713,7 @@ running:
 
 		case n := <-srv.removetrusted:
 			// This channel is used by RemoveTrustedPeer to remove a node
-			// from the trusted node set
+			// from the trusted node set.
 			srv.log.Trace("Removing trusted node", "node", n)
 			delete(trusted, n.ID())
 			if p, ok := peers[n.ID()]; ok {
@@ -977,7 +970,6 @@ func (srv *Server) setupConn(c *conn, dialDest *enode.Node) error {
 	}
 
 	// Run the capability negotiation handshake.
-	clog.Trace("protoHandshake: start")
 	phs, err := c.doProtoHandshake(srv.ourHandshake)
 	if err != nil {
 		clog.Trace("Failed p2p handshake", "err", err)
@@ -1010,23 +1002,12 @@ func nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
 // checkpoint sends the conn to run, which performs the
 // post-handshake checks for the stage (posthandshake, addpeer).
 func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
-	srv.log.Trace("checkpoint: send", "flags", c.flags)
 	select {
 	case stage <- c:
 	case <-srv.quit:
 		return errServerStopped
 	}
-	// Wait for the run loop to respond for this stage, but don't block
-	// forever during shutdown. If srv.quit is closed, return immediately
-	// so connection setup can unwind and listeners can exit cleanly.
-	select {
-	case err := <-c.cont:
-		srv.log.Trace("checkpoint: recv", "err", err)
-		return err
-	case <-srv.quit:
-		srv.log.Trace("checkpoint: recv quit")
-		return errServerStopped
-	}
+	return <-c.cont
 }
 
 func (srv *Server) launchPeer(c *conn) *Peer {
