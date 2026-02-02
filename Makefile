@@ -4,7 +4,6 @@
 
 .PHONY: geth android ios evm all test clean
 
-
 GOBIN = ./build/bin
 GO ?= latest
 # MODIFIED by Jakub Pajek (macOS make fix)
