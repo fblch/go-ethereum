@@ -10,15 +10,6 @@ import (
 	"strings"
 )
 
-// readFileOrEmpty reads a file and returns its contents or an empty slice on error.
-func readFileOrEmpty(path string) []byte {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}
-	}
-	return b
-}
-
 // ReadCertFile loads a certificate file as string. Empty content is allowed.
 func ReadCertFile(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
