@@ -16,16 +16,7 @@ type ELConfig struct {
 	AntiOverlap string
 }
 
-func ClearELMobileConfig(
-	use *bool,
-	cert *string,
-	vc *string,
-	vcPrivkey *string,
-	issuerPubkey *string,
-	host *string,
-	port *int,
-	antiOverlap *string,
-) {
+func ClearELMobileConfig(use *bool, cert *string, vc *string, vcPrivkey *string, issuerPubkey *string, host *string, port *int, antiOverlap *string) {
 	if use != nil {
 		*use = false
 	}
