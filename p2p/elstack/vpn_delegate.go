@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
@@ -47,19 +48,19 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if !cfg.Use {
 		return ErrELDisabled
 	}
-	if strings.TrimSpace(cfg.VC) == "" {
-		return fmt.Errorf("VC content is empty")
+	if strings.TrimSpace(cfg.HolderVC) == "" {
+		return fmt.Errorf("HolderVC content is empty")
 	}
-	if strings.TrimSpace(cfg.VCPrivKey) == "" {
-		return fmt.Errorf("VCPrivKey content is empty")
+	if strings.TrimSpace(cfg.HolderPrivKey) == "" {
+		return fmt.Errorf("HolderPrivKey content is empty")
 	}
-	if strings.TrimSpace(cfg.IssuerPubkey) == "" {
-		return fmt.Errorf("IssuerPubkey content is empty")
+	if strings.TrimSpace(cfg.IssuerPubKey) == "" {
+		return fmt.Errorf("IssuerPubKey content is empty")
 	}
-	if strings.TrimSpace(cfg.Host) == "" {
+	if strings.TrimSpace(cfg.ServerAddr) == "" {
 		return fmt.Errorf("EL server hostname is not set")
 	}
-	if strings.TrimSpace(cfg.Port) == "" {
+	if cfg.ServerPort <= 0 {
 		return fmt.Errorf("EL server port is not set")
 	}
 	if strings.TrimSpace(cfg.AntiOverlap) == "" {
@@ -99,15 +100,15 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	}
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
-	elLog.Info("SetupEL arg", "cfg.Host", cfg.Host)
-	elLog.Info("SetupEL arg", "cfg.Port", cfg.Port)
+	elLog.Info("SetupEL arg", "cfg.ServerAddr", cfg.ServerAddr)
+	elLog.Info("SetupEL arg", "cfg.ServerPort", cfg.ServerPort)
 
-	vc := cfg.VC
-	vcPrivKey := cfg.VCPrivKey
-	issuerPubkey := cfg.IssuerPubkey
+	vc := cfg.HolderVC
+	vcPrivKey := cfg.HolderPrivKey
+	issuerPubkey := cfg.IssuerPubKey
 
-	vpnHost := cfg.Host
-	vpnPort := cfg.Port
+	vpnHost := cfg.ServerAddr
+	vpnPort := strconv.Itoa(cfg.ServerPort)
 
 	antiOverlap := cfg.AntiOverlap
 
@@ -124,7 +125,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	productVersion := "0.1.0"
 	productPlatform := "Linux"
 
-	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.Cert, 1280)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCert, 1280)
 
 	defaultBurstSize := uint64(1024)
 	defaultTCPBuffer := uint64(16384)

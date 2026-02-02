@@ -907,32 +907,32 @@ var (
 		Value:    false,
 		Category: flags.NetworkingCategory,
 	}
-	ELServerCertFlag = &cli.StringFlag{
-		Name:     "el.cert",
-		Category: flags.NetworkingCategory,
-	}
-	ELVCFlag = &cli.StringFlag{
+	ELHolderVCFlag = &cli.StringFlag{
 		Name:     "el.vc",
 		Category: flags.NetworkingCategory,
 	}
-	ELVCPrivKeyFlag = &cli.StringFlag{
+	ELHolderPrivKeyFlag = &cli.StringFlag{
 		Name:     "el.vcprivkey",
-		Category: flags.NetworkingCategory,
-	}
-	ELIssuerPubkeyFlag = &cli.StringFlag{
-		Name:     "el.issuerpubkey",
-		Category: flags.NetworkingCategory,
-	}
-	ELHostFlag = &cli.StringFlag{
-		Name:     "el.host",
-		Category: flags.NetworkingCategory,
-	}
-	ELPortFlag = &cli.StringFlag{
-		Name:     "el.port",
 		Category: flags.NetworkingCategory,
 	}
 	ELAntiOverlapFlag = &cli.StringFlag{
 		Name:     "el.antioverlap",
+		Category: flags.NetworkingCategory,
+	}
+	ELIssuerPubKeyFlag = &cli.StringFlag{
+		Name:     "el.issuerpubkey",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerAddrFlag = &cli.StringFlag{
+		Name:     "el.host",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerPortFlag = &cli.IntFlag{
+		Name:     "el.port",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerCertFlag = &cli.StringFlag{
+		Name:     "el.cert",
 		Category: flags.NetworkingCategory,
 	}
 
@@ -1238,32 +1238,19 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if ctx.IsSet(UseELFlag.Name) {
 		cfg.EL.Use = ctx.Bool(UseELFlag.Name)
 	}
-	if ctx.IsSet(ELVCFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELVCFlag.Name))
+	if ctx.IsSet(ELHolderVCFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderVCFlag.Name))
 		if err != nil {
 			Fatalf("Failed to read VC: %v", err)
 		}
-		cfg.EL.VC = value
+		cfg.EL.HolderVC = value
 	}
-	if ctx.IsSet(ELVCPrivKeyFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELVCPrivKeyFlag.Name))
+	if ctx.IsSet(ELHolderPrivKeyFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderPrivKeyFlag.Name))
 		if err != nil {
 			Fatalf("Failed to read VCPrivKey: %v", err)
 		}
-		cfg.EL.VCPrivKey = value
-	}
-	if ctx.IsSet(ELIssuerPubkeyFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELIssuerPubkeyFlag.Name))
-		if err != nil {
-			Fatalf("Failed to read IssuerPubkey: %v", err)
-		}
-		cfg.EL.IssuerPubkey = value
-	}
-	if elServerHost := ctx.String(ELHostFlag.Name); elServerHost != "" {
-		cfg.EL.Host = elServerHost
-	}
-	if elServerServ := ctx.String(ELPortFlag.Name); elServerServ != "" {
-		cfg.EL.Port = elServerServ
+		cfg.EL.HolderPrivKey = value
 	}
 	if ctx.IsSet(ELAntiOverlapFlag.Name) {
 		path := ctx.Path(ELAntiOverlapFlag.Name)
@@ -1273,13 +1260,26 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.EL.AntiOverlap = token
 	}
+	if ctx.IsSet(ELIssuerPubKeyFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELIssuerPubKeyFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read IssuerPubkey: %v", err)
+		}
+		cfg.EL.IssuerPubKey = value
+	}
+	if elServerHost := ctx.String(ELServerAddrFlag.Name); elServerHost != "" {
+		cfg.EL.ServerAddr = elServerHost
+	}
+	if elServerPort := ctx.Int(ELServerPortFlag.Name); elServerPort != 0 {
+		cfg.EL.ServerPort = elServerPort
+	}
 	if cfg.EL.Use {
 		certPath := ctx.Path(ELServerCertFlag.Name)
 		cert, err := elstack.ReadCertFile(certPath)
 		if err != nil {
 			Fatalf("Failed to read EL certificate: %v", err)
 		}
-		cfg.EL.Cert = cert
+		cfg.EL.ServerCert = cert
 	}
 }
 

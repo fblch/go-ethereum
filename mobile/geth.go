@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"strconv"
 
 	// ADDED by Jakub Pajek BEG
 	"errors"
@@ -199,34 +198,34 @@ type NodeConfig struct {
 	ELUse bool
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELVC is the client verifiable credential of emotion-link
-	ELVC string
+	// ELHolderVC is the client verifiable credential of emotion-link
+	ELHolderVC string
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELPrivkey is the private key string of the VC holder
-	ELPrivkey string
-
-	// ADDED by Hinata AWAIISHIMA
-	// IssuerPubkey is the VC Issuer's public key string
-	IssuerPubkey string
-
-	// ADDED by Hinata AWAIISHIMA
-	// ELCert is the ca certs to connect to the emotion-link server
-	ELCert string
-
-	// ADDED by Hinata AWAIISHIMA
-	// ELHost is the emotion-link host server name
-	ELHost string
-
-	// ADDED by Hinata AWAIISHIMA
-	// ELPort is the emotion-link port of host server
-	// This value is a number, but when setting it, it needs to be a string.
-	ELPort int
+	// ELHolderPrivKey is the private key string of the VC holder
+	ELHolderPrivKey string
 
 	// ADDED by Hinata AWAIISHIMA
 	// ELAntiOverlap blocks Duplicating of the connection from same client
 	// This value is a number, but when setting it, it needs to be a string.
 	ELAntiOverlap string
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELIssuerPubKey is the VC Issuer's public key string
+	ELIssuerPubKey string
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELServerAddr is the emotion-link host server name
+	ELServerAddr string
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELServerPort is the emotion-link port of host server
+	// This value is a number, but when setting it, it needs to be a string.
+	ELServerPort int
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELServerCert is the ca certs to connect to the emotion-link server
+	ELServerCert string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -379,72 +378,72 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	// ADDED by Hinata AWAIISHIMA BEG
 	if !config.ELUse {
 		needsClear := false
-		if config.ELVC != "" {
-			log.Warn("invalid config combination: ELVC is not empty but ELUse is set false")
+		if config.ELHolderVC != "" {
+			log.Warn("invalid config combination: ELHolderVC is not empty but ELUse is set false")
 			needsClear = true
 		}
-		if config.ELPrivkey != "" {
-			log.Warn("invalid config combination: ELPrivkey is not empty but ELUse is set false")
-			needsClear = true
-		}
-		if config.IssuerPubkey != "" {
-			log.Warn("invalid config combination: IssuerPubkey is not empty but ELUse is set false")
-			needsClear = true
-		}
-		if config.ELCert != "" {
-			log.Warn("invalid config combination: ELCert is not empty but ELUse is set false")
-			needsClear = true
-		}
-		if config.ELHost != "" {
-			log.Warn("invalid config combination: ELHost is not empty but ELUse is set false")
-			needsClear = true
-		}
-		if config.ELPort != 0 {
-			log.Warn("invalid config combination: ELPort is not 0 but ELUse is set false")
+		if config.ELHolderPrivKey != "" {
+			log.Warn("invalid config combination: ELHolderPrivKey is not empty but ELUse is set false")
 			needsClear = true
 		}
 		if config.ELAntiOverlap != "" {
 			log.Warn("invalid config combination: ELAntiOverlap is not empty but ELUse is set false")
 			needsClear = true
 		}
+		if config.ELIssuerPubKey != "" {
+			log.Warn("invalid config combination: ELIssuerPubKey is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerAddr != "" {
+			log.Warn("invalid config combination: ELServerAddr is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerPort != 0 {
+			log.Warn("invalid config combination: ELServerPort is not 0 but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerCert != "" {
+			log.Warn("invalid config combination: ELServerCert is not empty but ELUse is set false")
+			needsClear = true
+		}
 
 		if needsClear {
 			elstack.ClearELMobileConfig(
-				&config.ELUse, &config.ELCert, &config.ELVC, &config.ELPrivkey,
-				&config.IssuerPubkey, &config.ELHost, &config.ELPort, &config.ELAntiOverlap,
+				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCert,
 			)
 		}
 	} else {
 		missing := false
-		if config.ELVC == "" {
-			log.Warn("invalid config combination: ELVC is empty but ELUse is set true")
+		if config.ELHolderVC == "" {
+			log.Warn("invalid config combination: ELHolderVC is empty but ELUse is set true")
 			missing = true
 		}
-		if config.ELPrivkey == "" {
-			log.Warn("invalid config combination: ELPrivkey is empty but ELUse is set true")
-			missing = true
-		}
-		if config.IssuerPubkey == "" {
-			log.Warn("invalid config combination: IssuerPubkey is empty but ELUse is set true")
-			missing = true
-		}
-		if config.ELHost == "" {
-			log.Warn("invalid config combination: ELHost is empty but ELUse is set true")
-			missing = true
-		}
-		if config.ELPort == 0 {
-			log.Warn("invalid config combination: ELPort is 0 but ELUse is set true")
+		if config.ELHolderPrivKey == "" {
+			log.Warn("invalid config combination: ELHolderPrivKey is empty but ELUse is set true")
 			missing = true
 		}
 		if config.ELAntiOverlap == "" {
 			log.Warn("invalid config combination: ELAntiOverlap is empty but ELUse is set true")
 			missing = true
 		}
+		if config.ELIssuerPubKey == "" {
+			log.Warn("invalid config combination: ELIssuerPubKey is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELServerAddr == "" {
+			log.Warn("invalid config combination: ELServerAddr is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELServerPort == 0 {
+			log.Warn("invalid config combination: ELServerPort is 0 but ELUse is set true")
+			missing = true
+		}
 
 		if missing {
 			elstack.ClearELMobileConfig(
-				&config.ELUse, &config.ELCert, &config.ELVC, &config.ELPrivkey,
-				&config.IssuerPubkey, &config.ELHost, &config.ELPort, &config.ELAntiOverlap,
+				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCert,
 			)
 		}
 	}
@@ -485,14 +484,14 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			MaxPeers:         config.MaxPeers,
 			// ADDED by Hinata AWAIISHIMA
 			EL: &elstack.ELConfig{
-				Use:          config.ELUse,
-				Cert:         config.ELCert,
-				VC:           config.ELVC,
-				VCPrivKey:    config.ELPrivkey,
-				IssuerPubkey: config.IssuerPubkey,
-				Host:         config.ELHost,
-				Port:         strconv.Itoa(config.ELPort),
-				AntiOverlap:  config.ELAntiOverlap,
+				Use:           config.ELUse,
+				HolderVC:      config.ELHolderVC,
+				HolderPrivKey: config.ELHolderPrivKey,
+				AntiOverlap:   config.ELAntiOverlap,
+				IssuerPubKey:  config.ELIssuerPubKey,
+				ServerAddr:    config.ELServerAddr,
+				ServerPort:    config.ELServerPort,
+				ServerCert:    config.ELServerCert,
 			},
 		},
 	}

@@ -160,13 +160,13 @@ var (
 		utils.MinerNotifyFullFlag,
 		// ADDED by Hinata AWAIISHIMA BEG(el settings)
 		utils.UseELFlag,
-		utils.ELVCFlag,
-		utils.ELVCPrivKeyFlag,
-		utils.ELIssuerPubkeyFlag,
+		utils.ELHolderVCFlag,
+		utils.ELHolderPrivKeyFlag,
 		utils.ELAntiOverlapFlag,
+		utils.ELIssuerPubKeyFlag,
+		utils.ELServerAddrFlag,
+		utils.ELServerPortFlag,
 		utils.ELServerCertFlag,
-		utils.ELHostFlag,
-		utils.ELPortFlag,
 		// ADDED by Hinata AWAIISHIMA END(el settings)
 		configFileFlag,
 	}, utils.NetworkFlags, utils.DatabasePathFlags)

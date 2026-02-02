@@ -51,13 +51,13 @@ func main() {
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA (el settings)
 		elUse         = flag.Bool("el.use", false, "enable emotion link support")
-		elServerCert  = flag.String("el.cert", "", "using server certificates")
-		elVC          = flag.String("el.vc", "", "emotion link verifiable credential file path")
-		elPrivkey     = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
-		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
-		elServerHost  = flag.String("el.host", "", "emotion link server host")
-		elServerServ  = flag.String("el.port", "", "emotion link server service name")
+		elHolderVC    = flag.String("el.vc", "", "emotion link verifiable credential file path")
+		elHolderPriv  = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
 		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
+		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
+		elServerAddr  = flag.String("el.host", "", "emotion link server host")
+		elServerPort  = flag.Int("el.port", 0, "emotion link server service port")
+		elServerCert  = flag.String("el.cert", "", "using server certificates")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -120,11 +120,11 @@ func main() {
 			log.Warn("boot without a specified cert file", "reason", err)
 			cert = ""
 		}
-		vc, err := elstack.ReadSecretFile(*elVC)
+		vc, err := elstack.ReadSecretFile(*elHolderVC)
 		if err != nil {
 			utils.Fatalf("EL vc: %v", err)
 		}
-		vcPriv, err := elstack.ReadSecretFile(*elPrivkey)
+		vcPriv, err := elstack.ReadSecretFile(*elHolderPriv)
 		if err != nil {
 			utils.Fatalf("EL vcprivkey: %v", err)
 		}
@@ -137,14 +137,14 @@ func main() {
 			utils.Fatalf("EL antiOverlap: %v", err)
 		}
 		elCfg := &elstack.ELConfig{
-			Use:          true,
-			Cert:         cert,
-			VC:           vc,
-			VCPrivKey:    vcPriv,
-			IssuerPubkey: issuerPub,
-			Host:         *elServerHost,
-			Port:         *elServerServ,
-			AntiOverlap:  antiOverlap,
+			Use:           true,
+			HolderVC:      vc,
+			HolderPrivKey: vcPriv,
+			AntiOverlap:   antiOverlap,
+			IssuerPubKey:  issuerPub,
+			ServerAddr:    *elServerAddr,
+			ServerPort:    *elServerPort,
+			ServerCert:    cert,
 		}
 		addr, err := elstack.StartAndWait(elCfg, nil)
 		if err != nil {
