@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	// ADDED by Jakub Pajek BEG
 	"errors"
@@ -490,7 +491,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				VCPrivKey:    config.ELPrivkey,
 				IssuerPubkey: config.IssuerPubkey,
 				Host:         config.ELHost,
-				Port:         string(config.ELPort),
+				Port:         strconv.Itoa(config.ELPort),
 				AntiOverlap:  config.ELAntiOverlap,
 			},
 		},
