@@ -125,7 +125,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	productVersion := "0.1.0"
 	productPlatform := "Linux"
 
-	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCert, 1280)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCACert, 1280)
 
 	defaultBurstSize := uint64(1024)
 	defaultTCPBuffer := uint64(16384)

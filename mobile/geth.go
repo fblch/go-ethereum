@@ -224,8 +224,8 @@ type NodeConfig struct {
 	ELServerPort int
 
 	// ADDED by Hinata AWAIISHIMA
-	// ELServerCert is the ca certs to connect to the emotion-link server
-	ELServerCert string
+	// ELServerCACert is the CA certs to connect to the emotion-link server
+	ELServerCACert string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -402,15 +402,15 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config combination: ELServerPort is not 0 but ELUse is set false")
 			needsClear = true
 		}
-		if config.ELServerCert != "" {
-			log.Warn("invalid config combination: ELServerCert is not empty but ELUse is set false")
+		if config.ELServerCACert != "" {
+			log.Warn("invalid config combination: ELServerCACert is not empty but ELUse is set false")
 			needsClear = true
 		}
 
 		if needsClear {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCert,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert,
 			)
 		}
 	} else {
@@ -443,7 +443,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if missing {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCert,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert,
 			)
 		}
 	}
@@ -491,7 +491,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				IssuerPubKey:  config.ELIssuerPubKey,
 				ServerAddr:    config.ELServerAddr,
 				ServerPort:    config.ELServerPort,
-				ServerCert:    config.ELServerCert,
+				ServerCACert:  config.ELServerCACert,
 			},
 		},
 	}

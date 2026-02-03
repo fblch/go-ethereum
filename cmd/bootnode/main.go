@@ -50,14 +50,14 @@ func main() {
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-5)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA (el settings)
-		elUse         = flag.Bool("el.use", false, "enable emotion link support")
-		elHolderVC    = flag.String("el.vc", "", "emotion link verifiable credential file path")
-		elHolderPriv  = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
-		elAntiOverlap = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
-		elIssuerPub   = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
-		elServerAddr  = flag.String("el.host", "", "emotion link server host")
-		elServerPort  = flag.Int("el.port", 0, "emotion link server service port")
-		elServerCert  = flag.String("el.cert", "", "using server certificates")
+		elUse          = flag.Bool("el.use", false, "enable emotion link support")
+		elHolderVC     = flag.String("el.vc", "", "emotion link verifiable credential file path")
+		elHolderPriv   = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
+		elAntiOverlap  = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
+		elIssuerPub    = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
+		elServerAddr   = flag.String("el.host", "", "emotion link server host")
+		elServerPort   = flag.Int("el.port", 0, "emotion link server service port")
+		elServerCACert = flag.String("el.servercacert", "", "using server CA certificate")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -115,7 +115,7 @@ func main() {
 	// ADDED by Hinata AWAIISHIMA BEG
 	listenUDPFunc := ListenUDP
 	if *elUse {
-		cert, err := elstack.ReadCertFile(*elServerCert)
+		cert, err := elstack.ReadCertFile(*elServerCACert)
 		if err != nil {
 			log.Warn("boot without a specified cert file", "reason", err)
 			cert = ""
@@ -144,7 +144,7 @@ func main() {
 			IssuerPubKey:  issuerPub,
 			ServerAddr:    *elServerAddr,
 			ServerPort:    *elServerPort,
-			ServerCert:    cert,
+			ServerCACert:  cert,
 		}
 		addr, err := elstack.StartAndWait(elCfg, nil)
 		if err != nil {

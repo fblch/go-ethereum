@@ -10,7 +10,7 @@ type ELConfig struct {
 	IssuerPubKey  string
 	ServerAddr    string
 	ServerPort    int
-	ServerCert    string
+	ServerCACert  string
 }
 
 func ClearELMobileConfig(
@@ -21,7 +21,7 @@ func ClearELMobileConfig(
 	issuerPubKey *string,
 	serverAddr *string,
 	serverPort *int,
-	serverCert *string,
+	serverCACert *string,
 ) {
 	if use != nil {
 		*use = false
@@ -44,7 +44,7 @@ func ClearELMobileConfig(
 	if serverPort != nil {
 		*serverPort = 0
 	}
-	if serverCert != nil {
-		*serverCert = ""
+	if serverCACert != nil {
+		*serverCACert = ""
 	}
 }

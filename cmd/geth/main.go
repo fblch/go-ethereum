@@ -166,7 +166,7 @@ var (
 		utils.ELIssuerPubKeyFlag,
 		utils.ELServerAddrFlag,
 		utils.ELServerPortFlag,
-		utils.ELServerCertFlag,
+		utils.ELServerCACertFlag,
 		// ADDED by Hinata AWAIISHIMA END(el settings)
 		configFileFlag,
 	}, utils.NetworkFlags, utils.DatabasePathFlags)

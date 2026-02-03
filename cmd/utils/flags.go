@@ -931,8 +931,8 @@ var (
 		Name:     "el.serverport",
 		Category: flags.NetworkingCategory,
 	}
-	ELServerCertFlag = &cli.StringFlag{
-		Name:     "el.servercert",
+	ELServerCACertFlag = &cli.StringFlag{
+		Name:     "el.servercacert",
 		Category: flags.NetworkingCategory,
 	}
 
@@ -1274,12 +1274,12 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		cfg.EL.ServerPort = elServerPort
 	}
 	if cfg.EL.Use {
-		certPath := ctx.Path(ELServerCertFlag.Name)
+		certPath := ctx.Path(ELServerCACertFlag.Name)
 		cert, err := elstack.ReadCertFile(certPath)
 		if err != nil {
 			Fatalf("Failed to read EL certificate: %v", err)
 		}
-		cfg.EL.ServerCert = cert
+		cfg.EL.ServerCACert = cert
 	}
 }
 
