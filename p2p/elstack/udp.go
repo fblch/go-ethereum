@@ -25,6 +25,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 		return &ElStackUdpConn{closeCh: make(chan struct{})}, err
 	}
 	localAddr := c.LocalAddr()
+	elLog.Info("ListenELUDP ok", "network", network, "addr", addr, "local", localAddr)
 	return &ElStackUdpConn{inner: c, laddr: localAddr, closeCh: make(chan struct{})}, nil
 }
 
