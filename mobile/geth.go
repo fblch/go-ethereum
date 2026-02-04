@@ -435,8 +435,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config combination: ELServerAddr is empty but ELUse is set true")
 			missing = true
 		}
-		if config.ELServerPort == 0 {
-			log.Warn("invalid config combination: ELServerPort is 0 but ELUse is set true")
+		if config.ELServerPort < 0 {
+			log.Warn("invalid config combination: ELServerPort is negative but ELUse is set true")
 			missing = true
 		}
 

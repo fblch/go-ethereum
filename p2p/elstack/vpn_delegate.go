@@ -60,8 +60,8 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if strings.TrimSpace(cfg.ServerAddr) == "" {
 		return fmt.Errorf("EL server hostname is not set")
 	}
-	if cfg.ServerPort <= 0 {
-		return fmt.Errorf("EL server port is not set")
+	if cfg.ServerPort < 0 {
+		return fmt.Errorf("EL server port is set negative")
 	}
 	if strings.TrimSpace(cfg.AntiOverlap) == "" {
 		return fmt.Errorf("AntiOverlap token is empty")
