@@ -19,6 +19,7 @@ type ElStackUdpConn struct {
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+	elLog.Trace("ListenELUDP called", "network", network, "addr", addr)
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
 		elLog.Error("UDP Bind FAILED", "err", err)
@@ -30,6 +31,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	elLog.Trace("ElStackUdpConn ReadFromUDPAddrPort called")
 	type readResult struct {
 		n    int
 		addr netip.AddrPort
@@ -62,6 +64,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
+	elLog.Trace("ElStackUdpConn WriteToUDPAddrPort called", "addr", addr)
 	n, uerr := c.inner.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
 		// Wrap the el_stack error so callers still observe the familiar net.Error
@@ -73,6 +76,7 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
+	elLog.Trace("ElStackUdpConn Close called")
 	if c.inner != nil {
 		c.closeOnce.Do(func() {
 			// Make Close idempotent because geth can close the socket from multiple
@@ -86,4 +90,7 @@ func (c *ElStackUdpConn) Close() error {
 	return c.closeErr
 }
 
-func (c *ElStackUdpConn) LocalAddr() net.Addr { return c.laddr }
+func (c *ElStackUdpConn) LocalAddr() net.Addr {
+	elLog.Trace("ElStackUdpConn LocalAddr called")
+	return c.laddr
+}
