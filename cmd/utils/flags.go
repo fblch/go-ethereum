@@ -1270,7 +1270,11 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if elServerHost := ctx.String(ELServerAddrFlag.Name); elServerHost != "" {
 		cfg.EL.ServerAddr = elServerHost
 	}
-	if elServerPort := ctx.Int(ELServerPortFlag.Name); elServerPort >= 0 {
+	if ctx.IsSet(ELServerPortFlag.Name) {
+		elServerPort := ctx.Int(ELServerPortFlag.Name)
+		if elServerPort <= 0 {
+			Fatalf("EL server port must be positive")
+		}
 		cfg.EL.ServerPort = elServerPort
 	}
 	if cfg.EL.Use {
