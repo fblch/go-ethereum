@@ -519,28 +519,41 @@ func (tab *Table) removeIP(b *bucket, ip netip.Addr) {
 // handleAddNode adds the node in the request to the table, if there is space.
 // The caller must hold tab.mutex.
 func (tab *Table) handleAddNode(req addNodeOp) bool {
+	logctx := []interface{}{
+		"id", req.node.ID(),
+		"ip", req.node.IPAddr(),
+		"udp", req.node.UDP(),
+		"tcp", req.node.TCP(),
+		"inbound", req.isInbound,
+	}
 	if req.node.ID() == tab.self().ID() {
+		tab.log.Trace("Skip add node: self", logctx...)
 		return false
 	}
 	// For nodes from inbound contact, there is an additional safety measure: if the table
 	// is still initializing the node is not added.
 	if req.isInbound && !tab.isInitDone() {
+		tab.log.Debug("Skip add node: inbound while initializing", logctx...)
 		return false
 	}
 
 	b := tab.bucket(req.node.ID())
+	logctx = append(logctx, "bucket", b.index)
 	n, _ := tab.bumpInBucket(b, req.node, req.isInbound)
 	if n != nil {
 		// Already in bucket.
+		tab.log.Trace("Skip add node: already in bucket", logctx...)
 		return false
 	}
 	if len(b.entries) >= bucketSize {
 		// Bucket full, maybe add as replacement.
+		tab.log.Debug("Bucket full, queue as replacement", logctx...)
 		tab.addReplacement(b, req.node)
 		return false
 	}
 	if !tab.addIP(b, req.node.IPAddr()) {
 		// Can't add: IP limit reached.
+		tab.log.Debug("Skip add node: IP limit reached", logctx...)
 		return false
 	}
 
@@ -553,6 +566,7 @@ func (tab *Table) handleAddNode(req addNodeOp) bool {
 	b.entries = append(b.entries, wn)
 	b.replacements = deleteNode(b.replacements, wn.ID())
 	tab.nodeAdded(b, wn)
+	tab.log.Trace("Added node to table", logctx...)
 	return true
 }
 
