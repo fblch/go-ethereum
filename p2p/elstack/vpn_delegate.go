@@ -150,6 +150,7 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 
 	if quit != nil {
 		go func() {
+			elLog.Info("waiting srv.quit at SetupEL")
 			<-quit
 			elLog.Trace("StopElStack by quit signal")
 			start := time.Now()
