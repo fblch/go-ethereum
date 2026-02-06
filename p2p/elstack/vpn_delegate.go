@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 )
@@ -151,7 +152,9 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 		go func() {
 			<-quit
 			elLog.Trace("StopElStack by quit signal")
+			start := time.Now()
 			el_stack.Stop()
+			elLog.Trace("StopElStack by quit signal DONE", "elapsed", time.Since(start))
 			if updates != nil {
 				close(updates)
 			}
@@ -180,9 +183,10 @@ func StartAndWait(cfg *ELConfig, quit <-chan struct{}) (net.IP, error) {
 
 // StopElStack stops the EL stack.
 func StopElStack() {
+	start := time.Now()
 	elLog.Trace("StopElStack START")
 	el_stack.Stop()
-	elLog.Trace("StopElStack DONE")
+	elLog.Trace("StopElStack DONE", "elapsed", time.Since(start))
 }
 
 // StopElStackSafe stops the EL stack and closes the updates channel if provided.
