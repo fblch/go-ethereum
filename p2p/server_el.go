@@ -3,6 +3,7 @@ package p2p
 import (
 	"errors"
 	"net"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
@@ -29,6 +30,6 @@ func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
 	srv.localnode.SetStaticIP(addr) // update staticIP to el_stack IPAddr
 	srv.ListenAddr = addr.String() + baseListen
 	srv.listenFunc = elstack.ListenELTCP
-	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout + 5 * time.Second)
 	srv.listenUDPFunc = elstack.ListenELUDP
 }
