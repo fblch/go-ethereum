@@ -141,7 +141,9 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 
 	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
 
-	if err := el_stack.Start(delegate, vpnCfg, vcCfg, nil); err != nil {
+	capturePath := "./elcapture.pcap"
+
+	if err := el_stack.Start(delegate, vpnCfg, vcCfg, &capturePath); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
 		sendUpdate(updates, VpnDelegate{Err: err})
