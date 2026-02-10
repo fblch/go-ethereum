@@ -4078,16 +4078,22 @@ func NewElStackTcpListener(network, address string) (net.Listener, error) {
 }
 
 func (l *ElStackTcpListener) Accept() (net.Conn, error) {
-	if l.closed.Load() {
-		return nil, os.ErrClosed
-	}
+	for {
+		if l.closed.Load() {
+			return nil, os.ErrClosed
+		}
 
-	stream, err := l.listener.Accept(0)
-	if err != nil {
-		return nil, mapSocketErrorToIO(err)
-	}
+		stream, err := l.listener.Accept(200)
+		if err != nil {
+			// タイムアウトは無視して再試行
+			if err == ErrSocketErrorTcpAcceptTimeout {
+				continue
+			}
+			return nil, mapSocketErrorToIO(err)
+		}
 
-	return newElStackTcpConnFromStream(stream), nil
+		return newElStackTcpConnFromStream(stream), nil
+	}
 }
 
 func (l *ElStackTcpListener) Close() error {
