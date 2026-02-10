@@ -59,10 +59,10 @@ const (
 
 	// Maximum time allowed for reading a complete message.
 	// This is effectively the amount of time a connection can be idle.
-	frameReadTimeout = 60 * time.Second
+	frameReadTimeout = 30 * time.Second
 
 	// Maximum amount of time allowed for writing a complete message.
-	frameWriteTimeout = 40 * time.Second
+	frameWriteTimeout = 20 * time.Second
 )
 
 var (
@@ -380,7 +380,7 @@ func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, 
 // ADDED by Hinata AWAIISHIMA
 // LocalAddr forwards to the underlying UDPConn.
 func (s *sharedUDPConn) LocalAddr() net.Addr {
-	if s == nil || s.under == nil {
+	if s.under == nil {
 		return nil
 	}
 	return s.under.LocalAddr()
