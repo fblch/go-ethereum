@@ -434,7 +434,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_el_stack_checksum_method_tcplistener_accept()
 		})
-		if checksum != 48341 {
+		if checksum != 42799 {
 			// If this happens try cleaning and rebuilding your project
 			panic("el_stack: uniffi_el_stack_checksum_method_tcplistener_accept: UniFFI API checksum mismatch")
 		}
@@ -1177,14 +1177,14 @@ func (_ FfiDestroyerElStackVpnConfig) Destroy(value *ElStackVpnConfig) {
 }
 
 type TcpListenerInterface interface {
-	Accept(timeoutSecs uint64) (*TcpStream, *SocketError)
+	Accept(timeoutMsecs uint64) (*TcpStream, *SocketError)
 	BindAddr() string
 }
 type TcpListener struct {
 	ffiObject FfiObject
 }
 
-func (_self *TcpListener) Accept(timeoutSecs uint64) (*TcpStream, *SocketError) {
+func (_self *TcpListener) Accept(timeoutMsecs uint64) (*TcpStream, *SocketError) {
 	_pointer := _self.ffiObject.incrementPointer("*TcpListener")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1199,7 +1199,7 @@ func (_self *TcpListener) Accept(timeoutSecs uint64) (*TcpStream, *SocketError) 
 			return FfiConverterTcpStreamINSTANCE.Lift(ffi)
 		},
 		C.uniffi_el_stack_fn_method_tcplistener_accept(
-			_pointer, FfiConverterUint64INSTANCE.Lower(timeoutSecs)),
+			_pointer, FfiConverterUint64INSTANCE.Lower(timeoutMsecs)),
 		// pollFn
 		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
 			C.ffi_el_stack_rust_future_poll_pointer(handle, continuation, data)
@@ -2699,28 +2699,28 @@ func (err SocketError) Unwrap() error {
 }
 
 // Err* are used for checking error type with `errors.Is`
-var ErrSocketErrorNameResolvError = fmt.Errorf("SocketError: NameResolvError")
-var ErrSocketErrorAddressConvertError = fmt.Errorf("SocketError: AddressConvertError")
-var ErrSocketErrorInvalidHostnameError = fmt.Errorf("SocketError: InvalidHostnameError")
-var ErrSocketErrorTcpConnectError = fmt.Errorf("SocketError: TcpConnectError")
-var ErrSocketErrorTcpConnectTimeout = fmt.Errorf("SocketError: TcpConnectTimeout")
-var ErrSocketErrorTcpBindError = fmt.Errorf("SocketError: TcpBindError")
-var ErrSocketErrorUdpBindError = fmt.Errorf("SocketError: UdpBindError")
-var ErrSocketErrorTlsHandshakeError = fmt.Errorf("SocketError: TlsHandshakeError")
-var ErrSocketErrorTlsHandshakeTimeout = fmt.Errorf("SocketError: TlsHandshakeTimeout")
-var ErrSocketErrorQuicConnectError = fmt.Errorf("SocketError: QuicConnectError")
-var ErrSocketErrorTcpAcceptError = fmt.Errorf("SocketError: TcpAcceptError")
+var ErrSocketErrorNameResolvError = errors.New("SocketError: NameResolvError")
+var ErrSocketErrorAddressConvertError = errors.New("SocketError: AddressConvertError")
+var ErrSocketErrorInvalidHostnameError = errors.New("SocketError: InvalidHostnameError")
+var ErrSocketErrorTcpConnectError = errors.New("SocketError: TcpConnectError")
+var ErrSocketErrorTcpConnectTimeout = errors.New("SocketError: TcpConnectTimeout")
+var ErrSocketErrorTcpBindError = errors.New("SocketError: TcpBindError")
+var ErrSocketErrorUdpBindError = errors.New("SocketError: UdpBindError")
+var ErrSocketErrorTlsHandshakeError = errors.New("SocketError: TlsHandshakeError")
+var ErrSocketErrorTlsHandshakeTimeout = errors.New("SocketError: TlsHandshakeTimeout")
+var ErrSocketErrorQuicConnectError = errors.New("SocketError: QuicConnectError")
+var ErrSocketErrorTcpAcceptError = errors.New("SocketError: TcpAcceptError")
 var ErrSocketErrorTcpAcceptTimeout = errors.New("SocketError: TcpAcceptTimeout")
-var ErrSocketErrorAddressError = fmt.Errorf("SocketError: AddressError")
-var ErrSocketErrorConnectionClosed = fmt.Errorf("SocketError: ConnectionClosed")
-var ErrSocketErrorInvalidCertificateError = fmt.Errorf("SocketError: InvalidCertificateError")
-var ErrSocketErrorTlsError = fmt.Errorf("SocketError: TlsError")
-var ErrSocketErrorTcpRecvTimeout = fmt.Errorf("SocketError: TcpRecvTimeout")
-var ErrSocketErrorTcpSendTimeout = fmt.Errorf("SocketError: TcpSendTimeout")
-var ErrSocketErrorUdpRecvTimeout = fmt.Errorf("SocketError: UdpRecvTimeout")
-var ErrSocketErrorUdpSendTimeout = fmt.Errorf("SocketError: UdpSendTimeout")
-var ErrSocketErrorOther = fmt.Errorf("SocketError: Other")
-var ErrSocketErrorNotInitializedError = fmt.Errorf("SocketError: NotInitializedError")
+var ErrSocketErrorAddressError = errors.New("SocketError: AddressError")
+var ErrSocketErrorConnectionClosed = errors.New("SocketError: ConnectionClosed")
+var ErrSocketErrorInvalidCertificateError = errors.New("SocketError: InvalidCertificateError")
+var ErrSocketErrorTlsError = errors.New("SocketError: TlsError")
+var ErrSocketErrorTcpRecvTimeout = errors.New("SocketError: TcpRecvTimeout")
+var ErrSocketErrorTcpSendTimeout = errors.New("SocketError: TcpSendTimeout")
+var ErrSocketErrorUdpRecvTimeout = errors.New("SocketError: UdpRecvTimeout")
+var ErrSocketErrorUdpSendTimeout = errors.New("SocketError: UdpSendTimeout")
+var ErrSocketErrorOther = errors.New("SocketError: Other")
+var ErrSocketErrorNotInitializedError = errors.New("SocketError: NotInitializedError")
 
 // Variant structs
 type SocketErrorNameResolvError struct {

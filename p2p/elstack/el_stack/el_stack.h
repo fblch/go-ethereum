@@ -569,7 +569,7 @@ void uniffi_el_stack_fn_free_tcplistener(void* ptr, RustCallStatus *out_status
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_METHOD_TCPLISTENER_ACCEPT
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_METHOD_TCPLISTENER_ACCEPT
-uint64_t uniffi_el_stack_fn_method_tcplistener_accept(void* ptr, uint64_t timeout_secs
+uint64_t uniffi_el_stack_fn_method_tcplistener_accept(void* ptr, uint64_t timeout_msecs
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_METHOD_TCPLISTENER_BIND_ADDR
