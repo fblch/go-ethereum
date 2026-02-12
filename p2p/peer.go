@@ -359,16 +359,22 @@ func (p *Peer) readLoop(errc chan<- error) {
 	defer p.wg.Done()
 	defer p.log.Trace("Peer.readLoop exit")
 	for {
+		p.log.Debug("Peer.readLoop read start")
 		msg, err := p.rw.ReadMsg()
 		if err != nil {
+			p.log.Debug("Peer.readLoop read end", "err", err)
 			errc <- err
 			return
 		}
+		p.log.Debug("Peer.readLoop read end", "code", msg.Code, "size", msg.Size)
 		msg.ReceivedAt = time.Now()
+		p.log.Debug("Peer.readLoop handle start", "code", msg.Code)
 		if err = p.handle(msg); err != nil {
+			p.log.Debug("Peer.readLoop handle end", "code", msg.Code, "err", err)
 			errc <- err
 			return
 		}
+		p.log.Debug("Peer.readLoop handle end", "code", msg.Code)
 	}
 }
 
