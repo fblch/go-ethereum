@@ -935,6 +935,11 @@ var (
 		Name:     "el.servercacert",
 		Category: flags.NetworkingCategory,
 	}
+	ELCapturePathFlag = &cli.StringFlag{
+		Name:     "el.capturepath",
+		Usage:    "File path to store EL packet captures (set to enable capture)",
+		Category: flags.NetworkingCategory,
+	}
 
 	// Console
 	JSpathFlag = &flags.DirectoryFlag{
@@ -1284,6 +1289,10 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 			Fatalf("Failed to read EL certificate: %v", err)
 		}
 		cfg.EL.ServerCACert = cert
+	}
+	if ctx.IsSet(ELCapturePathFlag.Name) {
+		capturePath := ctx.String(ELCapturePathFlag.Name)
+		cfg.EL.CapturePath = &capturePath
 	}
 }
 

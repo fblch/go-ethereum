@@ -410,7 +410,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if needsClear {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, nil,
 			)
 		}
 	} else {
@@ -443,7 +443,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if missing {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, nil,
 			)
 		}
 	}
@@ -492,6 +492,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				ServerAddr:    config.ELServerAddr,
 				ServerPort:    config.ELServerPort,
 				ServerCACert:  config.ELServerCACert,
+				CapturePath:   nil,
 			},
 		},
 	}

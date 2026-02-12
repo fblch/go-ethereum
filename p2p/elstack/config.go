@@ -11,6 +11,7 @@ type ELConfig struct {
 	ServerAddr    string
 	ServerPort    int
 	ServerCACert  string
+	CapturePath   *string
 }
 
 func ClearELMobileConfig(
@@ -22,6 +23,7 @@ func ClearELMobileConfig(
 	serverAddr *string,
 	serverPort *int,
 	serverCACert *string,
+	capturePath **string,
 ) {
 	if use != nil {
 		*use = false
@@ -46,5 +48,8 @@ func ClearELMobileConfig(
 	}
 	if serverCACert != nil {
 		*serverCACert = ""
+	}
+	if capturePath != nil {
+		*capturePath = nil
 	}
 }
