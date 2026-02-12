@@ -320,19 +320,14 @@ loop:
 		}
 	}
 
-	p.log.Debug("Peer.run shutdown start", "reason", reason, "err", err)
 	close(p.closed)
-	p.log.Debug("Peer.run closing transport")
 	p.rw.close(reason)
-	p.log.Debug("Peer.run transport closed, waiting goroutines")
 	p.wg.Wait()
-	p.log.Debug("Peer.run shutdown done")
 	return remoteRequested, err
 }
 
 func (p *Peer) pingLoop() {
 	defer p.wg.Done()
-	defer p.log.Trace("Peer.pingLoop exit")
 
 	ping := time.NewTimer(pingInterval)
 	defer ping.Stop()
@@ -357,24 +352,17 @@ func (p *Peer) pingLoop() {
 
 func (p *Peer) readLoop(errc chan<- error) {
 	defer p.wg.Done()
-	defer p.log.Trace("Peer.readLoop exit")
 	for {
-		p.log.Debug("Peer.readLoop read start")
 		msg, err := p.rw.ReadMsg()
 		if err != nil {
-			p.log.Debug("Peer.readLoop read end", "err", err)
 			errc <- err
 			return
 		}
-		p.log.Debug("Peer.readLoop read end", "code", msg.Code, "size", msg.Size)
 		msg.ReceivedAt = time.Now()
-		p.log.Debug("Peer.readLoop handle start", "code", msg.Code)
 		if err = p.handle(msg); err != nil {
-			p.log.Debug("Peer.readLoop handle end", "code", msg.Code, "err", err)
 			errc <- err
 			return
 		}
-		p.log.Debug("Peer.readLoop handle end", "code", msg.Code)
 	}
 }
 

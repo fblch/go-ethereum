@@ -175,6 +175,7 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 		return res.n, res.err
 	}
 }
+
 func (c *ElStackTcpConn) Write(b []byte) (n int, err error) {
 	if c == nil || c.inner == nil {
 		return 0, net.ErrClosed
