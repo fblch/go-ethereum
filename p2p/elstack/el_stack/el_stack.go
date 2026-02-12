@@ -4251,14 +4251,12 @@ func (c *ElStackTcpConn) Write(b []byte) (int, error) {
 }
 
 func (c *ElStackTcpConn) Close() error {
-	fmt.Println("el_stack TCP connection Close() called")
 	if c.closed.Swap(true) {
 		return os.ErrClosed
 	}
 	// Rust側 close（Destroy で ARC 解放・Close 呼び出しは Rust 実装に合わせる）
 	c.stream.Close()
 	c.stream.Destroy()
-	fmt.Println("el_stack TCP connection Close() done")
 	return nil
 }
 
