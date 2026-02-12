@@ -2710,7 +2710,7 @@ var ErrSocketErrorTlsHandshakeError = fmt.Errorf("SocketError: TlsHandshakeError
 var ErrSocketErrorTlsHandshakeTimeout = fmt.Errorf("SocketError: TlsHandshakeTimeout")
 var ErrSocketErrorQuicConnectError = fmt.Errorf("SocketError: QuicConnectError")
 var ErrSocketErrorTcpAcceptError = fmt.Errorf("SocketError: TcpAcceptError")
-var ErrSocketErrorTcpAcceptTimeout = fmt.Errorf("SocketError: TcpAcceptTimeout")
+var ErrSocketErrorTcpAcceptTimeout = errors.New("SocketError: TcpAcceptTimeout")
 var ErrSocketErrorAddressError = fmt.Errorf("SocketError: AddressError")
 var ErrSocketErrorConnectionClosed = fmt.Errorf("SocketError: ConnectionClosed")
 var ErrSocketErrorInvalidCertificateError = fmt.Errorf("SocketError: InvalidCertificateError")
@@ -4086,7 +4086,7 @@ func (l *ElStackTcpListener) Accept() (net.Conn, error) {
 		stream, err := l.listener.Accept(200)
 		if err != nil {
 			// タイムアウトは無視して再試行
-			if err == ErrSocketErrorTcpAcceptTimeout {
+			if errors.Is(err, ErrSocketErrorTcpAcceptTimeout) {
 				continue
 			}
 			return nil, mapSocketErrorToIO(err)
