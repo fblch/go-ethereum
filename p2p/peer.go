@@ -332,6 +332,7 @@ loop:
 
 func (p *Peer) pingLoop() {
 	defer p.wg.Done()
+	defer p.log.Trace("Peer.pingLoop exit")
 
 	ping := time.NewTimer(pingInterval)
 	defer ping.Stop()
@@ -356,6 +357,7 @@ func (p *Peer) pingLoop() {
 
 func (p *Peer) readLoop(errc chan<- error) {
 	defer p.wg.Done()
+	defer p.log.Trace("Peer.readLoop exit")
 	for {
 		msg, err := p.rw.ReadMsg()
 		if err != nil {
