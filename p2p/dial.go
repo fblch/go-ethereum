@@ -187,7 +187,6 @@ func newDialScheduler(config dialConfig, it enode.Iterator, setupFunc dialSetupF
 
 // stop shuts down the dialer, canceling all current dial tasks.
 func (d *dialScheduler) stop() {
-	d.log.Debug("dialScheduler.stop() called")
 	d.cancel()
 	d.wg.Wait()
 }
