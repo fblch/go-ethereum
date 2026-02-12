@@ -3,10 +3,9 @@ package elstack
 import (
 	"context"
 	"fmt"
-
-	// "el_stack"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
@@ -142,6 +141,7 @@ type ElStackTcpConn struct {
 	raddr     net.Addr
 	closeOnce sync.Once
 	closeErr  error
+	closed    atomic.Bool
 }
 
 func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
@@ -153,12 +153,23 @@ func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
 }
 
 // net.Conn interface 実装
-func (c *ElStackTcpConn) Read(b []byte) (n int, err error)  { return c.inner.Read(b) }
-func (c *ElStackTcpConn) Write(b []byte) (n int, err error) { return c.inner.Write(b) }
+func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
+	if c == nil || c.inner == nil || c.closed.Load() {
+		return 0, net.ErrClosed
+	}
+	return c.inner.Read(b)
+}
+func (c *ElStackTcpConn) Write(b []byte) (n int, err error) {
+	if c == nil || c.inner == nil || c.closed.Load() {
+		return 0, net.ErrClosed
+	}
+	return c.inner.Write(b)
+}
 
 func (c *ElStackTcpConn) Close() error {
 	c.closeOnce.Do(func() {
 		elLog.Trace("ElStackTcpConn Close", "peer", c.raddr)
+		c.closed.Store(true)
 		c.closeErr = c.inner.Close()
 	})
 	return c.closeErr
