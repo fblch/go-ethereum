@@ -126,7 +126,7 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 		return nil, ctx.Err()
 	case res := <-resCh:
 		if res.err != nil {
-			elLog.Warn("ElStackTcpDialer Dial failed", "node", dest.ID(), "err", res.err)
+			elLog.Error("ElStackTcpDialer Dial failed", "node", dest.ID(), "err", res.err)
 			return nil, res.err
 		}
 		elLog.Trace("ElStackTcpDialer Dial success", "node", dest.ID(), "elapsed", time.Since(start))
