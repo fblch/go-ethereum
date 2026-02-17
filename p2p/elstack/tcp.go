@@ -2,7 +2,7 @@ package elstack
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -16,6 +16,8 @@ type ElStackTcpListener struct {
 	close     chan struct{}
 	closeOnce sync.Once
 }
+
+var ElStackTcpListenerClosedErr = errors.New("EL stack TCP listener is already closed.")
 
 // el経由の処理を本ファイルにまとめるためのラッパ関数
 func ListenELTCP(network, addr string) (net.Listener, error) {
@@ -44,19 +46,21 @@ func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
 
 	go func() {
 		c, err := ln.inner.Accept()
+		elLog.Debug("el_stack.Accept returned")
 		resCh <- acceptResult{conn: c, err: err}
 	}()
 
 	select {
 	case res := <-resCh:
 		if res.err != nil {
-			elLog.Error("ElStackTcpListener Accept failed", "err", res.err)
+			elLog.Error("Accept failed", "err", res.err)
 			return nil, res.err
 		}
+		elLog.Debug("Accept success", "ip", res.conn.RemoteAddr())
 		return newElStackTcpConn(res.conn), nil
 	case <-ln.close:
-		elLog.Debug("(ElStackTcpListener).Accept() STOP", "reason", "listener closed")
-		return nil, fmt.Errorf("ElStackTcpListener is already closed")
+		elLog.Debug("Accept STOP", "reason", "listener closed")
+		return nil, ElStackTcpListenerClosedErr
 	}
 }
 
