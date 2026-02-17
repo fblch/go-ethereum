@@ -134,7 +134,7 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 			elLog.Error("Dial failed", "node", dest.ID(), "addr", addrStr, "err", res.err)
 			return nil, res.err
 		}
-		elLog.Trace("Dial success", "node", dest.ID(), "elapsed", time.Since(start))
+		elLog.Trace("Dial success", "node", dest.ID(), "addr", addrStr, "elapsed", time.Since(start))
 		return newElStackTcpConn(res.conn), nil
 	}
 }
