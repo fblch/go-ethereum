@@ -226,6 +226,10 @@ type NodeConfig struct {
 	// ADDED by Hinata AWAIISHIMA
 	// ELServerCACert is the CA certs to connect to the emotion-link server
 	ELServerCACert string
+
+	// ADDED by Hinata AWAIISHIMA
+	// ELCapturePath is the file path to store packet captures for emotion-link
+	ELCapturePath string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -259,6 +263,8 @@ var defaultNodeConfig = &NodeConfig{
 	// ADDED by Jakub Pajek END
 	// ADDED by Hinata AWAIISHIMA
 	ELUse: false,
+	// ADDED by Hinata AWAIISHIMA
+	ELCapturePath: "",
 }
 
 // NewNodeConfig creates a new node option set, initialized to the default values.
@@ -406,11 +412,15 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config combination: ELServerCACert is not empty but ELUse is set false")
 			needsClear = true
 		}
+		if config.ELCapturePath != "" {
+			log.Warn("invalid config combination: ELCapturePath is not empty but ELUse is set false")
+			needsClear = true
+		}
 
 		if needsClear {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, nil,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, &config.ELCapturePath,
 			)
 		}
 	} else {
@@ -443,7 +453,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if missing {
 			elstack.ClearELMobileConfig(
 				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, nil,
+				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, &config.ELCapturePath,
 			)
 		}
 	}
@@ -454,6 +464,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		return nil, err
 	}
 	// ADDED by Jakub Pajek END
+
+	var capturePathPtr *string
+	if config.ELCapturePath != "" {
+		capturePathPtr = &config.ELCapturePath
+	}
 
 	// Create the empty networking stack
 	nodeConf := &node.Config{
@@ -492,7 +507,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				ServerAddr:    config.ELServerAddr,
 				ServerPort:    config.ELServerPort,
 				ServerCACert:  config.ELServerCACert,
-				CapturePath:   nil,
+				CapturePath:   capturePathPtr,
 			},
 		},
 	}

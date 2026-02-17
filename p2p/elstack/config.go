@@ -23,7 +23,7 @@ func ClearELMobileConfig(
 	serverAddr *string,
 	serverPort *int,
 	serverCACert *string,
-	capturePath **string,
+	capturePath *string,
 ) {
 	if use != nil {
 		*use = false
@@ -50,6 +50,6 @@ func ClearELMobileConfig(
 		*serverCACert = ""
 	}
 	if capturePath != nil {
-		*capturePath = nil
+		*capturePath = ""
 	}
 }
