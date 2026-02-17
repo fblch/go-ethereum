@@ -94,7 +94,7 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 	start := time.Now()
 	addr, _ := dest.TCPEndpoint()
 	addrStr := addr.String()
-	elLog.Trace("ElStackTcpDialer Dial start", "node", dest.ID(), "addr", addrStr)
+	elLog.Debug("Dial start", "node", dest.ID(), "addr", addrStr)
 
 	ctx, cancel := d.ensureDialContext(ctx)
 	if cancel != nil {
@@ -127,14 +127,14 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 				_ = res.conn.Close()
 			}
 		}()
-		elLog.Error("ElStackTcpDialer Dial timeout", "node", dest.ID(), "addr", addrStr, "err", ctx.Err())
+		elLog.Error("Dial timeout", "node", dest.ID(), "addr", addrStr, "err", ctx.Err())
 		return nil, ctx.Err()
 	case res := <-resCh:
 		if res.err != nil {
-			elLog.Error("ElStackTcpDialer Dial failed", "node", dest.ID(), "addr", addrStr, "err", res.err)
+			elLog.Error("Dial failed", "node", dest.ID(), "addr", addrStr, "err", res.err)
 			return nil, res.err
 		}
-		elLog.Trace("ElStackTcpDialer Dial success", "node", dest.ID(), "elapsed", time.Since(start))
+		elLog.Trace("Dial success", "node", dest.ID(), "elapsed", time.Since(start))
 		return newElStackTcpConn(res.conn), nil
 	}
 }

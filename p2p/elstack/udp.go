@@ -31,7 +31,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	elLog.Trace("ElStackUdpConn ReadFromUDPAddrPort called")
+	elLog.Trace("ReadFromUDPAddrPort called")
 	type readResult struct {
 		n    int
 		addr netip.AddrPort
@@ -44,7 +44,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 		defer close(resCh)
 		n, udpAddr, err := c.inner.ReadFromUDP(b)
 		if err != nil {
-			elLog.Error("ElStackUdpConn ReadFromUDP failed", "err", err)
+			elLog.Error("el_stack.ReadFromUDP failed", "err", err)
 			resCh <- readResult{err: err}
 			return
 		}
@@ -64,11 +64,12 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	elLog.Trace("ElStackUdpConn WriteToUDPAddrPort called", "addr", addr)
+	elLog.Trace("WriteToUDPAddrPort called", "addr", addr)
 	n, uerr := c.inner.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
 		// Wrap the el_stack error so callers still observe the familiar net.Error
 		// surface that the discovery stack already knows how to handle.
+		elLog.Error("WriteToUDPAddrPort failed", "err", uerr)
 		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
 	}
 	return n, nil
@@ -76,7 +77,7 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-	elLog.Trace("ElStackUdpConn Close called")
+	elLog.Trace("Closing UDP connection")
 	if c.inner != nil {
 		c.closeOnce.Do(func() {
 			// Make Close idempotent because geth can close the socket from multiple
@@ -90,7 +91,4 @@ func (c *ElStackUdpConn) Close() error {
 	return c.closeErr
 }
 
-func (c *ElStackUdpConn) LocalAddr() net.Addr {
-	elLog.Trace("ElStackUdpConn LocalAddr called")
-	return c.laddr
-}
+func (c *ElStackUdpConn) LocalAddr() net.Addr { return c.laddr }
