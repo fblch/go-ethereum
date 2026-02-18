@@ -36,10 +36,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
 	"golang.org/x/crypto/sha3"
 )
+
+var handshakeLogger = log.New("subsystem", "rlpx")
 
 // Conn is an RLPx network connection. It wraps a low-level network connection. The
 // underlying connection should not be used for other activity when it is wrapped by Conn.
@@ -412,28 +415,54 @@ type authRespV4 struct {
 //
 // prv is the local client's private key.
 func (h *handshakeState) runRecipient(conn io.ReadWriter, prv *ecdsa.PrivateKey) (s Secrets, err error) {
+	start := time.Now()
+	defer func() {
+		handshakeLogger.Debug("RLPx handshake recipient finished", "elapsed", time.Since(start), "err", err)
+	}()
+
+	stepStart := time.Now()
 	authMsg := new(authMsgV4)
 	authPacket, err := h.readMsg(authMsg, prv, conn)
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake recipient read auth failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
-	if err := h.handleAuthMsg(authMsg, prv); err != nil {
-		return s, err
-	}
+	handshakeLogger.Debug("RLPx handshake recipient read auth", "elapsed", time.Since(stepStart), "size", len(authPacket))
 
+	stepStart = time.Now()
+	if err := h.handleAuthMsg(authMsg, prv); err != nil {
+		handshakeLogger.Debug("RLPx handshake recipient handle auth failed", "elapsed", time.Since(stepStart), "err", err)
+		return s, err
+	}
+	handshakeLogger.Debug("RLPx handshake recipient handled auth", "elapsed", time.Since(stepStart))
+
+	stepStart = time.Now()
 	authRespMsg, err := h.makeAuthResp()
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake recipient make auth response failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
+	handshakeLogger.Debug("RLPx handshake recipient made auth response", "elapsed", time.Since(stepStart))
+
+	stepStart = time.Now()
 	authRespPacket, err := h.sealEIP8(authRespMsg)
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake recipient seal auth response failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
-	if _, err = conn.Write(authRespPacket); err != nil {
-		return s, err
-	}
+	handshakeLogger.Debug("RLPx handshake recipient sealed auth response", "elapsed", time.Since(stepStart), "size", len(authRespPacket))
 
-	return h.secrets(authPacket, authRespPacket)
+	stepStart = time.Now()
+	if _, err = conn.Write(authRespPacket); err != nil {
+		handshakeLogger.Debug("RLPx handshake recipient write auth response failed", "elapsed", time.Since(stepStart), "err", err)
+		return s, err
+	}
+	handshakeLogger.Debug("RLPx handshake recipient wrote auth response", "elapsed", time.Since(stepStart), "size", len(authRespPacket))
+
+	stepStart = time.Now()
+	secret, secretErr := h.secrets(authPacket, authRespPacket)
+	handshakeLogger.Debug("RLPx handshake recipient derived secrets", "elapsed", time.Since(stepStart), "err", secretErr)
+	return secret, secretErr
 }
 
 func (h *handshakeState) handleAuthMsg(msg *authMsgV4, prv *ecdsa.PrivateKey) error {
@@ -515,29 +544,54 @@ func (h *handshakeState) runInitiator(conn io.ReadWriter, prv *ecdsa.PrivateKey,
 	h.initiator = true
 	h.remote = ecies.ImportECDSAPublic(remote)
 
+	start := time.Now()
+	defer func() {
+		handshakeLogger.Debug("RLPx handshake initiator finished", "elapsed", time.Since(start), "err", err)
+	}()
+
+	stepStart := time.Now()
 	authMsg, err := h.makeAuthMsg(prv)
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake initiator make auth failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
+	handshakeLogger.Debug("RLPx handshake initiator made auth", "elapsed", time.Since(stepStart))
+
+	stepStart = time.Now()
 	authPacket, err := h.sealEIP8(authMsg)
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake initiator seal auth failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
+	handshakeLogger.Debug("RLPx handshake initiator sealed auth", "elapsed", time.Since(stepStart), "size", len(authPacket))
 
+	stepStart = time.Now()
 	if _, err = conn.Write(authPacket); err != nil {
+		handshakeLogger.Debug("RLPx handshake initiator write auth failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
+	handshakeLogger.Debug("RLPx handshake initiator wrote auth", "elapsed", time.Since(stepStart), "size", len(authPacket))
 
+	stepStart = time.Now()
 	authRespMsg := new(authRespV4)
 	authRespPacket, err := h.readMsg(authRespMsg, prv, conn)
 	if err != nil {
+		handshakeLogger.Debug("RLPx handshake initiator read auth response failed", "elapsed", time.Since(stepStart), "err", err)
 		return s, err
 	}
-	if err := h.handleAuthResp(authRespMsg); err != nil {
-		return s, err
-	}
+	handshakeLogger.Debug("RLPx handshake initiator read auth response", "elapsed", time.Since(stepStart), "size", len(authRespPacket))
 
-	return h.secrets(authPacket, authRespPacket)
+	stepStart = time.Now()
+	if err := h.handleAuthResp(authRespMsg); err != nil {
+		handshakeLogger.Debug("RLPx handshake initiator handle auth response failed", "elapsed", time.Since(stepStart), "err", err)
+		return s, err
+	}
+	handshakeLogger.Debug("RLPx handshake initiator handled auth response", "elapsed", time.Since(stepStart))
+
+	stepStart = time.Now()
+	secret, secretErr := h.secrets(authPacket, authRespPacket)
+	handshakeLogger.Debug("RLPx handshake initiator derived secrets", "elapsed", time.Since(stepStart), "err", secretErr)
+	return secret, secretErr
 }
 
 // makeAuthMsg creates the initiator handshake message.
