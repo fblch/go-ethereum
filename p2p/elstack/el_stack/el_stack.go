@@ -4083,12 +4083,8 @@ func (l *ElStackTcpListener) Accept() (net.Conn, error) {
 			return nil, os.ErrClosed
 		}
 
-		stream, err := l.listener.Accept(200)
+		stream, err := l.listener.Accept(0)
 		if err != nil {
-			// タイムアウトは無視して再試行
-			if errors.Is(err, ErrSocketErrorTcpAcceptTimeout) {
-				continue
-			}
 			return nil, mapSocketErrorToIO(err)
 		}
 
