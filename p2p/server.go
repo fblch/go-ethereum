@@ -437,9 +437,12 @@ func (srv *Server) Start() (err error) {
 	}
 	srv.setupPortMapping()
 	// ADDED by Hinata AWAIISHIMA
-	if err := srv.setupEL(); err != nil { 
-		// when EL stack is unavailable, output a log and setting p2p with default connections.
-		srv.log.Warn("EL unavailable, continuing without EL stack", "err", err)
+	if srv.EL.Use {
+		if err := srv.setupEL(); err != nil {
+			// when EL stack is unavailable, output a log and setting p2p with default connections.
+			srv.log.Error("EL unavailable, continuing without EL stack", "err", err)
+			return err
+		}
 	}
 
 	if srv.ListenAddr != "" {

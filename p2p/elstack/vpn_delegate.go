@@ -15,6 +15,7 @@ import (
 type VpnDelegate struct {
 	Addr    net.IP
 	Err     error
+	Status  el_stack.VpnStatus
 	updates chan VpnDelegate
 }
 
@@ -162,23 +163,21 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 	}
 }
 
-// StartAndWait sets up EL and waits for the first delegate update, returning the
-// assigned IP on success. The quit channel can be nil if no shutdown signal is needed.
-func StartAndWait(cfg *ELConfig, quit <-chan struct{}) (net.IP, error) {
-	updates := make(chan VpnDelegate, 1)
-	SetupEL(cfg, updates, quit)
-
-	first, ok := <-updates
-	if !ok {
-		return nil, fmt.Errorf("EL setup terminated before initial link")
+// WaitInitialEL waits for the first address or error on the updates channel.
+func WaitInitialEL(updates <-chan VpnDelegate) (net.IP, error) {
+	for {
+		first, ok := <-updates
+		if !ok {
+			return nil, fmt.Errorf("EL setup terminated before initial link")
+		}
+		if first.Err != nil {
+			return nil, first.Err
+		}
+		if first.Addr != nil {
+			return first.Addr, nil
+		}
+		// Ignore pure status updates here; wait for the first address.
 	}
-	if first.Err != nil {
-		return nil, first.Err
-	}
-	if first.Addr == nil {
-		return nil, fmt.Errorf("EL setup returned nil IP")
-	}
-	return first.Addr, nil
 }
 
 // StopElStack stops the EL stack.
