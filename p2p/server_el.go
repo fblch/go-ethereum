@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"errors"
 	"net"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
@@ -9,9 +8,6 @@ import (
 
 func (srv *Server) setupEL() error {
 	if err := elstack.ValidateELConfig(srv.EL); err != nil {
-		if errors.Is(err, elstack.ErrELDisabled) || errors.Is(err, elstack.ErrELConfigNil) {
-			return nil
-		}
 		return err
 	}
 
@@ -51,6 +47,11 @@ func (srv *Server) monitorEL(updates <-chan elstack.VpnDelegate) {
 			return
 		case u, ok := <-updates:
 			if !ok {
+				return
+			}
+			if u.Err != nil {
+				srv.log.Error("EL persistent error, stopping server", "err", u.Err)
+				srv.Stop()
 				return
 			}
 			if u.Addr != nil {

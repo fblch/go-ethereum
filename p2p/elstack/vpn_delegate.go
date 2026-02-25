@@ -15,7 +15,6 @@ import (
 type VpnDelegate struct {
 	Addr    net.IP
 	Err     error
-	Status  el_stack.VpnStatus
 	updates chan VpnDelegate
 }
 
@@ -77,6 +76,12 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
+	if d.updates == nil {
+		return
+	}
+	if isPersistentConnectionError(msg) {
+		sendUpdate(d.updates, VpnDelegate{Err: fmt.Errorf("EL persistent error: %s", msg)})
+	}
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
@@ -193,5 +198,32 @@ func StopElStackSafe(updates chan VpnDelegate) {
 	StopElStack()
 	if updates != nil {
 		close(updates)
+	}
+}
+
+// isPersistentConnectionError returns true if the connection error message
+// represents a non-transient (permanent) server-side failure where retry is futile.
+func isPersistentConnectionError(msg string) bool {
+	switch {
+	case strings.Contains(msg, "RequestNotSupportedError"):
+		return true
+	case strings.Contains(msg, "UnsupportedClientError"):
+		return true
+	case strings.Contains(msg, "IncorrectRequestError"):
+		return true
+	case strings.Contains(msg, "AuthenticationError"):
+		return true
+	case strings.Contains(msg, "IncorrectProtocolTransitionError"):
+		return true
+	case strings.Contains(msg, "FailedToGetAddressError"):
+		return true
+	case strings.Contains(msg, "InternalServerError"):
+		return true
+	case strings.Contains(msg, "NextRequestIsNoneError"):
+		return true
+	case strings.Contains(msg, "FixAddressInUseError"):
+		return true
+	default:
+		return false
 	}
 }
