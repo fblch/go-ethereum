@@ -18,6 +18,7 @@ func (srv *Server) setupEL() error {
 	elstack.SetupEL(srv.EL, updates, srv.quit)
 	addr, err := elstack.WaitInitialEL(updates)
 	if err != nil {
+		elstack.StopElStackSafe(updates)
 		return err
 	}
 	srv.applyELBindings(addr, baseListen)
