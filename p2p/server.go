@@ -440,7 +440,7 @@ func (srv *Server) Start() (err error) {
 	if srv.EL.Use {
 		if err := srv.setupEL(); err != nil {
 			// when EL stack is unavailable, output a log and setting p2p with default connections.
-			srv.log.Error("EL unavailable, continuing without EL stack", "err", err)
+			srv.log.Error("EL setup failed", "err", err)
 			return err
 		}
 	}
