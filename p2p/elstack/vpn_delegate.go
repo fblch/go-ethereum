@@ -11,29 +11,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
 )
 
-// WisteriaVpnEventDelegate 実装
-type VpnDelegate struct {
-	Addr    net.IP
-	Err     error
-	updates chan VpnDelegate
+// LinkedResult represents the initial link outcome from EL.
+type LinkedResult struct {
+	Addr net.IP
+	Err  error
 }
 
-// sendUpdate delivers a delegate update without blocking callers. If the channel
-// is full or already closed, the update is dropped.
-func sendUpdate(updates chan VpnDelegate, v VpnDelegate) {
-	if updates == nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			elLog.Debug("drop EL update", "reason", r)
-		}
-	}()
-	select {
-	case updates <- v:
-	default:
-		elLog.Debug("drop EL update", "reason", "channel full")
-	}
+// WisteriaVpnEventDelegate 実装
+type VpnDelegate struct {
+	results chan LinkedResult
 }
 
 var (
@@ -76,34 +62,32 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	if d.updates == nil {
-		return
-	}
-	if isPersistentConnectionError(msg) {
-		sendUpdate(d.updates, VpnDelegate{Err: fmt.Errorf("EL persistent error: %s", msg)})
-	}
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
 	ipAddr := ipAddrs[0][:strings.Index(ipAddrs[0], "/")]
 	elLog.Info("get ip address", "address", ipAddr)
-	if d.updates == nil {
+	if d.results == nil {
 		return
 	}
 	addr := net.ParseIP(ipAddr)
 	if addr == nil {
-		sendUpdate(d.updates, VpnDelegate{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)})
+		d.results <- LinkedResult{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)}
 		return
 	}
-	sendUpdate(d.updates, VpnDelegate{Addr: addr})
+	d.results <- LinkedResult{Addr: addr}
 }
 
-func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
-	if err := ValidateELConfig(cfg); err != nil {
-		sendUpdate(updates, VpnDelegate{Err: err})
+func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
+	if results == nil {
 		return
 	}
+	if err := ValidateELConfig(cfg); err != nil {
+		results <- LinkedResult{Err: err}
+		return
+	}
+
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
 	elLog.Info("SetupEL arg", "cfg.ServerAddr", cfg.ServerAddr)
@@ -133,55 +117,50 @@ func SetupEL(cfg *ELConfig, updates chan VpnDelegate, quit <-chan struct{}) {
 
 	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCACert, 1280)
 
-	defaultBurstSize := uint64(1024)
-	defaultTCPBuffer := uint64(16384)
-	defaultUDPBuffer := uint64(8192)
-	defaultMetaDataSize := uint64(32)
-	buffCfg := el_stack.NewElStackSocketBufferConfig(defaultBurstSize, &defaultTCPBuffer, &defaultUDPBuffer, &defaultMetaDataSize)
+	// defaultBurstSize := uint64(1024)
+	// defaultTCPBuffer := uint64(16384)
+	// defaultUDPBuffer := uint64(8192)
+	// defaultMetaDataSize := uint64(32)
+	// buffCfg := el_stack.NewElStackSocketBufferConfig(defaultBurstSize, &defaultTCPBuffer, &defaultUDPBuffer, &defaultMetaDataSize)
+	buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
 
 	el_stack.Initialize(prodCfg, buffCfg)
-	delegate := &VpnDelegate{
-		updates: updates,
-	}
 
 	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
+
+	delegate := &VpnDelegate{results: results}
 
 	if err := el_stack.Start(delegate, vpnCfg, vcCfg, cfg.CapturePath); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
-		sendUpdate(updates, VpnDelegate{Err: err})
+		results <- LinkedResult{Err: err}
 		return
 	}
 
 	if quit != nil {
 		go func() {
-			elLog.Info("waiting srv.quit at SetupEL")
 			<-quit
-			elLog.Trace("StopElStack by quit signal")
-			start := time.Now()
 			el_stack.Stop()
-			elLog.Trace("StopElStack by quit signal DONE", "elapsed", time.Since(start))
-			if updates != nil {
-				close(updates)
+			if results != nil {
+				close(results)
 			}
 		}()
 	}
 }
 
-// WaitInitialEL waits for the first address or error on the updates channel.
-func WaitInitialEL(updates <-chan VpnDelegate) (net.IP, error) {
+// WaitInitialEL waits for the first address or error on the results channel.
+func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
 	for {
-		first, ok := <-updates
+		v, ok := <-results
 		if !ok {
 			return nil, fmt.Errorf("EL setup terminated before initial link")
 		}
-		if first.Err != nil {
-			return nil, first.Err
+		if v.Err != nil {
+			return nil, v.Err
 		}
-		if first.Addr != nil {
-			return first.Addr, nil
+		if v.Addr != nil {
+			return v.Addr, nil
 		}
-		// Ignore pure status updates here; wait for the first address.
 	}
 }
 
@@ -194,36 +173,9 @@ func StopElStack() {
 }
 
 // StopElStackSafe stops the EL stack and closes the updates channel if provided.
-func StopElStackSafe(updates chan VpnDelegate) {
+func StopElStackSafe(resCh chan LinkedResult) {
 	StopElStack()
-	if updates != nil {
-		close(updates)
-	}
-}
-
-// isPersistentConnectionError returns true if the connection error message
-// represents a non-transient (permanent) server-side failure where retry is futile.
-func isPersistentConnectionError(msg string) bool {
-	switch {
-	case strings.Contains(msg, "RequestNotSupportedError"):
-		return true
-	case strings.Contains(msg, "UnsupportedClientError"):
-		return true
-	case strings.Contains(msg, "IncorrectRequestError"):
-		return true
-	case strings.Contains(msg, "AuthenticationError"):
-		return true
-	case strings.Contains(msg, "IncorrectProtocolTransitionError"):
-		return true
-	case strings.Contains(msg, "FailedToGetAddressError"):
-		return true
-	case strings.Contains(msg, "InternalServerError"):
-		return true
-	case strings.Contains(msg, "NextRequestIsNoneError"):
-		return true
-	case strings.Contains(msg, "FixAddressInUseError"):
-		return true
-	default:
-		return false
+	if resCh != nil {
+		close(resCh)
 	}
 }

@@ -146,9 +146,9 @@ func main() {
 			ServerPort:    *elServerPort,
 			ServerCACert:  cert,
 		}
-		updates := make(chan elstack.VpnDelegate, 16)
-		elstack.SetupEL(elCfg, updates, nil)
-		addr, err := elstack.WaitInitialEL(updates)
+		results := make(chan elstack.LinkedResult, 1)
+		go elstack.SetupEL(elCfg, results, nil)
+		addr, err := elstack.WaitInitialEL(results)
 		if err != nil {
 			utils.Fatalf("EL setup failed: %v", err)
 		}

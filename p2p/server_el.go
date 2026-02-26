@@ -12,17 +12,16 @@ func (srv *Server) setupEL() error {
 	}
 
 	baseListen := srv.ListenAddr
-	updates := make(chan elstack.VpnDelegate, 16)
+	results := make(chan elstack.LinkedResult, 1)
 
 	// Start EL stack and wait synchronously for the first IP before binding listeners.
-	elstack.SetupEL(srv.EL, updates, srv.quit)
-	addr, err := elstack.WaitInitialEL(updates)
+	go elstack.SetupEL(srv.EL, results, srv.quit)
+	addr, err := elstack.WaitInitialEL(results)
 	if err != nil {
-		elstack.StopElStackSafe(updates)
 		return err
 	}
+
 	srv.applyELBindings(addr, baseListen)
-	go srv.monitorEL(updates)
 	return nil
 }
 
@@ -32,43 +31,4 @@ func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
 	srv.listenFunc = elstack.ListenELTCP
 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 	srv.listenUDPFunc = elstack.ListenELUDP
-}
-
-// monitorEL watches EL status updates and enforces a timeout when disconnected.
-func (srv *Server) monitorEL(updates <-chan elstack.VpnDelegate) {
-	currentIP := net.IP(nil)
-	if srv.localnode != nil {
-		if n := srv.localnode.Node(); n != nil {
-			currentIP = n.IP()
-		}
-	}
-	for {
-		select {
-		case <-srv.quit:
-			return
-		case u, ok := <-updates:
-			if !ok {
-				return
-			}
-			if u.Err != nil {
-				srv.log.Error("EL persistent error, stopping server", "err", u.Err)
-				srv.Stop()
-				return
-			}
-			if u.Addr != nil {
-				if !u.Addr.Equal(currentIP) {
-					srv.log.Info("EL IP updated", "old", currentIP, "new", u.Addr)
-					// Re-use whatever port is currently in ListenAddr. If none, default to empty suffix.
-					suffix := ""
-					if _, port, err := net.SplitHostPort(srv.ListenAddr); err == nil && port != "" {
-						suffix = ":" + port
-					}
-					srv.applyELBindings(u.Addr, suffix)
-					currentIP = u.Addr
-				} else {
-					srv.log.Debug("EL IP unchanged", "ip", u.Addr)
-				}
-			}
-		}
-	}
 }
