@@ -117,11 +117,10 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCACert, 1280)
 
-	// defaultBurstSize := uint64(1024)
-	// defaultTCPBuffer := uint64(16384)
-	// defaultUDPBuffer := uint64(8192)
-	// defaultMetaDataSize := uint64(32)
-	// buffCfg := el_stack.NewElStackSocketBufferConfig(defaultBurstSize, &defaultTCPBuffer, &defaultUDPBuffer, &defaultMetaDataSize)
+	// default:
+	// - tcpBuffSize = 16,384 bytes
+	// - udpBuffSize = 8,192 bytes
+	// - udpMetaSize = 32 entries
 	buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
 
 	el_stack.Initialize(prodCfg, buffCfg)
