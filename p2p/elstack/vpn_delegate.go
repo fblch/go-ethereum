@@ -62,6 +62,10 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
+	if d.results == nil {
+		return
+	}
+	d.results <- LinkedResult{Err: fmt.Errorf(msg)}
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {

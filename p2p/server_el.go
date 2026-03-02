@@ -22,6 +22,8 @@ func (srv *Server) setupEL() error {
 	}
 
 	srv.applyELBindings(addr, baseListen)
+	go srv.monitorEL(results)
+
 	return nil
 }
 
@@ -31,4 +33,21 @@ func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
 	srv.listenFunc = elstack.ListenELTCP
 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 	srv.listenUDPFunc = elstack.ListenELUDP
+}
+
+func (srv *Server) monitorEL(results chan elstack.LinkedResult) {
+	for {
+		select {
+		case result, ok := <-results:
+			if !ok {
+				srv.log.Error("LinkedResult channel is disabled")
+				return
+			}
+			if result.Err != nil {
+				srv.log.Error("EL link disconnected", "reason", result.Err)
+			}
+		case <-srv.quit:
+			return
+		}
+	}
 }
