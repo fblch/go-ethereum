@@ -126,7 +126,7 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	// - udpBuffSize = 8,192 bytes
 	// - udpMetaSize = 32 entries
 	// buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
-	maxBurstSize := uint64(1024)
+	maxBurstSize := uint64(2048)
 	tcpBuffSize := uint64(65536)
 	udpBuffSize := uint64(65536)
 	udpMetaSize := uint64(2048)
