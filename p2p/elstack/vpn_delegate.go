@@ -122,14 +122,23 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCACert, 1280)
 
 	// default:
-	// - tcpBuffSize = 16,384 bytes
-	// - udpBuffSize = 8,192 bytes
-	// - udpMetaSize = 32 entries
+	// tcpBuffSize := uint64(16384)
+	// udpBuffSize := uint64(8192)
+	// udpMetaSize := uint64(32)
 	// buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
-	maxBurstSize := uint64(1024)
-	tcpBuffSize := uint64(65536)
-	udpBuffSize := uint64(65536)
-	udpMetaSize := uint64(2048)
+	// todo: reserch to default android default tcp/udp buffer statuses
+	// AndroidOS:
+	tcpBuffSize := uint64(131072)
+	udpBuffSize := uint64(212992)
+	udpMetaSize := uint64(32)
+	// iOS:
+	// tcpBuffSize := uint64(65536)
+	// udpBuffSize := uint64(65536)
+	// udpMetaSize := uint64(32)
+	maxBurstSize := uint64(2048)
+	// tcpBuffSize := uint64(65536)
+	// udpBuffSize := uint64(65536)
+	// udpMetaSize := uint64(2048)
 	buffCfg := el_stack.NewElStackSocketBufferConfig(maxBurstSize, &tcpBuffSize, &udpBuffSize, &udpMetaSize)
 
 	el_stack.Initialize(prodCfg, buffCfg)
