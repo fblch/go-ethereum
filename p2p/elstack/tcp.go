@@ -24,15 +24,14 @@ func ListenELTCP(network, addr string) (net.Listener, error) {
 	ln, err := el_stack.NewElStackTcpListener(network, addr)
 	if err != nil {
 		elLog.Error("ListenELTCP failed", "network", network, "addr", addr, "err", err)
+		return nil, err
 	}
-	if err == nil {
-		elLog.Info("ListenELTCP ok", "network", network, "addr", addr, "local", ln.Addr())
-	}
+	elLog.Info("ListenELTCP ok", "network", network, "addr", addr, "local", ln.Addr())
 	listener := &ElStackTcpListener{
 		inner: ln,
 		close: make(chan struct{}),
 	}
-	return listener, err
+	return listener, nil
 }
 
 // net.Listener interface 実装

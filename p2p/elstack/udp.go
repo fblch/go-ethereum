@@ -23,7 +23,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
 		elLog.Error("UDP Bind FAILED", "err", err)
-		return &ElStackUdpConn{closeCh: make(chan struct{})}, err
+		return nil, err
 	}
 	localAddr := c.LocalAddr()
 	elLog.Info("ListenELUDP ok", "network", network, "addr", addr, "local", localAddr)
