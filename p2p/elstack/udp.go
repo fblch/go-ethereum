@@ -78,16 +78,16 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
 	elLog.Trace("Closing UDP connection")
-	if c.inner != nil {
-		c.closeOnce.Do(func() {
-			// Make Close idempotent because geth can close the socket from multiple
-			// goroutines during shutdown.
+	c.closeOnce.Do(func() {
+		// Make Close idempotent because geth can close the socket from multiple
+		// goroutines during shutdown.
+		if c.inner != nil {
 			c.closeErr = c.inner.Close()
-			if c.closeCh != nil {
-				close(c.closeCh)
-			}
-		})
-	}
+		}
+		if c.closeCh != nil {
+			close(c.closeCh)
+		}
+	})
 	return c.closeErr
 }
 
