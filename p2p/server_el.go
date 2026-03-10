@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
@@ -21,18 +22,26 @@ func (srv *Server) setupEL() error {
 		return err
 	}
 
-	srv.applyELBindings(addr, baseListen)
+	if err := srv.applyELBindings(addr, baseListen); err != nil {
+		return err
+	}
 	go srv.monitorEL(results)
 
 	return nil
 }
 
-func (srv *Server) applyELBindings(addr net.IP, baseListen string) {
+func (srv *Server) applyELBindings(addr net.IP, baseListen string) error {
+	_, port, err := net.SplitHostPort(baseListen)
+	if err != nil {
+		return fmt.Errorf("invalid base ListenAddr %q: %w", baseListen, err)
+	}
+
 	srv.localnode.SetStaticIP(addr) // update staticIP to el_stack IPAddr
-	srv.ListenAddr = addr.String() + baseListen
+	srv.ListenAddr = net.JoinHostPort(addr.String(), port)
 	srv.listenFunc = elstack.ListenELTCP
 	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
 	srv.listenUDPFunc = elstack.ListenELUDP
+	return nil
 }
 
 func (srv *Server) monitorEL(results chan elstack.LinkedResult) {
