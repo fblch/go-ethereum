@@ -7,13 +7,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
 
+const initialELResultsBufferSize = 8
+
 func (srv *Server) setupEL() error {
 	if err := elstack.ValidateELConfig(srv.EL); err != nil {
 		return err
 	}
 
 	baseListen := srv.ListenAddr
-	results := make(chan elstack.LinkedResult, 1)
+	results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 
 	// Start EL stack and wait synchronously for the first IP before binding listeners.
 	go elstack.SetupEL(srv.EL, results, srv.quit)
