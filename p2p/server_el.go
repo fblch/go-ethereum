@@ -3,6 +3,7 @@ package p2p
 import (
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
 )
@@ -16,15 +17,31 @@ func (srv *Server) setupEL() error {
 
 	baseListen := srv.ListenAddr
 	results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
+	setupQuit := make(chan struct{})
+	var stopELOnce sync.Once
+	stopEL := func() {
+		stopELOnce.Do(func() {
+			close(setupQuit)
+		})
+	}
 
 	// Start EL stack and wait synchronously for the first IP before binding listeners.
-	go elstack.SetupEL(srv.EL, results, srv.quit)
+	go func() {
+		select {
+		case <-srv.quit:
+			stopEL()
+		case <-setupQuit:
+		}
+	}()
+	go elstack.SetupEL(srv.EL, results, setupQuit)
 	addr, err := elstack.WaitInitialEL(results)
 	if err != nil {
+		stopEL()
 		return err
 	}
 
 	if err := srv.applyELBindings(addr, baseListen); err != nil {
+		stopEL()
 		return err
 	}
 	go srv.monitorEL(results)
