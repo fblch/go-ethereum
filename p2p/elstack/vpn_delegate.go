@@ -31,6 +31,8 @@ type linkedResultStream struct {
 	closed bool
 }
 
+const criticalResultRetryInterval = 10 * time.Millisecond
+
 func newLinkedResultStream(ch chan LinkedResult) *linkedResultStream {
 	if ch == nil {
 		return nil
@@ -38,7 +40,17 @@ func newLinkedResultStream(ch chan LinkedResult) *linkedResultStream {
 	return &linkedResultStream{ch: ch}
 }
 
-func (s *linkedResultStream) Send(v LinkedResult) bool {
+func (s *linkedResultStream) trySendLocked(v LinkedResult) bool {
+	select {
+	case s.ch <- v:
+		return true
+	default:
+		return false
+	}
+}
+
+// SendBestEffort sends a result without blocking. It may drop when the buffer is full.
+func (s *linkedResultStream) SendBestEffort(v LinkedResult) bool {
 	if s == nil {
 		return false
 	}
@@ -47,12 +59,36 @@ func (s *linkedResultStream) Send(v LinkedResult) bool {
 	if s.closed || s.ch == nil {
 		return false
 	}
-	select {
-	case s.ch <- v:
+	if s.trySendLocked(v) {
 		return true
-	default:
-		elLog.Warn("LinkedResult channel is full; dropping event")
+	}
+	elLog.Warn("LinkedResult channel is full; dropping event")
+	return false
+}
+
+// SendCritical retries until the event is sent or the stream is closed.
+func (s *linkedResultStream) SendCritical(v LinkedResult) bool {
+	if s == nil {
 		return false
+	}
+	loggedRetry := false
+	for {
+		s.mu.Lock()
+		if s.closed || s.ch == nil {
+			s.mu.Unlock()
+			return false
+		}
+		if s.trySendLocked(v) {
+			s.mu.Unlock()
+			return true
+		}
+		s.mu.Unlock()
+
+		if !loggedRetry {
+			elLog.Warn("LinkedResult channel is full; retrying critical event")
+			loggedRetry = true
+		}
+		time.Sleep(criticalResultRetryInterval)
 	}
 }
 
@@ -111,7 +147,7 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	_ = d.results.Send(LinkedResult{Err: errors.New(msg)})
+	_ = d.results.SendBestEffort(LinkedResult{Err: errors.New(msg)})
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
@@ -127,10 +163,10 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("get ip address", "address", ipAddr)
 	addr := net.ParseIP(ipAddr)
 	if addr == nil {
-		_ = d.results.Send(LinkedResult{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)})
+		_ = d.results.SendBestEffort(LinkedResult{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)})
 		return
 	}
-	_ = d.results.Send(LinkedResult{Addr: addr})
+	_ = d.results.SendCritical(LinkedResult{Addr: addr})
 }
 
 func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
@@ -139,7 +175,8 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 		return
 	}
 	if err := ValidateELConfig(cfg); err != nil {
-		_ = resultStream.Send(LinkedResult{Err: err})
+		_ = resultStream.SendCritical(LinkedResult{Err: err})
+		resultStream.Close()
 		return
 	}
 
@@ -201,7 +238,8 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	if err := el_stack.Start(delegate, vpnCfg, vcCfg, cfg.CapturePath); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
-		_ = resultStream.Send(LinkedResult{Err: err})
+		_ = resultStream.SendCritical(LinkedResult{Err: err})
+		resultStream.Close()
 		return
 	}
 
