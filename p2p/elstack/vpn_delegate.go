@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
@@ -19,7 +20,55 @@ type LinkedResult struct {
 
 // WisteriaVpnEventDelegate 実装
 type VpnDelegate struct {
-	results chan LinkedResult
+	results *linkedResultStream
+}
+
+// linkedResultStream serializes send/close operations for LinkedResult channel.
+// It prevents panics caused by concurrent close and send.
+type linkedResultStream struct {
+	ch     chan LinkedResult
+	mu     sync.Mutex
+	closed bool
+}
+
+func newLinkedResultStream(ch chan LinkedResult) *linkedResultStream {
+	if ch == nil {
+		return nil
+	}
+	return &linkedResultStream{ch: ch}
+}
+
+func (s *linkedResultStream) Send(v LinkedResult) bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.ch == nil {
+		return false
+	}
+	select {
+	case s.ch <- v:
+		return true
+	default:
+		elLog.Warn("LinkedResult channel is full; dropping event")
+		return false
+	}
+}
+
+func (s *linkedResultStream) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.closed = true
+	if s.ch != nil {
+		close(s.ch)
+	}
 }
 
 var (
@@ -62,10 +111,7 @@ func (d *VpnDelegate) OnStatusChange(status el_stack.VpnStatus) {
 
 func (d *VpnDelegate) OnConnectionError(msg string) {
 	elLog.Error("VPN Connection error", "msg", msg)
-	if d.results == nil {
-		return
-	}
-	d.results <- LinkedResult{Err: fmt.Errorf(msg)}
+	_ = d.results.Send(LinkedResult{Err: fmt.Errorf(msg)})
 }
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
@@ -79,23 +125,21 @@ func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 		ipAddr = strings.TrimSpace(ipAddr[:slash])
 	}
 	elLog.Info("get ip address", "address", ipAddr)
-	if d.results == nil {
-		return
-	}
 	addr := net.ParseIP(ipAddr)
 	if addr == nil {
-		d.results <- LinkedResult{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)}
+		_ = d.results.Send(LinkedResult{Err: fmt.Errorf("invalid IP from EL: %s", ipAddr)})
 		return
 	}
-	d.results <- LinkedResult{Addr: addr}
+	_ = d.results.Send(LinkedResult{Addr: addr})
 }
 
 func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
-	if results == nil {
+	resultStream := newLinkedResultStream(results)
+	if resultStream == nil {
 		return
 	}
 	if err := ValidateELConfig(cfg); err != nil {
-		results <- LinkedResult{Err: err}
+		_ = resultStream.Send(LinkedResult{Err: err})
 		return
 	}
 
@@ -152,12 +196,12 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
 
-	delegate := &VpnDelegate{results: results}
+	delegate := &VpnDelegate{results: resultStream}
 
 	if err := el_stack.Start(delegate, vpnCfg, vcCfg, cfg.CapturePath); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
-		results <- LinkedResult{Err: err}
+		_ = resultStream.Send(LinkedResult{Err: err})
 		return
 	}
 
@@ -165,14 +209,13 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 		go func() {
 			<-quit
 			el_stack.Stop()
-			if results != nil {
-				close(results)
-			}
+			resultStream.Close()
 		}()
 	}
 }
 
-// WaitInitialEL waits for the first address or error on the results channel.
+// WaitInitialEL keeps waiting until an initial address is received.
+// Error events are logged and ignored so transient failures can recover.
 func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
 	for {
 		v, ok := <-results
@@ -180,9 +223,11 @@ func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
 			return nil, fmt.Errorf("EL setup terminated before initial link")
 		}
 		if v.Err != nil {
-			return nil, v.Err
+			elLog.Warn("EL initial link failed, waiting for retry", "err", v.Err)
+			continue
 		}
 		if v.Addr != nil {
+			elLog.Info("EL initial link established", "ip", v.Addr)
 			return v.Addr, nil
 		}
 	}
@@ -196,10 +241,8 @@ func StopElStack() {
 	elLog.Trace("StopElStack DONE", "elapsed", time.Since(start))
 }
 
-// StopElStackSafe stops the EL stack and closes the updates channel if provided.
-func StopElStackSafe(resCh chan LinkedResult) {
+// StopElStackSafe stops the EL stack.
+// Channel close is intentionally owned by SetupEL to avoid close/send races.
+func StopElStackSafe(_ chan LinkedResult) {
 	StopElStack()
-	if resCh != nil {
-		close(resCh)
-	}
 }
