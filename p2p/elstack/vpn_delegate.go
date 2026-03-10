@@ -70,7 +70,14 @@ func (d *VpnDelegate) OnConnectionError(msg string) {
 
 func (d *VpnDelegate) OnLinkedParams(ipAddrs, dnsAddrs, routes []string) {
 	elLog.Info("LinkedParams", "IP", ipAddrs, "DNS", dnsAddrs, "ROUTES", routes)
-	ipAddr := ipAddrs[0][:strings.Index(ipAddrs[0], "/")]
+	if len(ipAddrs) == 0 {
+		elLog.Warn("LinkedParams has no IP address yet; skipping")
+		return
+	}
+	ipAddr := strings.TrimSpace(ipAddrs[0])
+	if slash := strings.Index(ipAddr, "/"); slash >= 0 {
+		ipAddr = strings.TrimSpace(ipAddr[:slash])
+	}
 	elLog.Info("get ip address", "address", ipAddr)
 	if d.results == nil {
 		return
