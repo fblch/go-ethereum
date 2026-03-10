@@ -255,12 +255,17 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 // WaitInitialEL keeps waiting until an initial address is received.
 // Error events are logged and ignored so transient failures can recover.
 func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
+	var lastErr error
 	for {
 		v, ok := <-results
 		if !ok {
+			if lastErr != nil {
+				return nil, fmt.Errorf("EL setup terminated before initial link: %w", lastErr)
+			}
 			return nil, fmt.Errorf("EL setup terminated before initial link")
 		}
 		if v.Err != nil {
+			lastErr = v.Err
 			elLog.Warn("EL initial link failed, waiting for retry", "err", v.Err)
 			continue
 		}
