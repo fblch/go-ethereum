@@ -223,7 +223,7 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	// tcpBuffSize := uint64(65536)
 	// udpBuffSize := uint64(65536)
 	// udpMetaSize := uint64(32)
-	maxBurstSize := uint64(8)
+	maxBurstSize := uint64(16)
 	// tcpBuffSize := uint64(65536)
 	// udpBuffSize := uint64(65536)
 	// udpMetaSize := uint64(2048)
