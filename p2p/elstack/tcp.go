@@ -23,10 +23,8 @@ var ElStackTcpListenerClosedErr = errors.New("EL stack TCP listener is already c
 func ListenELTCP(network, addr string) (net.Listener, error) {
 	ln, err := el_stack.NewElStackTcpListener(network, addr)
 	if err != nil {
-		elLog.Error("ListenELTCP failed", "network", network, "addr", addr, "err", err)
 		return nil, err
 	}
-	elLog.Info("ListenELTCP ok", "network", network, "addr", addr, "local", ln.Addr())
 	listener := &ElStackTcpListener{
 		inner: ln,
 		close: make(chan struct{}),
@@ -45,20 +43,16 @@ func (ln *ElStackTcpListener) Accept() (net.Conn, error) {
 
 	go func() {
 		c, err := ln.inner.Accept()
-		elLog.Debug("el_stack.Accept returned")
 		resCh <- acceptResult{conn: c, err: err}
 	}()
 
 	select {
 	case res := <-resCh:
 		if res.err != nil {
-			elLog.Error("Accept failed", "err", res.err)
 			return nil, res.err
 		}
-		elLog.Debug("Accept success", "ip", res.conn.RemoteAddr())
 		return newElStackTcpConn(res.conn), nil
 	case <-ln.close:
-		elLog.Debug("Accept STOP", "reason", "listener closed")
 		return nil, ElStackTcpListenerClosedErr
 	}
 }
@@ -90,10 +84,7 @@ func (d *ElStackTcpDialer) ensureDialContext(ctx context.Context) (context.Conte
 }
 
 func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, error) {
-	start := time.Now()
 	addr, _ := dest.TCPEndpoint()
-	addrStr := addr.String()
-	elLog.Debug("Dial start", "node", dest.ID(), "addr", addrStr)
 
 	ctx, cancel := d.ensureDialContext(ctx)
 	if cancel != nil {
@@ -126,14 +117,11 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 				_ = res.conn.Close()
 			}
 		}()
-		elLog.Error("Dial timeout", "node", dest.ID(), "addr", addrStr, "err", ctx.Err())
 		return nil, ctx.Err()
 	case res := <-resCh:
 		if res.err != nil {
-			elLog.Error("Dial failed", "node", dest.ID(), "addr", addrStr, "err", res.err)
 			return nil, res.err
 		}
-		elLog.Trace("Dial success", "node", dest.ID(), "addr", addrStr, "elapsed", time.Since(start))
 		return newElStackTcpConn(res.conn), nil
 	}
 }
@@ -189,7 +177,6 @@ func (c *ElStackTcpConn) Write(b []byte) (n int, err error) {
 
 func (c *ElStackTcpConn) Close() error {
 	c.closeOnce.Do(func() {
-		elLog.Trace("ElStackTcpConn Close", "peer", c.raddr)
 		c.closeErr = c.inner.Close()
 		close(c.closeCh)
 	})

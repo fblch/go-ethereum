@@ -19,19 +19,15 @@ type ElStackUdpConn struct {
 }
 
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
-	elLog.Trace("ListenELUDP called", "network", network, "addr", addr)
 	c, err := el_stack.NewElStackUdpConn(network, addr)
 	if err != nil {
-		elLog.Error("UDP Bind FAILED", "err", err)
 		return nil, err
 	}
 	localAddr := c.LocalAddr()
-	elLog.Info("ListenELUDP ok", "network", network, "addr", addr, "local", localAddr)
 	return &ElStackUdpConn{inner: c, laddr: localAddr, closeCh: make(chan struct{})}, nil
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
-	elLog.Trace("ReadFromUDPAddrPort called")
 	type readResult struct {
 		n    int
 		addr netip.AddrPort
@@ -44,7 +40,6 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 		defer close(resCh)
 		n, udpAddr, err := c.inner.ReadFromUDP(b)
 		if err != nil {
-			elLog.Error("el_stack.ReadFromUDP failed", "err", err)
 			resCh <- readResult{err: err}
 			return
 		}
@@ -64,12 +59,10 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 }
 
 func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error) {
-	elLog.Trace("WriteToUDPAddrPort called", "addr", addr)
 	n, uerr := c.inner.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 	if uerr != nil {
 		// Wrap the el_stack error so callers still observe the familiar net.Error
 		// surface that the discovery stack already knows how to handle.
-		elLog.Error("WriteToUDPAddrPort failed", "err", uerr)
 		return n, &net.OpError{Op: "write", Net: "udp", Source: c.laddr, Addr: net.UDPAddrFromAddrPort(addr), Err: uerr}
 	}
 	return n, nil
@@ -77,7 +70,6 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n in
 
 // discover.UDPConn の要件を満たすためのラッパーメソッド
 func (c *ElStackUdpConn) Close() error {
-	elLog.Trace("Closing UDP connection")
 	c.closeOnce.Do(func() {
 		// Make Close idempotent because geth can close the socket from multiple
 		// goroutines during shutdown.
