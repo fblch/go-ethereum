@@ -3,8 +3,10 @@ package elstack
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack" // if you copied el_stack directory directly below elstack directory, use it.
@@ -130,18 +132,59 @@ type ElStackTcpConn struct {
 	inner     net.Conn
 	laddr     net.Addr
 	raddr     net.Addr
+	readMu    sync.Mutex
+	readOnce  sync.Once
+	readBuf   []byte
+	recvCh    chan []byte
+	recvErrCh chan error
+	closed    atomic.Bool
 	closeOnce sync.Once
 	closeErr  error
 	closeCh   chan struct{}
 }
 
 func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
-	return &ElStackTcpConn{
-		inner:   c,
-		raddr:   c.RemoteAddr(),
-		laddr:   c.LocalAddr(),
-		closeCh: make(chan struct{}),
+	conn := &ElStackTcpConn{
+		inner:     c,
+		raddr:     c.RemoteAddr(),
+		laddr:     c.LocalAddr(),
+		recvCh:    make(chan []byte, 128),
+		recvErrCh: make(chan error, 1),
+		closeCh:   make(chan struct{}),
 	}
+	conn.startReader()
+	return conn
+}
+
+func (c *ElStackTcpConn) startReader() {
+	c.readOnce.Do(func() {
+		go func() {
+			defer close(c.recvCh)
+
+			buf := make([]byte, 64*1024)
+			for {
+				n, err := c.inner.Read(buf)
+				if err != nil {
+					select {
+					case c.recvErrCh <- err:
+					default:
+					}
+					return
+				}
+				if n == 0 {
+					continue
+				}
+				p := make([]byte, n)
+				copy(p, buf[:n])
+
+				select {
+				case c.recvCh <- p:
+				case <-c.closeCh:
+					return
+				}
+			}
+		}()
+	})
 }
 
 // net.Conn interface 実装
@@ -149,22 +192,39 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 	if c == nil || c.inner == nil {
 		return 0, net.ErrClosed
 	}
-
-	type readResult struct {
-		n   int
-		err error
+	if c.closed.Load() {
+		return 0, net.ErrClosed
 	}
-	resCh := make(chan readResult, 1)
-	go func() {
-		n, err := c.inner.Read(b)
-		resCh <- readResult{n: n, err: err}
-	}()
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
+
+	if len(c.readBuf) > 0 {
+		n := copy(b, c.readBuf)
+		c.readBuf = c.readBuf[n:]
+		return n, nil
+	}
 
 	select {
 	case <-c.closeCh:
 		return 0, net.ErrClosed
-	case res := <-resCh:
-		return res.n, res.err
+	case err := <-c.recvErrCh:
+		return 0, err
+	case pkt, ok := <-c.recvCh:
+		if !ok {
+			select {
+			case err := <-c.recvErrCh:
+				return 0, err
+			default:
+				return 0, io.EOF
+			}
+		}
+		if len(pkt) <= len(b) {
+			n := copy(b, pkt)
+			return n, nil
+		}
+		n := copy(b, pkt[:len(b)])
+		c.readBuf = append(c.readBuf[:0], pkt[n:]...)
+		return n, nil
 	}
 }
 
@@ -172,13 +232,17 @@ func (c *ElStackTcpConn) Write(b []byte) (n int, err error) {
 	if c == nil || c.inner == nil {
 		return 0, net.ErrClosed
 	}
+	if c.closed.Load() {
+		return 0, net.ErrClosed
+	}
 	return c.inner.Write(b)
 }
 
 func (c *ElStackTcpConn) Close() error {
 	c.closeOnce.Do(func() {
-		c.closeErr = c.inner.Close()
+		c.closed.Store(true)
 		close(c.closeCh)
+		c.closeErr = c.inner.Close()
 	})
 	return c.closeErr
 }
