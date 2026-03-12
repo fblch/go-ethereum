@@ -134,8 +134,9 @@ type ElStackTcpConn struct {
 	raddr     net.Addr
 	readMu    sync.Mutex
 	readOnce  sync.Once
-	readBuf   []byte
-	recvCh    chan []byte
+	pending   readPacket
+	hasPacket bool
+	recvCh    chan readPacket
 	recvErrCh chan error
 	closed    atomic.Bool
 	closeOnce sync.Once
@@ -143,12 +144,26 @@ type ElStackTcpConn struct {
 	closeCh   chan struct{}
 }
 
+type readPacket struct {
+	buf []byte
+	off int
+	n   int
+}
+
+const elStackReadChunkSize = 64 * 1024
+
+var elStackReadBufPool = sync.Pool{
+	New: func() any {
+		return make([]byte, elStackReadChunkSize)
+	},
+}
+
 func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
 	conn := &ElStackTcpConn{
 		inner:     c,
 		raddr:     c.RemoteAddr(),
 		laddr:     c.LocalAddr(),
-		recvCh:    make(chan []byte, 128),
+		recvCh:    make(chan readPacket, 128),
 		recvErrCh: make(chan error, 1),
 		closeCh:   make(chan struct{}),
 	}
@@ -160,26 +175,27 @@ func (c *ElStackTcpConn) startReader() {
 	c.readOnce.Do(func() {
 		go func() {
 			defer close(c.recvCh)
-
-			buf := make([]byte, 64*1024)
 			for {
+				buf := elStackReadBufPool.Get().([]byte)
 				n, err := c.inner.Read(buf)
+
+				if n > 0 {
+					pkt := readPacket{buf: buf, n: n}
+					select {
+					case c.recvCh <- pkt:
+					case <-c.closeCh:
+						elStackReadBufPool.Put(buf)
+						return
+					}
+				} else {
+					elStackReadBufPool.Put(buf)
+				}
+
 				if err != nil {
 					select {
 					case c.recvErrCh <- err:
 					default:
 					}
-					return
-				}
-				if n == 0 {
-					continue
-				}
-				p := make([]byte, n)
-				copy(p, buf[:n])
-
-				select {
-				case c.recvCh <- p:
-				case <-c.closeCh:
 					return
 				}
 			}
@@ -198,9 +214,14 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
 
-	if len(c.readBuf) > 0 {
-		n := copy(b, c.readBuf)
-		c.readBuf = c.readBuf[n:]
+	if c.hasPacket {
+		n := copy(b, c.pending.buf[c.pending.off:c.pending.n])
+		c.pending.off += n
+		if c.pending.off >= c.pending.n {
+			elStackReadBufPool.Put(c.pending.buf)
+			c.pending = readPacket{}
+			c.hasPacket = false
+		}
 		return n, nil
 	}
 
@@ -218,12 +239,15 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 				return 0, io.EOF
 			}
 		}
-		if len(pkt) <= len(b) {
-			n := copy(b, pkt)
+		if pkt.n <= len(b) {
+			n := copy(b, pkt.buf[:pkt.n])
+			elStackReadBufPool.Put(pkt.buf)
 			return n, nil
 		}
-		n := copy(b, pkt[:len(b)])
-		c.readBuf = append(c.readBuf[:0], pkt[n:]...)
+		n := copy(b, pkt.buf[:pkt.n])
+		pkt.off = n
+		c.pending = pkt
+		c.hasPacket = true
 		return n, nil
 	}
 }
