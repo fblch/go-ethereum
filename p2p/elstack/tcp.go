@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -129,19 +130,22 @@ func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn
 }
 
 type ElStackTcpConn struct {
-	inner     net.Conn
-	laddr     net.Addr
-	raddr     net.Addr
-	readMu    sync.Mutex
-	readOnce  sync.Once
-	pending   readPacket
-	hasPacket bool
-	recvCh    chan readPacket
-	recvErrCh chan error
-	closed    atomic.Bool
-	closeOnce sync.Once
-	closeErr  error
-	closeCh   chan struct{}
+	inner        net.Conn
+	laddr        net.Addr
+	raddr        net.Addr
+	readMu       sync.Mutex
+	readOnce     sync.Once
+	pending      readPacket
+	hasPacket    bool
+	recvCh       chan readPacket
+	recvErrCh    chan error
+	readDLmu     sync.Mutex
+	readDeadline time.Time
+	readDLCh     chan struct{}
+	closed       atomic.Bool
+	closeOnce    sync.Once
+	closeErr     error
+	closeCh      chan struct{}
 }
 
 type readPacket struct {
@@ -165,6 +169,7 @@ func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
 		laddr:     c.LocalAddr(),
 		recvCh:    make(chan readPacket, 128),
 		recvErrCh: make(chan error, 1),
+		readDLCh:  make(chan struct{}),
 		closeCh:   make(chan struct{}),
 	}
 	conn.startReader()
@@ -225,30 +230,43 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 		return n, nil
 	}
 
-	select {
-	case <-c.closeCh:
-		return 0, net.ErrClosed
-	case err := <-c.recvErrCh:
-		return 0, err
-	case pkt, ok := <-c.recvCh:
-		if !ok {
-			select {
-			case err := <-c.recvErrCh:
-				return 0, err
-			default:
-				return 0, io.EOF
+	for {
+		deadline, deadlineChanged := c.snapshotReadDeadline()
+		timer := newReadDeadlineTimer(deadline)
+
+		select {
+		case <-c.closeCh:
+			stopReadDeadlineTimer(timer)
+			return 0, net.ErrClosed
+		case <-deadlineChanged:
+			stopReadDeadlineTimer(timer)
+			continue
+		case <-readDeadlineTimerC(timer):
+			return 0, os.ErrDeadlineExceeded
+		case err := <-c.recvErrCh:
+			stopReadDeadlineTimer(timer)
+			return 0, err
+		case pkt, ok := <-c.recvCh:
+			stopReadDeadlineTimer(timer)
+			if !ok {
+				select {
+				case err := <-c.recvErrCh:
+					return 0, err
+				default:
+					return 0, io.EOF
+				}
 			}
-		}
-		if pkt.n <= len(b) {
+			if pkt.n <= len(b) {
+				n := copy(b, pkt.buf[:pkt.n])
+				elStackReadBufPool.Put(pkt.buf)
+				return n, nil
+			}
 			n := copy(b, pkt.buf[:pkt.n])
-			elStackReadBufPool.Put(pkt.buf)
+			pkt.off = n
+			c.pending = pkt
+			c.hasPacket = true
 			return n, nil
 		}
-		n := copy(b, pkt.buf[:pkt.n])
-		pkt.off = n
-		c.pending = pkt
-		c.hasPacket = true
-		return n, nil
 	}
 }
 
@@ -271,8 +289,64 @@ func (c *ElStackTcpConn) Close() error {
 	return c.closeErr
 }
 
-func (c *ElStackTcpConn) LocalAddr() net.Addr                { return c.laddr }
-func (c *ElStackTcpConn) RemoteAddr() net.Addr               { return c.raddr }
-func (c *ElStackTcpConn) SetDeadline(t time.Time) error      { return c.inner.SetDeadline(t) }
-func (c *ElStackTcpConn) SetReadDeadline(t time.Time) error  { return c.inner.SetReadDeadline(t) }
+func (c *ElStackTcpConn) LocalAddr() net.Addr  { return c.laddr }
+func (c *ElStackTcpConn) RemoteAddr() net.Addr { return c.raddr }
+func (c *ElStackTcpConn) SetDeadline(t time.Time) error {
+	if err := c.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return c.SetWriteDeadline(t)
+}
+
+func (c *ElStackTcpConn) SetReadDeadline(t time.Time) error {
+	if c == nil || c.inner == nil {
+		return net.ErrClosed
+	}
+	if c.closed.Load() {
+		return net.ErrClosed
+	}
+	c.readDLmu.Lock()
+	c.readDeadline = t
+	close(c.readDLCh)
+	c.readDLCh = make(chan struct{})
+	c.readDLmu.Unlock()
+	return nil
+}
+
 func (c *ElStackTcpConn) SetWriteDeadline(t time.Time) error { return c.inner.SetWriteDeadline(t) }
+
+func (c *ElStackTcpConn) snapshotReadDeadline() (time.Time, <-chan struct{}) {
+	c.readDLmu.Lock()
+	defer c.readDLmu.Unlock()
+	return c.readDeadline, c.readDLCh
+}
+
+func newReadDeadlineTimer(deadline time.Time) *time.Timer {
+	if deadline.IsZero() {
+		return nil
+	}
+	timeout := time.Until(deadline)
+	if timeout <= 0 {
+		return time.NewTimer(0)
+	}
+	return time.NewTimer(timeout)
+}
+
+func stopReadDeadlineTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+}
+
+func readDeadlineTimerC(timer *time.Timer) <-chan time.Time {
+	if timer == nil {
+		return nil
+	}
+	return timer.C
+}
