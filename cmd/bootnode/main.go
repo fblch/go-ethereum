@@ -152,7 +152,15 @@ func main() {
 		if err != nil {
 			utils.Fatalf("EL setup failed: %v", err)
 		}
-		*listenAddr = addr.String() + *listenAddr
+		baseListen := *listenAddr
+		if baseListen == "" {
+			utils.Fatalf("EL enabled requires non-empty -addr")
+		}
+		_, port, err := net.SplitHostPort(baseListen)
+		if err != nil {
+			utils.Fatalf("invalid -addr %q: %v", baseListen, err)
+		}
+		*listenAddr = net.JoinHostPort(addr.String(), port)
 		listenUDPFunc = elstack.ListenELUDP
 	}
 	// ADDED by Hinata AWAIISHIMA END
