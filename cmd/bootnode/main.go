@@ -35,6 +35,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 )
 
+const initialELResultsBufferSize = 8
+
 func main() {
 	var (
 		listenAddr  = flag.String("addr", ":30301", "listen address")
@@ -146,7 +148,7 @@ func main() {
 			ServerPort:    *elServerPort,
 			ServerCACert:  cert,
 		}
-		results := make(chan elstack.LinkedResult, 1)
+		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 		go elstack.SetupEL(elCfg, results, nil)
 		addr, err := elstack.WaitInitialEL(results)
 		if err != nil {
@@ -161,6 +163,7 @@ func main() {
 			utils.Fatalf("invalid -addr %q: %v", baseListen, err)
 		}
 		*listenAddr = net.JoinHostPort(addr.String(), port)
+		go monitorEL(results)
 		listenUDPFunc = elstack.ListenELUDP
 	}
 	// ADDED by Hinata AWAIISHIMA END
@@ -218,6 +221,15 @@ func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
 	fmt.Println(n.URLv4())
 	fmt.Println("Note: you're using cmd/bootnode, a developer tool.")
 	fmt.Println("We recommend using a regular node as bootstrap node for production deployments.")
+}
+
+func monitorEL(results <-chan elstack.LinkedResult) {
+	for result := range results {
+		if result.Err != nil {
+			log.Error("EL link disconnected", "reason", result.Err)
+		}
+	}
+	log.Error("LinkedResult channel is disabled")
 }
 
 func doPortMapping(natm nat.Interface, ln *enode.LocalNode, addr *net.UDPAddr) *net.UDPAddr {
