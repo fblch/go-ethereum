@@ -3,6 +3,7 @@ package p2p
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack"
@@ -50,6 +51,9 @@ func (srv *Server) setupEL() error {
 }
 
 func (srv *Server) applyELBindings(addr net.IP, baseListen string) error {
+	if strings.TrimSpace(baseListen) == "" {
+		return fmt.Errorf("EL enabled requires non-empty ListenAddr")
+	}
 	_, port, err := net.SplitHostPort(baseListen)
 	if err != nil {
 		return fmt.Errorf("invalid base ListenAddr %q: %w", baseListen, err)
