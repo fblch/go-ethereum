@@ -2,6 +2,7 @@ package elstack
 
 import (
 	"errors"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -149,6 +150,31 @@ func TestElStackTcpConnReadCanResumeAfterDeadlineTimeout(t *testing.T) {
 	}
 	if string(buf[:n]) != "abc" {
 		t.Fatalf("unexpected payload: %q", string(buf[:n]))
+	}
+}
+
+func TestElStackTcpConnReadReturnsDataBeforeTerminalError(t *testing.T) {
+	inner := newDeadlineTrackingConn()
+	conn := newElStackTcpConn(inner)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	inner.enqueueRead([]byte("abc"), io.EOF)
+
+	buf := make([]byte, 8)
+	n, err := conn.Read(buf)
+	if err != nil {
+		t.Fatalf("first read should return payload without terminal error, got: %v", err)
+	}
+	if n != 3 || string(buf[:n]) != "abc" {
+		t.Fatalf("unexpected first read result n=%d payload=%q", n, string(buf[:n]))
+	}
+
+	n, err = conn.Read(buf)
+	if n != 0 {
+		t.Fatalf("expected zero bytes on terminal read, got %d", n)
+	}
+	if !errors.Is(err, io.EOF) {
+		t.Fatalf("expected io.EOF on terminal read, got: %v", err)
 	}
 }
 

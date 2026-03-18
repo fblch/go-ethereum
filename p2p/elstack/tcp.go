@@ -136,9 +136,9 @@ type ElStackTcpConn struct {
 	readMu       sync.Mutex
 	readOnce     sync.Once
 	pending      readPacket
+	pendingErr   error
 	hasPacket    bool
 	recvCh       chan readPacket
-	recvErrCh    chan error
 	readDLmu     sync.Mutex
 	readDeadline time.Time
 	readDLCh     chan struct{}
@@ -152,6 +152,7 @@ type readPacket struct {
 	buf []byte
 	off int
 	n   int
+	err error
 }
 
 const elStackReadChunkSize = 64 * 1024
@@ -168,7 +169,6 @@ func newElStackTcpConn(c net.Conn) *ElStackTcpConn {
 		raddr:     c.RemoteAddr(),
 		laddr:     c.LocalAddr(),
 		recvCh:    make(chan readPacket, 128),
-		recvErrCh: make(chan error, 1),
 		readDLCh:  make(chan struct{}),
 		closeCh:   make(chan struct{}),
 	}
@@ -185,11 +185,15 @@ func (c *ElStackTcpConn) startReader() {
 				n, err := c.inner.Read(buf)
 
 				if n > 0 {
-					pkt := readPacket{buf: buf, n: n}
+					// Keep payload and terminal error in one event to preserve order.
+					pkt := readPacket{buf: buf, n: n, err: err}
 					select {
 					case c.recvCh <- pkt:
 					case <-c.closeCh:
 						elStackReadBufPool.Put(buf)
+						return
+					}
+					if err != nil {
 						return
 					}
 				} else {
@@ -198,7 +202,7 @@ func (c *ElStackTcpConn) startReader() {
 
 				if err != nil {
 					select {
-					case c.recvErrCh <- err:
+					case c.recvCh <- readPacket{err: err}:
 					default:
 					}
 					return
@@ -219,10 +223,19 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
 
+	if c.pendingErr != nil {
+		err := c.pendingErr
+		c.pendingErr = nil
+		return 0, err
+	}
+
 	if c.hasPacket {
 		n := copy(b, c.pending.buf[c.pending.off:c.pending.n])
 		c.pending.off += n
 		if c.pending.off >= c.pending.n {
+			if c.pending.err != nil {
+				c.pendingErr = c.pending.err
+			}
 			elStackReadBufPool.Put(c.pending.buf)
 			c.pending = readPacket{}
 			c.hasPacket = false
@@ -243,21 +256,19 @@ func (c *ElStackTcpConn) Read(b []byte) (n int, err error) {
 			continue
 		case <-readDeadlineTimerC(timer):
 			return 0, os.ErrDeadlineExceeded
-		case err := <-c.recvErrCh:
-			stopReadDeadlineTimer(timer)
-			return 0, err
 		case pkt, ok := <-c.recvCh:
 			stopReadDeadlineTimer(timer)
 			if !ok {
-				select {
-				case err := <-c.recvErrCh:
-					return 0, err
-				default:
-					return 0, io.EOF
-				}
+				return 0, io.EOF
+			}
+			if pkt.n == 0 && pkt.err != nil {
+				return 0, pkt.err
 			}
 			if pkt.n <= len(b) {
 				n := copy(b, pkt.buf[:pkt.n])
+				if pkt.err != nil {
+					c.pendingErr = pkt.err
+				}
 				elStackReadBufPool.Put(pkt.buf)
 				return n, nil
 			}
