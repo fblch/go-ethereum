@@ -1,204 +1,80 @@
 package elstack
 
 import (
+	"context"
 	"errors"
-	"io"
 	"net"
-	"os"
-	"sync"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
-type testAddr string
-
-func (a testAddr) Network() string { return "tcp" }
-func (a testAddr) String() string  { return string(a) }
-
-type readResult struct {
-	data []byte
-	err  error
-}
-
-type deadlineTrackingConn struct {
-	readCh    chan readResult
-	closeOnce sync.Once
-	closeCh   chan struct{}
-
-	mu                 sync.Mutex
-	readDeadlineCalls  int
-	writeDeadlineCalls int
-}
-
-func newDeadlineTrackingConn() *deadlineTrackingConn {
-	return &deadlineTrackingConn{
-		readCh:  make(chan readResult, 16),
-		closeCh: make(chan struct{}),
+func TestListenELTCPRejectsEmptyInputs(t *testing.T) {
+	if _, err := ListenELTCP("", "127.0.0.1:30303"); err == nil {
+		t.Fatal("expected error for empty network")
+	}
+	if _, err := ListenELTCP("tcp", ""); err == nil {
+		t.Fatal("expected error for empty address")
 	}
 }
 
-func (c *deadlineTrackingConn) enqueueRead(data []byte, err error) {
-	payload := append([]byte(nil), data...)
-	c.readCh <- readResult{data: payload, err: err}
-}
+func TestEnsureDialContextKeepsExistingDeadline(t *testing.T) {
+	dialer := NewElStackTcpDialer(3 * time.Second)
+	base, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-func (c *deadlineTrackingConn) deadlineCalls() (readCalls int, writeCalls int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.readDeadlineCalls, c.writeDeadlineCalls
-}
-
-func (c *deadlineTrackingConn) Read(b []byte) (int, error) {
-	select {
-	case <-c.closeCh:
-		return 0, net.ErrClosed
-	case res := <-c.readCh:
-		n := copy(b, res.data)
-		return n, res.err
+	ctx, release := dialer.ensureDialContext(base)
+	if release != nil {
+		t.Fatal("expected nil cancel func when context already has deadline")
+	}
+	baseDeadline, _ := base.Deadline()
+	ctxDeadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("expected deadline to exist")
+	}
+	if !ctxDeadline.Equal(baseDeadline) {
+		t.Fatalf("deadline changed unexpectedly: base=%v ctx=%v", baseDeadline, ctxDeadline)
 	}
 }
 
-func (c *deadlineTrackingConn) Write(b []byte) (int, error) {
-	select {
-	case <-c.closeCh:
-		return 0, net.ErrClosed
-	default:
-		return len(b), nil
+func TestEnsureDialContextAddsTimeoutWhenMissing(t *testing.T) {
+	dialer := NewElStackTcpDialer(2 * time.Second)
+	ctx, cancel := dialer.ensureDialContext(context.Background())
+	if cancel == nil {
+		t.Fatal("expected cancel func for context without deadline")
+	}
+	defer cancel()
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("expected deadline to be added")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 || remaining > 3*time.Second {
+		t.Fatalf("unexpected timeout window: %v", remaining)
 	}
 }
 
-func (c *deadlineTrackingConn) Close() error {
-	c.closeOnce.Do(func() {
-		close(c.closeCh)
-	})
-	return nil
-}
-
-func (c *deadlineTrackingConn) LocalAddr() net.Addr           { return testAddr("127.0.0.1:1") }
-func (c *deadlineTrackingConn) RemoteAddr() net.Addr          { return testAddr("127.0.0.1:2") }
-func (c *deadlineTrackingConn) SetDeadline(t time.Time) error { return nil }
-func (c *deadlineTrackingConn) SetReadDeadline(t time.Time) error {
-	c.mu.Lock()
-	c.readDeadlineCalls++
-	c.mu.Unlock()
-	return nil
-}
-func (c *deadlineTrackingConn) SetWriteDeadline(t time.Time) error {
-	c.mu.Lock()
-	c.writeDeadlineCalls++
-	c.mu.Unlock()
-	return nil
-}
-
-func TestElStackTcpConnReadDeadlineCanBeShortenedWhileBlocking(t *testing.T) {
-	inner := newDeadlineTrackingConn()
-	conn := newElStackTcpConn(inner)
-	t.Cleanup(func() { _ = conn.Close() })
-
-	if err := conn.SetReadDeadline(time.Now().Add(time.Hour)); err != nil {
-		t.Fatalf("SetReadDeadline failed: %v", err)
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		buf := make([]byte, 1)
-		_, err := conn.Read(buf)
-		errCh <- err
-	}()
-
-	time.Sleep(25 * time.Millisecond)
-	if err := conn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
-		t.Fatalf("SetReadDeadline update failed: %v", err)
-	}
-
-	select {
-	case err := <-errCh:
-		if !errors.Is(err, os.ErrDeadlineExceeded) {
-			t.Fatalf("expected deadline exceeded, got: %v", err)
-		}
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("Read did not wake after deadline update")
+func TestDialRejectsNilDestination(t *testing.T) {
+	dialer := NewElStackTcpDialer(time.Second)
+	_, err := dialer.Dial(context.Background(), nil)
+	if !errors.Is(err, ErrELStackDialDestinationNil) {
+		t.Fatalf("expected ErrELStackDialDestinationNil, got %v", err)
 	}
 }
 
-func TestElStackTcpConnReadCanResumeAfterDeadlineTimeout(t *testing.T) {
-	inner := newDeadlineTrackingConn()
-	conn := newElStackTcpConn(inner)
-	t.Cleanup(func() { _ = conn.Close() })
-
-	if err := conn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
-		t.Fatalf("SetReadDeadline failed: %v", err)
-	}
-
-	buf := make([]byte, 4)
-	_, err := conn.Read(buf)
-	if !errors.Is(err, os.ErrDeadlineExceeded) {
-		t.Fatalf("expected first read timeout, got: %v", err)
-	}
-
-	if err := conn.SetReadDeadline(time.Time{}); err != nil {
-		t.Fatalf("failed to clear read deadline: %v", err)
-	}
-	inner.enqueueRead([]byte("abc"), nil)
-
-	n, err := conn.Read(buf)
+func TestDialRejectsNodeWithoutTCPEndpoint(t *testing.T) {
+	key, err := crypto.GenerateKey()
 	if err != nil {
-		t.Fatalf("second read failed: %v", err)
+		t.Fatalf("GenerateKey failed: %v", err)
 	}
-	if n != 3 {
-		t.Fatalf("expected 3 bytes, got %d", n)
-	}
-	if string(buf[:n]) != "abc" {
-		t.Fatalf("unexpected payload: %q", string(buf[:n]))
-	}
-}
+	node := enode.NewV4(&key.PublicKey, net.ParseIP("127.0.0.1"), 0, 30303)
 
-func TestElStackTcpConnReadReturnsDataBeforeTerminalError(t *testing.T) {
-	inner := newDeadlineTrackingConn()
-	conn := newElStackTcpConn(inner)
-	t.Cleanup(func() { _ = conn.Close() })
-
-	inner.enqueueRead([]byte("abc"), io.EOF)
-
-	buf := make([]byte, 8)
-	n, err := conn.Read(buf)
-	if err != nil {
-		t.Fatalf("first read should return payload without terminal error, got: %v", err)
-	}
-	if n != 3 || string(buf[:n]) != "abc" {
-		t.Fatalf("unexpected first read result n=%d payload=%q", n, string(buf[:n]))
-	}
-
-	n, err = conn.Read(buf)
-	if n != 0 {
-		t.Fatalf("expected zero bytes on terminal read, got %d", n)
-	}
-	if !errors.Is(err, io.EOF) {
-		t.Fatalf("expected io.EOF on terminal read, got: %v", err)
-	}
-}
-
-func TestElStackTcpConnDeadlinesAreHandledInWrapper(t *testing.T) {
-	inner := newDeadlineTrackingConn()
-	conn := newElStackTcpConn(inner)
-	t.Cleanup(func() { _ = conn.Close() })
-
-	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-		t.Fatalf("SetReadDeadline failed: %v", err)
-	}
-	readCalls, writeCalls := inner.deadlineCalls()
-	if readCalls != 0 || writeCalls != 0 {
-		t.Fatalf("expected no inner deadline calls after SetReadDeadline, got read=%d write=%d", readCalls, writeCalls)
-	}
-
-	if err := conn.SetDeadline(time.Now().Add(time.Second)); err != nil {
-		t.Fatalf("SetDeadline failed: %v", err)
-	}
-	readCalls, writeCalls = inner.deadlineCalls()
-	if readCalls != 0 {
-		t.Fatalf("expected inner SetReadDeadline to stay unused, got %d calls", readCalls)
-	}
-	if writeCalls != 1 {
-		t.Fatalf("expected one inner SetWriteDeadline call, got %d", writeCalls)
+	dialer := NewElStackTcpDialer(time.Second)
+	_, err = dialer.Dial(context.Background(), node)
+	if !errors.Is(err, ErrELStackDialDestinationTCP) {
+		t.Fatalf("expected ErrELStackDialDestinationTCP, got %v", err)
 	}
 }
