@@ -12,6 +12,7 @@ import (
 
 type ElStackUdpConn struct {
 	inner *el_stack.ElStackUdpConn
+	laddr net.Addr
 }
 
 // ListenELUDP is a thin wrapper around el_stack.NewElStackUdpConn.
@@ -23,7 +24,7 @@ func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ElStackUdpConn{inner: c}, nil
+	return &ElStackUdpConn{inner: c, laddr: c.LocalAddr()}, nil
 }
 
 func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (int, netip.AddrPort, error) {
@@ -55,7 +56,13 @@ func (c *ElStackUdpConn) Close() error {
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
-	if c == nil || c.inner == nil {
+	if c == nil {
+		return nil
+	}
+	if c.laddr != nil {
+		return c.laddr
+	}
+	if c.inner == nil {
 		return nil
 	}
 	return c.inner.LocalAddr()

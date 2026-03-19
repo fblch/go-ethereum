@@ -3,6 +3,7 @@ package elstack
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -10,6 +11,29 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
+
+type testAddr string
+
+func (a testAddr) Network() string { return "tcp" }
+func (a testAddr) String() string  { return string(a) }
+
+type addrAwareConn struct {
+	local  net.Addr
+	remote net.Addr
+}
+
+func (c *addrAwareConn) Read(_ []byte) (int, error)         { return 0, io.EOF }
+func (c *addrAwareConn) Write(b []byte) (int, error)        { return len(b), nil }
+func (c *addrAwareConn) SetDeadline(_ time.Time) error      { return nil }
+func (c *addrAwareConn) SetReadDeadline(_ time.Time) error  { return nil }
+func (c *addrAwareConn) SetWriteDeadline(_ time.Time) error { return nil }
+func (c *addrAwareConn) LocalAddr() net.Addr                { return c.local }
+func (c *addrAwareConn) RemoteAddr() net.Addr               { return c.remote }
+func (c *addrAwareConn) Close() error {
+	c.local = nil
+	c.remote = nil
+	return nil
+}
 
 func TestListenELTCPRejectsEmptyInputs(t *testing.T) {
 	if _, err := ListenELTCP("", "127.0.0.1:30303"); err == nil {
@@ -76,5 +100,35 @@ func TestDialRejectsNodeWithoutTCPEndpoint(t *testing.T) {
 	_, err = dialer.Dial(context.Background(), node)
 	if !errors.Is(err, ErrELStackDialDestinationTCP) {
 		t.Fatalf("expected ErrELStackDialDestinationTCP, got %v", err)
+	}
+}
+
+func TestElStackTcpConnRetainsAddressesAfterClose(t *testing.T) {
+	const (
+		wantLocal  = "127.0.0.1:30303"
+		wantRemote = "127.0.0.1:30304"
+	)
+	inner := &addrAwareConn{
+		local:  testAddr(wantLocal),
+		remote: testAddr(wantRemote),
+	}
+	conn := newElStackTcpConn(inner)
+	if conn == nil {
+		t.Fatal("expected wrapped conn")
+	}
+	if got := conn.LocalAddr().String(); got != wantLocal {
+		t.Fatalf("unexpected local addr before close: %s", got)
+	}
+	if got := conn.RemoteAddr().String(); got != wantRemote {
+		t.Fatalf("unexpected remote addr before close: %s", got)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+	if got := conn.LocalAddr().String(); got != wantLocal {
+		t.Fatalf("unexpected local addr after close: %s", got)
+	}
+	if got := conn.RemoteAddr().String(); got != wantRemote {
+		t.Fatalf("unexpected remote addr after close: %s", got)
 	}
 }
