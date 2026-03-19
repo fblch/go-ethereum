@@ -520,9 +520,9 @@ func (t *UDPv4) loop() {
 }
 
 func (t *UDPv4) send(toaddr netip.AddrPort, toid enode.ID, req v4wire.Packet) ([]byte, error) {
-    packet, hash, err := v4wire.Encode(t.priv, req)
-    if err != nil {
-        return hash, err
+	packet, hash, err := v4wire.Encode(t.priv, req)
+	if err != nil {
+		return hash, err
 	}
 	return hash, t.write(toaddr, toid, req.Name(), packet)
 }
