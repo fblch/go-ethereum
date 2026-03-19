@@ -420,6 +420,7 @@ func (h *handshakeState) runRecipient(conn io.ReadWriter, prv *ecdsa.PrivateKey)
 	if err := h.handleAuthMsg(authMsg, prv); err != nil {
 		return s, err
 	}
+
 	authRespMsg, err := h.makeAuthResp()
 	if err != nil {
 		return s, err
@@ -431,6 +432,7 @@ func (h *handshakeState) runRecipient(conn io.ReadWriter, prv *ecdsa.PrivateKey)
 	if _, err = conn.Write(authRespPacket); err != nil {
 		return s, err
 	}
+
 	return h.secrets(authPacket, authRespPacket)
 }
 
@@ -521,9 +523,11 @@ func (h *handshakeState) runInitiator(conn io.ReadWriter, prv *ecdsa.PrivateKey,
 	if err != nil {
 		return s, err
 	}
+
 	if _, err = conn.Write(authPacket); err != nil {
 		return s, err
 	}
+
 	authRespMsg := new(authRespV4)
 	authRespPacket, err := h.readMsg(authRespMsg, prv, conn)
 	if err != nil {
@@ -532,6 +536,7 @@ func (h *handshakeState) runInitiator(conn io.ReadWriter, prv *ecdsa.PrivateKey,
 	if err := h.handleAuthResp(authRespMsg); err != nil {
 		return s, err
 	}
+
 	return h.secrets(authPacket, authRespPacket)
 }
 
