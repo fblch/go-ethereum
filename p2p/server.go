@@ -345,7 +345,7 @@ func (srv *Server) Stop() {
 // sharedUDPConn cloudn't handle original UDP Connection struct because net.UDPConn is not interfece but struct.
 // To changed to handle discover.UDPConn interface and can handle original UDP connection structs that is implemented discover.UDPConn interface.
 type sharedUDPConn struct {
-	under     discover.UDPConn
+	discover.UDPConn
 	unhandled chan discover.ReadPacket
 }
 
@@ -366,24 +366,6 @@ func (s *sharedUDPConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPor
 // Close implements discover.UDPConn
 func (s *sharedUDPConn) Close() error {
 	return nil
-}
-
-// ADDED by Hinata AWAIISHIMA
-// WriteToUDPAddrPort forwards write calls to the underlying UDPConn with diagnostics.
-func (s *sharedUDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
-	if s.under == nil {
-		return 0, fmt.Errorf("sharedUDPConn: underlying is nil")
-	}
-	return s.under.WriteToUDPAddrPort(b, addr)
-}
-
-// ADDED by Hinata AWAIISHIMA
-// LocalAddr forwards to the underlying UDPConn.
-func (s *sharedUDPConn) LocalAddr() net.Addr {
-	if s.under == nil {
-		return nil
-	}
-	return s.under.LocalAddr()
 }
 
 // Start starts running the server.
@@ -504,11 +486,7 @@ func (srv *Server) setupDiscovery() error {
 		return nil
 	}
 
-	// ADDED by Hinata AWAIISHIMA BEG
-	var conn discover.UDPConn
-	var err error
-	// ADDED by Hinata AWAIISHIMA END
-	conn, err = srv.setupUDPListening()
+	conn, err := srv.setupUDPListening()
 	if err != nil {
 		return err
 	}
@@ -521,7 +499,7 @@ func (srv *Server) setupDiscovery() error {
 	// connection, so v5 can read unhandled messages from v4.
 	if srv.Config.DiscoveryV4 && srv.Config.DiscoveryV5 {
 		unhandled = make(chan discover.ReadPacket, 100)
-		sconn = &sharedUDPConn{under: conn, unhandled: unhandled}
+		sconn = &sharedUDPConn{conn, unhandled}
 	}
 
 	// Start discovery services.
@@ -545,7 +523,6 @@ func (srv *Server) setupDiscovery() error {
 			PrivateKey:  srv.PrivateKey,
 			NetRestrict: srv.NetRestrict,
 			Bootnodes:   srv.BootstrapNodesV5,
-			Unhandled:   unhandled,
 			Log:         srv.log,
 		}
 		srv.discv5, err = discover.ListenV5(sconn, srv.localnode, cfg)
@@ -644,7 +621,6 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	if srv.DiscAddr != "" {
 		listenAddr = srv.DiscAddr
 	}
-
 	addr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return nil, err
