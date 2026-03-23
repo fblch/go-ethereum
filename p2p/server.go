@@ -485,7 +485,6 @@ func (srv *Server) setupDiscovery() error {
 	if srv.NoDiscovery {
 		return nil
 	}
-
 	conn, err := srv.setupUDPListening()
 	if err != nil {
 		return err
