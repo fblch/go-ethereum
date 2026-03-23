@@ -14,6 +14,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"runtime"
@@ -4393,6 +4394,14 @@ func (c *ElStackUdpConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 	return n, udpAddr, nil
 }
 
+func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	n, udpAddr, err := c.ReadFromUDP(b)
+	if err != nil {
+		return 0, netip.AddrPort{}, err
+	}
+	return n, udpAddr.AddrPort(), nil
+}
+
 func (c *ElStackUdpConn) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
 	if c.closed {
 		return 0, os.ErrClosed
@@ -4412,6 +4421,10 @@ func (c *ElStackUdpConn) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
 		return 0, mapSocketErrorToIO(err)
 	}
 	return int(n), nil
+}
+
+func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
+	return c.WriteToUDP(b, net.UDPAddrFromAddrPort(addr))
 }
 
 func (c *ElStackUdpConn) Close() error {
