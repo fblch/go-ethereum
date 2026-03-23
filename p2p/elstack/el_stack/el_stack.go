@@ -3,8 +3,6 @@ package el_stack
 // #cgo CFLAGS: -I${SRCDIR}
 // #cgo !android LDFLAGS: ${SRCDIR}/libs/linux/libel_stack.a -lm
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack.a -lm
-// #cgo darwin,!ios,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack.a -lm
-// #cgo !darwin,ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack.a -lm
 // #include <el_stack.h>
 import "C"
 
@@ -3990,7 +3988,11 @@ func UdpBind(bindAddr string) (*UdpSocket, *SocketError) {
 // ======================= TCP =======================
 
 type ElStackTcpConn struct {
-	stream *TcpStream
+	stream  *TcpStream
+	network string
+
+	localAddr  *net.TCPAddr
+	remoteAddr *net.TCPAddr
 
 	// 受信系
 	recvCh    chan []byte
@@ -4008,11 +4010,36 @@ type ElStackTcpConn struct {
 	deadline      time.Time
 }
 
-func newElStackTcpConnFromStream(stream *TcpStream) *ElStackTcpConn {
+func resolveTCPAddrOrZero(network, addr string) *net.TCPAddr {
+	if network == "" {
+		network = "tcp"
+	}
+	tcpAddr, err := net.ResolveTCPAddr(network, addr)
+	if err != nil {
+		return &net.TCPAddr{}
+	}
+	return tcpAddr
+}
+
+func resolveUDPAddrOrZero(network, addr string) *net.UDPAddr {
+	if network == "" {
+		network = "udp"
+	}
+	udpAddr, err := net.ResolveUDPAddr(network, addr)
+	if err != nil {
+		return &net.UDPAddr{}
+	}
+	return udpAddr
+}
+
+func newElStackTcpConnFromStream(stream *TcpStream, network string) *ElStackTcpConn {
 	c := &ElStackTcpConn{
-		stream:    stream,
-		recvCh:    make(chan []byte, 128),
-		recvErrCh: make(chan error, 1),
+		stream:     stream,
+		network:    network,
+		localAddr:  resolveTCPAddrOrZero(network, stream.LocalAddr()),
+		remoteAddr: resolveTCPAddrOrZero(network, stream.PeerAddr()),
+		recvCh:     make(chan []byte, 128),
+		recvErrCh:  make(chan error, 1),
 	}
 	c.startReader()
 	return c
@@ -4053,12 +4080,13 @@ func NewElStackTcpConn(network, address string) (net.Conn, error) {
 		return nil, mapSocketErrorToIO(serr)
 	}
 
-	return newElStackTcpConnFromStream(stream), nil
+	return newElStackTcpConnFromStream(stream, network), nil
 }
 
 type ElStackTcpListener struct {
 	listener *TcpListener
 	network  string
+	addr     *net.TCPAddr
 	closed   atomic.Bool
 }
 
@@ -4076,6 +4104,7 @@ func NewElStackTcpListener(network, address string) (net.Listener, error) {
 	return &ElStackTcpListener{
 		listener: listener,
 		network:  network,
+		addr:     resolveTCPAddrOrZero(network, listener.BindAddr()),
 	}, nil
 }
 
@@ -4090,7 +4119,7 @@ func (l *ElStackTcpListener) Accept() (net.Conn, error) {
 			return nil, mapSocketErrorToIO(err)
 		}
 
-		return newElStackTcpConnFromStream(stream), nil
+		return newElStackTcpConnFromStream(stream, l.network), nil
 	}
 }
 
@@ -4103,12 +4132,7 @@ func (l *ElStackTcpListener) Close() error {
 }
 
 func (l *ElStackTcpListener) Addr() net.Addr {
-	addrStr := l.listener.BindAddr()
-	addr, err := net.ResolveTCPAddr(l.network, addrStr)
-	if err != nil {
-		return &net.TCPAddr{}
-	}
-	return addr
+	return l.addr
 }
 
 // -------- helpers: deadline -> seconds ----------
@@ -4259,21 +4283,11 @@ func (c *ElStackTcpConn) Close() error {
 }
 
 func (c *ElStackTcpConn) LocalAddr() net.Addr {
-	s := c.stream.LocalAddr()
-	a, err := net.ResolveTCPAddr("tcp", s)
-	if err != nil {
-		return &net.TCPAddr{}
-	}
-	return a
+	return c.localAddr
 }
 
 func (c *ElStackTcpConn) RemoteAddr() net.Addr {
-	s := c.stream.PeerAddr()
-	a, err := net.ResolveTCPAddr("tcp", s)
-	if err != nil {
-		return &net.TCPAddr{}
-	}
-	return a
+	return c.remoteAddr
 }
 
 func (c *ElStackTcpConn) SetDeadline(t time.Time) error {
@@ -4298,8 +4312,9 @@ func (c *ElStackTcpConn) SetWriteDeadline(t time.Time) error {
 type ElStackUdpConn struct {
 	sock *UdpSocket
 
-	network string
-	closed  bool
+	network   string
+	localAddr *net.UDPAddr
+	closed    bool
 
 	// 送信直列化
 	sendMu sync.Mutex
@@ -4342,7 +4357,11 @@ func NewElStackUdpConn(network string, laddr *net.UDPAddr) (*ElStackUdpConn, err
 		return nil, mapSocketErrorToIO(serr)
 	}
 
-	return &ElStackUdpConn{sock: sock, network: network}, nil
+	return &ElStackUdpConn{
+		sock:      sock,
+		network:   network,
+		localAddr: resolveUDPAddrOrZero(network, sock.LocalAddr()),
+	}, nil
 }
 
 func toElStackAddr(addr *net.UDPAddr) string {
@@ -4405,16 +4424,7 @@ func (c *ElStackUdpConn) Close() error {
 }
 
 func (c *ElStackUdpConn) LocalAddr() net.Addr {
-	s := c.sock.LocalAddr()
-	network := c.network
-	if network == "" {
-		network = "udp"
-	}
-	a, err := net.ResolveUDPAddr(network, s)
-	if err != nil {
-		return &net.UDPAddr{}
-	}
-	return a
+	return c.localAddr
 }
 
 func (c *ElStackUdpConn) SetDeadline(t time.Time) error {
