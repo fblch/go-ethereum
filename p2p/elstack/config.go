@@ -54,42 +54,17 @@ func ValidateELConfig(cfg *ELConfig) error {
 	return nil
 }
 
-func ClearELMobileConfig(
-	use *bool,
-	holderVC *string,
-	holderPrivKey *string,
-	antiOverlap *string,
-	issuerPubKey *string,
-	serverAddr *string,
-	serverPort *int,
-	serverCACert *string,
-	capturePath *string,
-) {
-	if use != nil {
-		*use = false
+func ClearELMobileConfig(cfg *ELConfig) {
+	if cfg == nil {
+		return
 	}
-	if holderVC != nil {
-		*holderVC = ""
-	}
-	if holderPrivKey != nil {
-		*holderPrivKey = ""
-	}
-	if antiOverlap != nil {
-		*antiOverlap = ""
-	}
-	if issuerPubKey != nil {
-		*issuerPubKey = ""
-	}
-	if serverAddr != nil {
-		*serverAddr = ""
-	}
-	if serverPort != nil {
-		*serverPort = 0
-	}
-	if serverCACert != nil {
-		*serverCACert = ""
-	}
-	if capturePath != nil {
-		*capturePath = ""
-	}
+	cfg.Use = false
+	cfg.HolderVC = ""
+	cfg.HolderPrivKey = ""
+	cfg.AntiOverlap = ""
+	cfg.IssuerPubKey = ""
+	cfg.ServerAddr = ""
+	cfg.ServerPort = 0
+	cfg.ServerCACert = ""
+	cfg.CapturePath = ""
 }

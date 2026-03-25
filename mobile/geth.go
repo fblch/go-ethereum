@@ -380,6 +380,17 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
 	// ADDED by Hinata AWAIISHIMA BEG
+	EL := elstack.ELConfig {
+		Use: config.ELUse,
+		HolderVC: config.ELHolderVC,
+		HolderPrivKey: config.ELHolderPrivKey,
+		AntiOverlap: config.ELAntiOverlap,
+		IssuerPubKey: config.ELIssuerPubKey,
+		ServerAddr: config.ELServerAddr,
+		ServerPort: config.ELServerPort,
+		ServerCACert: config.ELServerCACert,
+		CapturePath: config.ELCapturePath,
+	}
 	if !config.ELUse {
 		needsClear := false
 		if config.ELHolderVC != "" {
@@ -414,12 +425,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config combination: ELCapturePath is not empty but ELUse is set false")
 			needsClear = true
 		}
-
 		if needsClear {
-			elstack.ClearELMobileConfig(
-				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, &config.ELCapturePath,
-			)
+			elstack.ClearELMobileConfig(&EL)
 		}
 	} else {
 		missing := false
@@ -447,12 +454,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config combination: ELServerPort is not positive but ELUse is set true")
 			missing = true
 		}
-
 		if missing {
-			elstack.ClearELMobileConfig(
-				&config.ELUse, &config.ELHolderVC, &config.ELHolderPrivKey, &config.ELAntiOverlap,
-				&config.ELIssuerPubKey, &config.ELServerAddr, &config.ELServerPort, &config.ELServerCACert, &config.ELCapturePath,
-			)
+			elstack.ClearELMobileConfig(&EL)
 		}
 	}
 	// ADDED by Hinata AWAIISHIMA END
@@ -491,17 +494,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
 			MaxPeers:         config.MaxPeers,
 			// ADDED by Hinata AWAIISHIMA
-			EL: &elstack.ELConfig{
-				Use:           config.ELUse,
-				HolderVC:      config.ELHolderVC,
-				HolderPrivKey: config.ELHolderPrivKey,
-				AntiOverlap:   config.ELAntiOverlap,
-				IssuerPubKey:  config.ELIssuerPubKey,
-				ServerAddr:    config.ELServerAddr,
-				ServerPort:    config.ELServerPort,
-				ServerCACert:  config.ELServerCACert,
-				CapturePath:   config.ELCapturePath,
-			},
+			EL: &EL,
 		},
 	}
 
