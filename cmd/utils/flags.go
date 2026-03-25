@@ -1292,7 +1292,7 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		capturePath := ctx.String(ELCapturePathFlag.Name)
-		cfg.EL.CapturePath = &capturePath
+		cfg.EL.CapturePath = capturePath
 	}
 }
 
