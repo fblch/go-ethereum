@@ -115,7 +115,7 @@ func main() {
 	}
 
 	// ADDED by Hinata AWAIISHIMA BEG
-	listenUDPFunc := ListenUDP
+	listenUDPFunc := net.ListenUDP
 	if *elUse {
 		cert, err := elstack.ReadCertFile(*elServerCACert)
 		if err != nil {
@@ -205,12 +205,6 @@ func main() {
 	}
 
 	select {}
-}
-
-// ADDED by Hinata AWAIISHIMA
-// function of wrapper to return discover.UDPConn interface
-func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
-	return net.ListenUDP(network, addr)
 }
 
 func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
