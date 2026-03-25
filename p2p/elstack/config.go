@@ -17,7 +17,7 @@ type ELConfig struct {
 	ServerAddr    string
 	ServerPort    int
 	ServerCACert  string
-	CapturePath   *string
+	CapturePath   string
 }
 
 var (

@@ -263,8 +263,6 @@ var defaultNodeConfig = &NodeConfig{
 	// ADDED by Jakub Pajek END
 	// ADDED by Hinata AWAIISHIMA
 	ELUse: false,
-	// ADDED by Hinata AWAIISHIMA
-	ELCapturePath: "",
 }
 
 // NewNodeConfig creates a new node option set, initialized to the default values.
@@ -465,11 +463,6 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	}
 	// ADDED by Jakub Pajek END
 
-	var capturePathPtr *string
-	if config.ELCapturePath != "" {
-		capturePathPtr = &config.ELCapturePath
-	}
-
 	// Create the empty networking stack
 	nodeConf := &node.Config{
 		Name: clientIdentifier,
@@ -507,7 +500,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				ServerAddr:    config.ELServerAddr,
 				ServerPort:    config.ELServerPort,
 				ServerCACert:  config.ELServerCACert,
-				CapturePath:   capturePathPtr,
+				CapturePath:   config.ELCapturePath,
 			},
 		},
 	}
