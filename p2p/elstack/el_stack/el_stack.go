@@ -4056,7 +4056,7 @@ func isSupportedTcpNetwork(network string) bool {
 }
 
 // NewElStackTcpConn は net.Dial と同じ引数を受け取り、TcpConnect を通じて net.Conn 互換の接続を生成します。
-func NewElStackTcpConn(network, address string) (net.Conn, error) {
+func NewElStackTcpConn(network, address string, timeout time.Duration) (net.Conn, error) {
 	if !isSupportedTcpNetwork(network) {
 		return nil, fmt.Errorf("unsupported network: %s", network)
 	}
@@ -4075,10 +4075,11 @@ func NewElStackTcpConn(network, address string) (net.Conn, error) {
 			host = "localhost"
 		}
 	}
+	dialAddr := opAddr(network, net.JoinHostPort(host, port))
 
-	stream, serr := TcpConnect(host, port, 0)
+	stream, serr := TcpConnect(host, port, uint64(timeout.Seconds()))
 	if serr != nil {
-		return nil, mapSocketErrorToIO(serr)
+		return nil, mapSocketErrorToNetError("dial", network, nil, dialAddr, serr)
 	}
 
 	return newElStackTcpConnFromStream(stream, network), nil
@@ -4099,7 +4100,7 @@ func NewElStackTcpListener(network, address string) (net.Listener, error) {
 
 	listener, serr := TcpBind(address)
 	if serr != nil {
-		return nil, mapSocketErrorToIO(serr)
+		return nil, mapSocketErrorToNetError("listen", network, nil, opAddr(network, address), serr)
 	}
 
 	return &ElStackTcpListener{
@@ -4112,12 +4113,12 @@ func NewElStackTcpListener(network, address string) (net.Listener, error) {
 func (l *ElStackTcpListener) Accept() (net.Conn, error) {
 	for {
 		if l.closed.Load() {
-			return nil, os.ErrClosed
+			return nil, net.ErrClosed
 		}
 
 		stream, err := l.listener.Accept(0)
 		if err != nil {
-			return nil, mapSocketErrorToIO(err)
+			return nil, mapSocketErrorToNetError("accept", l.network, nil, l.addr, err)
 		}
 
 		return newElStackTcpConnFromStream(stream, l.network), nil
@@ -4126,7 +4127,7 @@ func (l *ElStackTcpListener) Accept() (net.Conn, error) {
 
 func (l *ElStackTcpListener) Close() error {
 	if l.closed.Swap(true) {
-		return os.ErrClosed
+		return net.ErrClosed
 	}
 	l.listener.Destroy()
 	return nil
@@ -4195,7 +4196,7 @@ func (c *ElStackTcpConn) startReader() {
 
 func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 	if c.closed.Load() {
-		return 0, os.ErrClosed
+		return 0, net.ErrClosed
 	}
 
 	// 期限タイマー（ユーザー体感の即時性のため）
@@ -4225,7 +4226,7 @@ func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 				if err == io.EOF {
 					return 0, io.EOF
 				}
-				return 0, mapSocketErrorToIO(err)
+				return 0, mapSocketReadErrorToNetError(c.closed.Load(), c.network, c.localAddr, c.remoteAddr, err)
 			default:
 				return 0, io.EOF
 			}
@@ -4244,7 +4245,7 @@ func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 		if err == io.EOF {
 			return 0, io.EOF
 		}
-		return 0, mapSocketErrorToIO(err)
+		return 0, mapSocketReadErrorToNetError(c.closed.Load(), c.network, c.localAddr, c.remoteAddr, err)
 
 	case <-timerC(timer):
 		return 0, os.ErrDeadlineExceeded
@@ -4253,7 +4254,7 @@ func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 
 func (c *ElStackTcpConn) Write(b []byte) (int, error) {
 	if c.closed.Load() {
-		return 0, os.ErrClosed
+		return 0, net.ErrClosed
 	}
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
@@ -4269,13 +4270,13 @@ func (c *ElStackTcpConn) Write(b []byte) (int, error) {
 	if err := c.stream.Send(p, timeoutSecs); isNilError(err) {
 		return len(b), nil
 	} else {
-		return 0, mapSocketErrorToIO(err)
+		return 0, mapSocketErrorToNetError("write", c.network, c.localAddr, c.remoteAddr, err)
 	}
 }
 
 func (c *ElStackTcpConn) Close() error {
 	if c.closed.Swap(true) {
-		return os.ErrClosed
+		return net.ErrClosed
 	}
 	// Rust側 close（Destroy で ARC 解放・Close 呼び出しは Rust 実装に合わせる）
 	c.stream.Close()
@@ -4355,7 +4356,7 @@ func NewElStackUdpConn(network string, laddr *net.UDPAddr) (*ElStackUdpConn, err
 
 	sock, serr := UdpBind(bindAddr)
 	if serr != nil {
-		return nil, mapSocketErrorToIO(serr)
+		return nil, mapSocketErrorToNetError("listen", network, nil, opAddr(network, bindAddr), serr)
 	}
 
 	return &ElStackUdpConn{
@@ -4374,7 +4375,7 @@ func toElStackAddr(addr *net.UDPAddr) string {
 
 func (c *ElStackUdpConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 	if c.closed {
-		return 0, nil, os.ErrClosed
+		return 0, nil, net.ErrClosed
 	}
 	// 期限切れ即時判定
 	if !c.readDeadline.IsZero() && time.Until(c.readDeadline) <= 0 {
@@ -4384,7 +4385,7 @@ func (c *ElStackUdpConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 	timeoutSecs := ceilSeconds(time.Until(c.readDeadline))
 	ret, err := c.sock.RecvFrom(timeoutSecs) // Rust 側で timeout 秒を処理
 	if err != nil {
-		return 0, nil, mapSocketErrorToIO(err)
+		return 0, nil, mapSocketErrorToNetError("read", c.network, c.localAddr, nil, err)
 	}
 	n := copy(b, ret.Buf)
 	udpAddr, err2 := net.ResolveUDPAddr("udp", ret.FromAddr)
@@ -4404,7 +4405,7 @@ func (c *ElStackUdpConn) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPo
 
 func (c *ElStackUdpConn) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
 	if c.closed {
-		return 0, os.ErrClosed
+		return 0, net.ErrClosed
 	}
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
@@ -4418,7 +4419,7 @@ func (c *ElStackUdpConn) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
 	rawAddr := toElStackAddr(addr)
 	n, err := c.sock.SendTo(b, rawAddr, timeoutSecs)
 	if err != nil {
-		return 0, mapSocketErrorToIO(err)
+		return 0, mapSocketErrorToNetError("write", c.network, c.localAddr, addr, err)
 	}
 	return int(n), nil
 }
@@ -4429,7 +4430,7 @@ func (c *ElStackUdpConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int,
 
 func (c *ElStackUdpConn) Close() error {
 	if c.closed {
-		return os.ErrClosed
+		return net.ErrClosed
 	}
 	c.closed = true
 	c.sock.Destroy()
@@ -4475,34 +4476,109 @@ func isNilError(err error) bool {
 	return v.Kind() == reflect.Ptr && v.IsNil()
 }
 
-// Rust側の SocketError 群を Go の一般的な I/O エラーにマップ
-func mapSocketErrorToIO(err error) error {
+type stringNetAddr struct {
+	network string
+	address string
+}
+
+func (a stringNetAddr) Network() string {
+	return a.network
+}
+
+func (a stringNetAddr) String() string {
+	return a.address
+}
+
+func normalizeNetAddr(addr net.Addr) net.Addr {
+	if addr == nil {
+		return nil
+	}
+	v := reflect.ValueOf(addr)
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		return nil
+	}
+	return addr
+}
+
+func netAddrString(addr net.Addr) string {
+	addr = normalizeNetAddr(addr)
+	if addr == nil {
+		return ""
+	}
+	return addr.String()
+}
+
+func opAddr(network, address string) net.Addr {
+	if address == "" {
+		return nil
+	}
+	return stringNetAddr{network: network, address: address}
+}
+
+func mapSocketReadErrorToNetError(closed bool, network string, sourceAddr, addr net.Addr, err error) error {
 	if isNilError(err) {
 		return nil
 	}
-	if errors.Is(err, ErrSocketErrorConnectionClosed) {
+	if err == io.EOF {
 		return io.EOF
 	}
-	if errors.Is(err, ErrSocketErrorTcpConnectError) ||
-		errors.Is(err, ErrSocketErrorTcpAcceptError) ||
-		errors.Is(err, ErrSocketErrorTcpBindError) ||
-		errors.Is(err, ErrSocketErrorUdpBindError) ||
-		errors.Is(err, ErrSocketErrorQuicConnectError) {
-		return os.ErrClosed
+	if errors.Is(err, ErrSocketErrorConnectionClosed) && !closed {
+		return io.EOF
 	}
-	if errors.Is(err, ErrSocketErrorTlsError) ||
-		errors.Is(err, ErrSocketErrorTlsHandshakeError) ||
-		errors.Is(err, ErrSocketErrorInvalidCertificateError) {
-		return io.ErrUnexpectedEOF
+	return mapSocketErrorToNetError("read", network, sourceAddr, addr, err)
+}
+
+// Rust側の SocketError 群を Go の net 互換エラーにマップ
+func mapSocketErrorToNetError(op, network string, sourceAddr, addr net.Addr, err error) error {
+	if isNilError(err) {
+		return nil
 	}
-	if errors.Is(err, ErrSocketErrorAddressConvertError) ||
-		errors.Is(err, ErrSocketErrorInvalidHostnameError) ||
-		errors.Is(err, ErrSocketErrorAddressError) {
-		return errors.New("invalid address")
+	sourceAddr = normalizeNetAddr(sourceAddr)
+	addr = normalizeNetAddr(addr)
+
+	mkOpErr := func(inner error) error {
+		return &net.OpError{
+			Op:     op,
+			Net:    network,
+			Source: sourceAddr,
+			Addr:   addr,
+			Err:    inner,
+		}
 	}
-	if errors.Is(err, ErrSocketErrorNameResolvError) {
-		return errors.New("name resolution failed")
+
+	addrText := netAddrString(addr)
+	if addrText == "" {
+		addrText = netAddrString(sourceAddr)
 	}
-	// デフォルトはオリジナルを返す
-	return err
+	dnsName := addrText
+	if host, _, splitErr := net.SplitHostPort(dnsName); splitErr == nil {
+		dnsName = host
+	}
+
+	switch {
+	case errors.Is(err, ErrSocketErrorConnectionClosed):
+		return net.ErrClosed
+	case errors.Is(err, ErrSocketErrorTcpConnectTimeout),
+		errors.Is(err, ErrSocketErrorTlsHandshakeTimeout),
+		errors.Is(err, ErrSocketErrorTcpAcceptTimeout),
+		errors.Is(err, ErrSocketErrorTcpRecvTimeout),
+		errors.Is(err, ErrSocketErrorTcpSendTimeout),
+		errors.Is(err, ErrSocketErrorUdpRecvTimeout),
+		errors.Is(err, ErrSocketErrorUdpSendTimeout):
+		return mkOpErr(os.ErrDeadlineExceeded)
+	case errors.Is(err, ErrSocketErrorAddressConvertError),
+		errors.Is(err, ErrSocketErrorInvalidHostnameError),
+		errors.Is(err, ErrSocketErrorAddressError):
+		return mkOpErr(&net.AddrError{
+			Err:  "invalid address",
+			Addr: addrText,
+		})
+	case errors.Is(err, ErrSocketErrorNameResolvError):
+		return mkOpErr(&net.DNSError{
+			Err:  "name resolution failed",
+			Name: dnsName,
+		})
+	default:
+		return mkOpErr(err)
+	}
 }

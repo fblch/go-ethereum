@@ -46,5 +46,5 @@ func (d ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn,
 	// p2p.tcpDialer.Dial only gets the TCPEndpoint and calls net.Dailer.DialContext,
 	// so we do the same here for consistency, but call el_stack.NewElStackTcpConn instead.
 	addr, _ := dest.TCPEndpoint()
-	return el_stack.NewElStackTcpConn("tcp", addr.String(), timeout.Seconds())
+	return el_stack.NewElStackTcpConn("tcp", addr.String(), timeout)
 }
