@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -66,17 +67,7 @@ func ReadOrCreateAntiOverlap(path string) (string, error) {
 }
 
 func isAlphaNumeric32(s string) bool {
-	if len(s) != 32 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-			continue
-		}
-		return false
-	}
-	return true
+	return regexp.MustCompile("^[a-zA-Z0-9]{32}$").MatchString(s)
 }
 
 func randomAlphaNumeric32() (string, error) {
