@@ -62,7 +62,7 @@ func (srv *Server) applyELBindings(addr net.IP, baseListen string) error {
 	srv.localnode.SetStaticIP(addr) // update staticIP to el_stack IPAddr
 	srv.ListenAddr = net.JoinHostPort(addr.String(), port)
 	srv.listenFunc = elstack.ListenELTCP
-	srv.Dialer = elstack.NewElStackTcpDialer(defaultDialTimeout)
+	srv.Dialer = elstack.ElStackTcpDialer{Timeout: defaultDialTimeout}
 	srv.listenUDPFunc = elstack.ListenELUDP
 	return nil
 }

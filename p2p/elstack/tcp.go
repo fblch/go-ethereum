@@ -2,17 +2,12 @@ package elstack
 
 import (
 	"context"
-	"errors"
 	"net"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-)
-
-var (
-	ErrELStackDialDestinationNil = errors.New("EL stack dial destination is nil")
-	ErrELStackDialDestinationTCP = errors.New("EL stack dial destination has no TCP endpoint")
 )
 
 // ListenELTCP directly calls el_stack.NewElStackTcpListener.
@@ -20,54 +15,36 @@ func ListenELTCP(network, addr string) (net.Listener, error) {
 	return el_stack.NewElStackTcpListener(network, addr)
 }
 
+// ElStackTcpDialer implements NodeDialer using EL tunneled TCP connections.
 type ElStackTcpDialer struct {
-	dialTimeout time.Duration
+	Timeout time.Duration
 }
 
-func NewElStackTcpDialer(timeout time.Duration) *ElStackTcpDialer {
-	return &ElStackTcpDialer{dialTimeout: timeout}
-}
-
-func (d *ElStackTcpDialer) ensureDialContext(ctx context.Context) (context.Context, context.CancelFunc) {
+// Dial implements NodeDialer interface using EL tunneled TCP connections.
+func (d ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, error) {
+	// net.Dailer.DialContext also panics if ctx is nil, so we do the same here for consistency.
 	if ctx == nil {
-		ctx = context.Background()
-	}
-	if _, ok := ctx.Deadline(); ok || d == nil || d.dialTimeout <= 0 {
-		return ctx, nil
-	}
-	return context.WithTimeout(ctx, d.dialTimeout)
-}
-
-func (d *ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, error) {
-	if dest == nil {
-		return nil, ErrELStackDialDestinationNil
-	}
-	addr, ok := dest.TCPEndpoint()
-	if !ok {
-		return nil, ErrELStackDialDestinationTCP
+		panic("nil context")
 	}
 
-	ctx, cancel := d.ensureDialContext(ctx)
-	if cancel != nil {
-		defer cancel()
+	// Choose the smaller value from the dialer's Timeout and the context's deadline, if any.
+	// Zero means no timeout, values smallert than a millisecond cause immediate timeout.
+	timeout := d.Timeout
+	if timeout < 0 || timeout > 0 && timeout < time.Second {
+		return nil, os.ErrDeadlineExceeded
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		timeUntilDeadline := time.Until(deadline)
+		if timeUntilDeadline < time.Second {
+			return nil, os.ErrDeadlineExceeded
+		}
+		if timeout == 0 || timeUntilDeadline < timeout {
+			timeout = timeUntilDeadline
+		}
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
-	conn, err := el_stack.NewElStackTcpConn("tcp", addr.String())
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-ctx.Done():
-		_ = conn.Close()
-		return nil, ctx.Err()
-	default:
-		return conn, nil
-	}
+	// p2p.tcpDialer.Dial only gets the TCPEndpoint and calls net.Dailer.DialContext,
+	// so we do the same here for consistency, but call el_stack.NewElStackTcpConn instead.
+	addr, _ := dest.TCPEndpoint()
+	return el_stack.NewElStackTcpConn("tcp", addr.String(), timeout.Seconds())
 }
