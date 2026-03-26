@@ -3996,11 +3996,9 @@ type ElStackTcpConn struct {
 	remoteAddr *net.TCPAddr
 
 	// 受信系
-	recvCh    chan []byte
-	recvErrCh chan error
-	readBuf   []byte
-	readOnce  sync.Once
-	closed    atomic.Bool
+	readMu  sync.Mutex
+	readBuf []byte
+	closed  atomic.Bool
 
 	// 送信直列化
 	sendMu sync.Mutex
@@ -4034,16 +4032,12 @@ func resolveUDPAddrOrZero(network, addr string) *net.UDPAddr {
 }
 
 func newElStackTcpConnFromStream(stream *TcpStream, network string) *ElStackTcpConn {
-	c := &ElStackTcpConn{
+	return &ElStackTcpConn{
 		stream:     stream,
 		network:    network,
 		localAddr:  resolveTCPAddrOrZero(network, stream.LocalAddr()),
 		remoteAddr: resolveTCPAddrOrZero(network, stream.PeerAddr()),
-		recvCh:     make(chan []byte, 128),
-		recvErrCh:  make(chan error, 1),
 	}
-	c.startReader()
-	return c
 }
 
 func isSupportedTcpNetwork(network string) bool {
@@ -4160,55 +4154,16 @@ func (c *ElStackTcpConn) sendTimeoutSecsFromDeadline() uint64 {
 	return ceilSeconds(time.Until(c.writeDeadline))
 }
 
-func (c *ElStackTcpConn) startReader() {
-	c.readOnce.Do(func() {
-		go func() {
-			defer close(c.recvCh)
-			for !c.closed.Load() {
-				// Read 締切を毎ループ反映して Rust 側に委譲
-				timeoutSecs := c.recvTimeoutSecsFromDeadline()
-				data, err := c.stream.RecvSafe(timeoutSecs)
-				if err != nil {
-					// io.EOF などもここに流して Read 側で受け取る
-					select {
-					case c.recvErrCh <- err:
-					default:
-					}
-					return
-				}
-				if len(data) == 0 {
-					// 0バイト＝EOF扱い
-					select {
-					case c.recvErrCh <- io.EOF:
-					default:
-					}
-					return
-				}
-				// 次段でバッファ再利用されないようコピーしておく
-				p := make([]byte, len(data))
-				copy(p, data)
-				// バックプレッシャ：満杯時はブロックしてでも運ぶ
-				c.recvCh <- p
-			}
-		}()
-	})
-}
-
 func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 	if c.closed.Load() {
 		return 0, net.ErrClosed
 	}
-
-	// 期限タイマー（ユーザー体感の即時性のため）
-	timer := (*time.Timer)(nil)
-	if !c.readDeadline.IsZero() {
-		if d := time.Until(c.readDeadline); d <= 0 {
-			return 0, os.ErrDeadlineExceeded
-		} else {
-			timer = time.NewTimer(d)
-			defer timer.Stop()
-		}
+	if len(b) == 0 {
+		return 0, nil
 	}
+
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
 
 	// 余りがあれば先に返す
 	if len(c.readBuf) > 0 {
@@ -4217,39 +4172,26 @@ func (c *ElStackTcpConn) Read(b []byte) (int, error) {
 		return n, nil
 	}
 
-	select {
-	case pkt, ok := <-c.recvCh:
-		if !ok {
-			// 読み終わり。エラーが来ていればそちらを優先
-			select {
-			case err := <-c.recvErrCh:
-				if err == io.EOF {
-					return 0, io.EOF
-				}
-				return 0, mapSocketReadErrorToNetError(c.closed.Load(), c.network, c.localAddr, c.remoteAddr, err)
-			default:
-				return 0, io.EOF
-			}
-		}
-		// b に入るだけ入れて、余りは readBuf へ
-		if len(pkt) <= len(b) {
-			n := copy(b, pkt)
-			return n, nil
-		} else {
-			n := copy(b, pkt[:len(b)])
-			c.readBuf = append(c.readBuf[:0], pkt[n:]...)
-			return n, nil
-		}
-
-	case err := <-c.recvErrCh:
-		if err == io.EOF {
-			return 0, io.EOF
-		}
-		return 0, mapSocketReadErrorToNetError(c.closed.Load(), c.network, c.localAddr, c.remoteAddr, err)
-
-	case <-timerC(timer):
+	// 期限切れ即時判定
+	if !c.readDeadline.IsZero() && time.Until(c.readDeadline) <= 0 {
 		return 0, os.ErrDeadlineExceeded
 	}
+
+	timeoutSecs := c.recvTimeoutSecsFromDeadline()
+	pkt, err := c.stream.RecvSafe(timeoutSecs)
+	if err != nil {
+		return 0, mapSocketReadErrorToNetError(c.closed.Load(), c.network, c.localAddr, c.remoteAddr, err)
+	}
+
+	// b に入るだけ入れて、余りは readBuf へ
+	if len(pkt) <= len(b) {
+		n := copy(b, pkt)
+		return n, nil
+	}
+
+	n := copy(b, pkt[:len(b)])
+	c.readBuf = append(c.readBuf[:0], pkt[n:]...)
+	return n, nil
 }
 
 func (c *ElStackTcpConn) Write(b []byte) (int, error) {
@@ -4456,15 +4398,6 @@ func (c *ElStackUdpConn) SetReadDeadline(t time.Time) error {
 func (c *ElStackUdpConn) SetWriteDeadline(t time.Time) error {
 	c.writeDeadline = t
 	return nil
-}
-
-// timerC は nil セーフなタイマー用チャネル取得
-func timerC(t *time.Timer) <-chan time.Time {
-	if t == nil {
-		// nil の場合は読み出せないチャネルを返す（select の他分岐だけが有効になる）
-		return make(<-chan time.Time)
-	}
-	return t.C
 }
 
 // 型付き nil (e.g. *SomeError(nil)) を正しく判定するためのヘルパ
