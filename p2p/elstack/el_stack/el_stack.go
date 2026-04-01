@@ -1,10 +1,8 @@
 package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
-// #cgo !darwin,ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack.a -lm
-// #cgo darwin,!ios,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack.a -lm
+// #cgo !android LDFLAGS: ${SRCDIR}/libs/linux/libel_stack.a -lm
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack.a -lm
-// #cgo linux,!ios,!darwin,!android LDFLAGS: ${SRCDIR}/libs/linux/libel_stack.a -lm
 // #include <el_stack.h>
 import "C"
 
