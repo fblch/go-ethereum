@@ -148,59 +148,56 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.
-	elLog.Debug("SetupEL arg", "cfg.ServerAddr", cfg.ServerAddr)
-	elLog.Debug("SetupEL arg", "cfg.ServerPort", cfg.ServerPort)
+	elLog.Info("SetupEL arg", "cfg.ServerAddr", cfg.ServerAddr)
+	elLog.Info("SetupEL arg", "cfg.ServerPort", cfg.ServerPort)
 
-	vpnTimeoutSec := uint64(30)
+	vc := cfg.HolderVC
+	vcPrivKey := cfg.HolderPrivKey
+	issuerPubkey := cfg.IssuerPubKey
+
+	vpnHost := cfg.ServerAddr
+	vpnPort := strconv.Itoa(cfg.ServerPort)
+
+	antiOverlap := cfg.AntiOverlap
+
 	vpnKeepAliveSec := uint64(10)
+	vpnTimeoutSec := uint64(30)
+
 	vpnCfg := el_stack.NewElStackVpnConfig(
-		cfg.ServerAddr,
-		strconv.Itoa(cfg.ServerPort),
-		cfg.AntiOverlap,
-		vpnTimeoutSec,
-		vpnKeepAliveSec,
+		vpnHost, vpnPort, antiOverlap,
+		vpnTimeoutSec, vpnKeepAliveSec,
 		el_stack.ElStackVpnConnectionTypeQuic,
 	)
 
 	productName := "go-ethereum-el"
 	productVersion := "0.1.0"
 	productPlatform := "Linux"
-	prodCfg := el_stack.NewElStackProductConfig(
-		productName,
-		productVersion,
-		productPlatform,
-		cfg.ServerCACert,
-		1280,
-	)
 
-	// args of el_stack.NewElStackSocketBufferConfig
-	maxBurstSize := uint64(1024)
+	prodCfg := el_stack.NewElStackProductConfig(productName, productVersion, productPlatform, cfg.ServerCACert, 1280)
+
 	// default:
 	// tcpBuffSize := uint64(16384)
 	// udpBuffSize := uint64(8192)
 	// udpMetaSize := uint64(32)
-
+	// buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
+	// todo: reserch to default android default tcp/udp buffer statuses
 	// AndroidOS:
 	tcpBuffSize := uint64(131072)
 	udpBuffSize := uint64(212992)
 	udpMetaSize := uint64(32)
-
 	// iOS:
 	// tcpBuffSize := uint64(65536)
 	// udpBuffSize := uint64(65536)
 	// udpMetaSize := uint64(32)
-
-	// buffCfg := el_stack.NewElStackSocketBufferConfig(1024, nil, nil, nil)
-	buffCfg := el_stack.NewElStackSocketBufferConfig(
-		maxBurstSize,
-		&tcpBuffSize,
-		&udpBuffSize,
-		&udpMetaSize,
-	)
+	maxBurstSize := uint64(1024)
+	// tcpBuffSize := uint64(65536)
+	// udpBuffSize := uint64(65536)
+	// udpMetaSize := uint64(2048)
+	buffCfg := el_stack.NewElStackSocketBufferConfig(maxBurstSize, &tcpBuffSize, &udpBuffSize, &udpMetaSize)
 
 	el_stack.Initialize(prodCfg, buffCfg)
 
-	vcCfg := el_stack.NewElStackVcConfig(cfg.HolderVC, cfg.HolderPrivKey, cfg.IssuerPubKey)
+	vcCfg := el_stack.NewElStackVcConfig(vc, vcPrivKey, issuerPubkey)
 
 	delegate := &VpnDelegate{results: resultStream}
 
