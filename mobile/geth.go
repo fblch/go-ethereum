@@ -380,24 +380,82 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
 	// ADDED by Hinata AWAIISHIMA BEG
-	EL := elstack.ELConfig{}
-	if config.ELUse {
-		el := elstack.ELConfig{
-			Use:           config.ELUse,
-			HolderVC:      config.ELHolderVC,
-			HolderPrivKey: config.ELHolderPrivKey,
-			AntiOverlap:   config.ELAntiOverlap,
-			IssuerPubKey:  config.ELIssuerPubKey,
-			ServerAddr:    config.ELServerAddr,
-			ServerPort:    config.ELServerPort,
-			ServerCACert:  config.ELServerCACert,
-			CapturePath:   config.ELCapturePath,
+	EL := elstack.ELConfig {
+		Use: config.ELUse,
+		HolderVC: config.ELHolderVC,
+		HolderPrivKey: config.ELHolderPrivKey,
+		AntiOverlap: config.ELAntiOverlap,
+		IssuerPubKey: config.ELIssuerPubKey,
+		ServerAddr: config.ELServerAddr,
+		ServerPort: config.ELServerPort,
+		ServerCACert: config.ELServerCACert,
+		CapturePath: config.ELCapturePath,
+	}
+	if !config.ELUse {
+		needsClear := false
+		if config.ELHolderVC != "" {
+			log.Warn("invalid config combination: ELHolderVC is not empty but ELUse is set false")
+			needsClear = true
 		}
-		
-		if err := elstack.ValidateMobileELConfig(&el); err == nil {
-			EL = el
-		} else {
-			log.Warn("invalid config: some of EL config values are invalid")
+		if config.ELHolderPrivKey != "" {
+			log.Warn("invalid config combination: ELHolderPrivKey is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELAntiOverlap != "" {
+			log.Warn("invalid config combination: ELAntiOverlap is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELIssuerPubKey != "" {
+			log.Warn("invalid config combination: ELIssuerPubKey is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerAddr != "" {
+			log.Warn("invalid config combination: ELServerAddr is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerPort != 0 {
+			log.Warn("invalid config combination: ELServerPort is not 0 but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELServerCACert != "" {
+			log.Warn("invalid config combination: ELServerCACert is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if config.ELCapturePath != "" {
+			log.Warn("invalid config combination: ELCapturePath is not empty but ELUse is set false")
+			needsClear = true
+		}
+		if needsClear {
+			elstack.ClearELMobileConfig(&EL)
+		}
+	} else {
+		missing := false
+		if config.ELHolderVC == "" {
+			log.Warn("invalid config combination: ELHolderVC is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELHolderPrivKey == "" {
+			log.Warn("invalid config combination: ELHolderPrivKey is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELAntiOverlap == "" {
+			log.Warn("invalid config combination: ELAntiOverlap is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELIssuerPubKey == "" {
+			log.Warn("invalid config combination: ELIssuerPubKey is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELServerAddr == "" {
+			log.Warn("invalid config combination: ELServerAddr is empty but ELUse is set true")
+			missing = true
+		}
+		if config.ELServerPort <= 0 {
+			log.Warn("invalid config combination: ELServerPort is not positive but ELUse is set true")
+			missing = true
+		}
+		if missing {
+			elstack.ClearELMobileConfig(&EL)
 		}
 	}
 	// ADDED by Hinata AWAIISHIMA END

@@ -54,12 +54,17 @@ func ValidateELConfig(cfg *ELConfig) error {
 	return nil
 }
 
-func ValidateMobileELConfig(cfg *ELConfig) error {
-	if err := ValidateELConfig(cfg); err != nil {
-		return err
+func ClearELMobileConfig(cfg *ELConfig) {
+	if cfg == nil {
+		return
 	}
-	if strings.TrimSpace(cfg.ServerCACert) == "" {
-		return fmt.Errorf("ServerCACert is required value to boot on mobile")
-	}
-	return nil
+	cfg.Use = false
+	cfg.HolderVC = ""
+	cfg.HolderPrivKey = ""
+	cfg.AntiOverlap = ""
+	cfg.IssuerPubKey = ""
+	cfg.ServerAddr = ""
+	cfg.ServerPort = 0
+	cfg.ServerCACert = ""
+	cfg.CapturePath = ""
 }
