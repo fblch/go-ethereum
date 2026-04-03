@@ -2,7 +2,7 @@ package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
 // #cgo ios,!darwin LDFLAGS: ${SRCDIR}/libs/ios/libel_stack.a -lm
-// #cgo !ios,darwin LDFLAGS: ${SRCDIR}/libs/darwin/libel_stack.a -lm
+// #cgo darwin,!ios LDFLAGS: ${SRCDIR}/libs/darwin/libel_stack.a -lm -framework SystemConfiguration -framework CoreFoundation
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack.a -lm
 // #cgo !android,!ios,!darwin LDFLAGS: ${SRCDIR}/libs/linux/libel_stack.a -lm
 // #include <el_stack.h>
