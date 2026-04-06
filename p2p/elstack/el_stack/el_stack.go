@@ -1,6 +1,7 @@
 package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
+// #cgo windows LDFLAGS: ${SRCDIR}/libs/windows/libel_stack.a -lm -liphlpapi -luserenv -lntdll
 // #cgo ios,!darwin LDFLAGS: ${SRCDIR}/libs/ios/libel_stack.a -lm
 // #cgo darwin,!ios LDFLAGS: ${SRCDIR}/libs/darwin/libel_stack.a -lm -framework SystemConfiguration -framework CoreFoundation
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack.a -lm
