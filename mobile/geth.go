@@ -193,41 +193,41 @@ type NodeConfig struct {
 	// to keep in clique snapshot cache (default: 128).
 	CliqueSnapshotCacheCount int
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELUse is the bool flag that the client uses emotion-link connections or not
 	ELUse bool
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELHolderVC is the client verifiable credential of emotion-link
 	ELHolderVC string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELHolderPrivKey is the private key string of the VC holder
 	ELHolderPrivKey string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELAntiOverlap blocks Duplicating of the connection from same client
 	// This value is a number, but when setting it, it needs to be a string.
 	ELAntiOverlap string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELIssuerPubKey is the VC Issuer's public key string
 	ELIssuerPubKey string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELServerAddr is the emotion-link host server name
 	ELServerAddr string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELServerPort is the emotion-link port of host server
 	// This value is a number, but when setting it, it needs to be a string.
 	ELServerPort int
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELServerCACert is the CA certs to connect to the emotion-link server
 	ELServerCACert string
 
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELCapturePath is the file path to store packet captures for emotion-link
 	ELCapturePath string
 }
