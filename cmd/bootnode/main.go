@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 )
 
+// ADDED by Hinata AWAIISHIMA (EL)
 const initialELResultsBufferSize = 8
 
 func main() {
@@ -51,7 +52,7 @@ func main() {
 		runv5       = flag.Bool("v5", false, "run a v5 topic discovery bootnode")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-5)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
-		// ADDED by Hinata AWAIISHIMA (el settings)
+		// ADDED by Hinata AWAIISHIMA BEG (EL)
 		elUse          = flag.Bool("el.use", false, "enable emotion link support")
 		elHolderVC     = flag.String("el.vc", "", "emotion link verifiable credential file path")
 		elHolderPriv   = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
@@ -60,6 +61,7 @@ func main() {
 		elServerAddr   = flag.String("el.host", "", "emotion link server host")
 		elServerPort   = flag.Int("el.port", 0, "emotion link server service port")
 		elServerCACert = flag.String("el.servercacert", "", "using server CA certificate")
+		// ADDED by Hinata AWAIISHIMA END (EL)
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -114,7 +116,7 @@ func main() {
 		}
 	}
 
-	// ADDED by Hinata AWAIISHIMA BEG
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	listenUDPFunc := ListenUDP
 	if *elUse {
 		cert, err := elstack.ReadCertFile(*elServerCACert)
@@ -166,12 +168,14 @@ func main() {
 		go monitorEL(results)
 		listenUDPFunc = elstack.ListenELUDP
 	}
-	// ADDED by Hinata AWAIISHIMA END
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
 	if err != nil {
 		utils.Fatalf("-ResolveUDPAddr: %v", err)
 	}
+	// MODIFIED by Hinata AWAIISHIMA (EL)
+	// conn, err := net.ListenUDP("udp", addr)
 	conn, err := listenUDPFunc("udp", addr)
 	if err != nil {
 		utils.Fatalf("-ListenUDP: %v", err)
@@ -207,7 +211,7 @@ func main() {
 	select {}
 }
 
-// ADDED by Hinata AWAIISHIMA
+// ADDED by Hinata AWAIISHIMA (EL)
 // function of wrapper to return discover.UDPConn interface
 func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return net.ListenUDP(network, addr)
@@ -223,6 +227,7 @@ func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
 	fmt.Println("We recommend using a regular node as bootstrap node for production deployments.")
 }
 
+// ADDED by Hinata AWAIISHIMA (EL)
 func monitorEL(results <-chan elstack.LinkedResult) {
 	for result := range results {
 		if result.Err != nil {

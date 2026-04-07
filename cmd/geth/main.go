@@ -158,7 +158,7 @@ var (
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
 		utils.MinerNotifyFullFlag,
-		// ADDED by Hinata AWAIISHIMA BEG(el settings)
+		// ADDED by Hinata AWAIISHIMA BEG (EL)
 		utils.UseELFlag,
 		utils.ELHolderVCFlag,
 		utils.ELHolderPrivKeyFlag,
@@ -168,7 +168,7 @@ var (
 		utils.ELServerPortFlag,
 		utils.ELServerCACertFlag,
 		utils.ELCapturePathFlag,
-		// ADDED by Hinata AWAIISHIMA END(el settings)
+		// ADDED by Hinata AWAIISHIMA END (EL)
 		configFileFlag,
 	}, utils.NetworkFlags, utils.DatabasePathFlags)
 

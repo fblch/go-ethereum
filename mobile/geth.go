@@ -261,7 +261,7 @@ var defaultNodeConfig = &NodeConfig{
 	CliqueSnapshotCacheSize:  128,
 	CliqueSnapshotCacheCount: 128,
 	// ADDED by Jakub Pajek END
-	// ADDED by Hinata AWAIISHIMA
+	// ADDED by Hinata AWAIISHIMA (EL)
 	ELUse: false,
 }
 
@@ -379,7 +379,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	} else if config.CliqueSnapshotCacheCount == 0 {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
-	// ADDED by Hinata AWAIISHIMA BEG
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	EL := elstack.ELConfig{}
 	if config.ELUse {
 		el := elstack.ELConfig{
@@ -400,7 +400,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			log.Warn("invalid config: some of EL config values are invalid")
 		}
 	}
-	// ADDED by Hinata AWAIISHIMA END
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	natif, err := nat.Parse(config.NAT)
 	if err != nil {
@@ -435,7 +435,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			// MODIFIED by Jakub Pajek END
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
 			MaxPeers:         config.MaxPeers,
-			// ADDED by Hinata AWAIISHIMA
+			// ADDED by Hinata AWAIISHIMA (EL)
 			EL: &EL,
 		},
 	}

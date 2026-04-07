@@ -900,8 +900,7 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 
-	// ADDED by Hinata AWAIISHIMA
-	// Emotion Link settings
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	UseELFlag = &cli.BoolFlag{
 		Name:     "el.use",
 		Value:    false,
@@ -940,6 +939,7 @@ var (
 		Usage:    "File path to store EL packet captures (set to enable capture)",
 		Category: flags.NetworkingCategory,
 	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	// Console
 	JSpathFlag = &flags.DirectoryFlag{
@@ -1234,7 +1234,7 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
-// ADDED by Hinata AWAIISHIMA
+// ADDED by Hinata AWAIISHIMA (EL)
 // setEL creates a config structure for emotion-link in p2p.Config
 func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if cfg.EL == nil {
@@ -1558,6 +1558,7 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setListenAddress(ctx, cfg)
 	setBootstrapNodes(ctx, cfg)
 	setBootstrapNodesV5(ctx, cfg)
+	// ADDED by Hinata AWAIISHIMA (EL)
 	setEL(ctx, cfg)
 
 	lightClient := ctx.String(SyncModeFlag.Name) == "light"
