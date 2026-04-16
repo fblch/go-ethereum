@@ -1,12 +1,12 @@
 package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
-// #cgo windows LDFLAGS: ${SRCDIR}/libs/windows/libel_stack.a -lm -liphlpapi -luserenv -lntdll
-// #cgo ios,!iossimulator,!darwin LDFLAGS: ${SRCDIR}/libs/ios/libel_stack.a -lm
-// #cgo ios,iossimulator,!darwin LDFLAGS: ${SRCDIR}/libs/iossimulator/libel_stack.a -lm
-// #cgo darwin,!ios LDFLAGS: ${SRCDIR}/libs/darwin/libel_stack.a -lm -framework SystemConfiguration -framework CoreFoundation
+// #cgo windows,amd64 LDFLAGS: ${SRCDIR}/libs/windows_amd64/libel_stack.a -lm -liphlpapi -luserenv -lntdll
+// #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack.a -lm
+// #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack.a -lm
+// #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack.a -lm -framework SystemConfiguration -framework CoreFoundation
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack.a -lm
-// #cgo !android,!ios,!darwin LDFLAGS: ${SRCDIR}/libs/linux/libel_stack.a -lm
+// #cgo linux,amd64 LDFLAGS: ${SRCDIR}/libs/linux_amd64/libel_stack.a -lm
 // #include <el_stack.h>
 import "C"
 
