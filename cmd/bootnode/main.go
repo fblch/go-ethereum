@@ -119,6 +119,7 @@ func main() {
 
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	listenUDPFunc := ListenUDP
+	var elCfg *elstack.ELConfig
 	if *elUse {
 		cert, err := elstack.ReadCertFile(*elServerCACert)
 		if err != nil {
@@ -141,7 +142,7 @@ func main() {
 		if err != nil {
 			utils.Fatalf("EL antiOverlap: %v", err)
 		}
-		elCfg := &elstack.ELConfig{
+		elCfg = &elstack.ELConfig{
 			Use:           true,
 			HolderVC:      vc,
 			HolderPrivKey: vcPriv,
@@ -152,6 +153,9 @@ func main() {
 			ServerCACert:  cert,
 			CapturePath:   *elCapturePath,
 		}
+	}
+	if err := elstack.ValidateELConfig(elCfg); err == nil {
+		natm = nil // Prefer EL over NAT when both are configured.
 		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 		go elstack.SetupEL(elCfg, results, nil)
 		addr, err := elstack.WaitInitialEL(results)
@@ -169,7 +173,6 @@ func main() {
 		*listenAddr = net.JoinHostPort(addr.String(), port)
 		go monitorEL(results)
 		listenUDPFunc = elstack.ListenELUDP
-		natm = nil	// Prefer EL over NAT when both are configured.
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 
