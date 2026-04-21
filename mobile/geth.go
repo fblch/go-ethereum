@@ -379,6 +379,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	} else if config.CliqueSnapshotCacheCount == 0 {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
+	
 	natif, err := nat.Parse(config.NAT)
 	if err != nil {
 		return nil, err
