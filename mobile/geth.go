@@ -379,6 +379,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	} else if config.CliqueSnapshotCacheCount == 0 {
 		config.CliqueSnapshotCacheCount = defaultNodeConfig.CliqueSnapshotCacheCount
 	}
+	natif, err := nat.Parse(config.NAT)
+	if err != nil {
+		return nil, err
+	}
+	// ADDED by Jakub Pajek END
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	EL := elstack.ELConfig{}
 	if config.ELUse {
@@ -396,17 +401,12 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		
 		if err := elstack.ValidateMobileELConfig(&el); err == nil {
 			EL = el
+			natif = nil		// Prefer EL over NAT when both are configured.
 		} else {
 			log.Warn("invalid config: some of EL config values are invalid")
 		}
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
-
-	natif, err := nat.Parse(config.NAT)
-	if err != nil {
-		return nil, err
-	}
-	// ADDED by Jakub Pajek END
 
 	// Create the empty networking stack
 	nodeConf := &node.Config{

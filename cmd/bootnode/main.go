@@ -169,6 +169,7 @@ func main() {
 		*listenAddr = net.JoinHostPort(addr.String(), port)
 		go monitorEL(results)
 		listenUDPFunc = elstack.ListenELUDP
+		natm = nil	// Prefer EL over NAT when both are configured.
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 
