@@ -54,13 +54,14 @@ func main() {
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA BEG (EL)
 		elUse          = flag.Bool("el.use", false, "enable emotion link support")
-		elHolderVC     = flag.String("el.vc", "", "emotion link verifiable credential file path")
-		elHolderPriv   = flag.String("el.vcprivkey", "", "emotion link VC holder private key file path")
+		elHolderVC     = flag.String("el.holdervc", "", "emotion link verifiable credential file path")
+		elHolderPriv   = flag.String("el.holderprivkey", "", "emotion link VC holder private key file path")
 		elAntiOverlap  = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
 		elIssuerPub    = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
-		elServerAddr   = flag.String("el.host", "", "emotion link server host")
-		elServerPort   = flag.Int("el.port", 0, "emotion link server service port")
+		elServerAddr   = flag.String("el.serveraddr", "", "emotion link server host")
+		elServerPort   = flag.Int("el.serverport", 0, "emotion link server service port")
 		elServerCACert = flag.String("el.servercacert", "", "using server CA certificate")
+		elCapturePath  = flag.String("el.capturepath", "", "path to store el packet capture file path")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
 		nodeKey *ecdsa.PrivateKey
@@ -149,6 +150,7 @@ func main() {
 			ServerAddr:    *elServerAddr,
 			ServerPort:    *elServerPort,
 			ServerCACert:  cert,
+			CapturePath:   *elCapturePath,
 		}
 		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 		go elstack.SetupEL(elCfg, results, nil)
