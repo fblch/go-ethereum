@@ -388,6 +388,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	EL := elstack.ELConfig{}
 	if config.ELUse {
+		if natif != nil {
+			return nil, errors.New("invalid config: NAT mode and EL mode can't use at same time")
+		}
 		el := elstack.ELConfig{
 			Use:           config.ELUse,
 			HolderVC:      config.ELHolderVC,
@@ -399,15 +402,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			ServerCACert:  config.ELServerCACert,
 			CapturePath:   config.ELCapturePath,
 		}
-		
-		if err := elstack.ValidateMobileELConfig(&el); err == nil {
-			if natif != nil {
-				return nil, errors.New("invalid config: NAT mode and EL mode can't use at same time")
-			}
-			EL = el
-		} else {
-			log.Warn("invalid config: some of EL config values are invalid")
+
+		if err := elstack.ValidateMobileELConfig(&el); err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
 		}
+		EL = el
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 

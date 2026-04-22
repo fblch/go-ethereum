@@ -385,6 +385,11 @@ func (srv *Server) Start() (err error) {
 	if srv.NoDial && srv.ListenAddr == "" {
 		srv.log.Warn("P2P server will be useless, neither dialing nor listening")
 	}
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	if srv.NAT != nil && srv.EL != nil && srv.EL.Use {
+		return errors.New("cannot use NAT mode and EL mode at same time")
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	// static fields
 	if srv.PrivateKey == nil {

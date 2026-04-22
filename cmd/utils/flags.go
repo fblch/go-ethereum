@@ -1297,12 +1297,7 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		capturePath := ctx.String(ELCapturePathFlag.Name)
 		elConfig.CapturePath = capturePath
 	}
-	if err := elstack.ValidateELConfig(&elConfig); err != nil {
-		cfg.EL = &elstack.ELConfig{}
-		return
-	}
 	cfg.EL = &elConfig
-	cfg.NAT = nil // Prefer EL over NAT when both are configured
 }
 
 // SplitAndTrim splits input separated by a comma
@@ -1567,8 +1562,13 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setListenAddress(ctx, cfg)
 	setBootstrapNodes(ctx, cfg)
 	setBootstrapNodesV5(ctx, cfg)
-	// ADDED by Hinata AWAIISHIMA (EL)
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	setEL(ctx, cfg)
+
+	if cfg.NAT != nil && cfg.EL != nil && cfg.EL.Use {
+		Fatalf("Cannot use NAT mode and EL mode at same time")
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	lightClient := ctx.String(SyncModeFlag.Name) == "light"
 	lightServer := (ctx.Int(LightServeFlag.Name) != 0)

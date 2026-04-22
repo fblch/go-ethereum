@@ -121,6 +121,9 @@ func main() {
 	listenUDPFunc := ListenUDP
 	var elCfg *elstack.ELConfig
 	if *elUse {
+		if natm != nil {
+			utils.Fatalf("cannot use NAT mode and EL mode at same time")
+		}
 		cert, err := elstack.ReadCertFile(*elServerCACert)
 		if err != nil {
 			log.Warn("boot without a specified cert file", "reason", err)
@@ -153,9 +156,10 @@ func main() {
 			ServerCACert:  cert,
 			CapturePath:   *elCapturePath,
 		}
-	}
-	if err := elstack.ValidateELConfig(elCfg); err == nil {
-		natm = nil // Prefer EL over NAT when both are configured.
+		if err := elstack.ValidateELConfig(elCfg); err != nil {
+			utils.Fatalf("invalid EL config: %v", err)
+		}
+
 		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 		go elstack.SetupEL(elCfg, results, nil)
 		addr, err := elstack.WaitInitialEL(results)
