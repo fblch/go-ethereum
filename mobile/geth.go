@@ -401,8 +401,10 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		}
 		
 		if err := elstack.ValidateMobileELConfig(&el); err == nil {
+			if natif != nil {
+				return nil, errors.New("invalid config: NAT mode and EL mode can't use at same time")
+			}
 			EL = el
-			natif = nil		// Prefer EL over NAT when both are configured.
 		} else {
 			log.Warn("invalid config: some of EL config values are invalid")
 		}
