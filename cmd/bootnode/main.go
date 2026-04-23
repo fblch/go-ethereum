@@ -119,23 +119,21 @@ func main() {
 
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	listenUDPFunc := ListenUDP
-	var elCfg *elstack.ELConfig
 	if *elUse {
 		if natm != nil {
 			utils.Fatalf("cannot use NAT mode and EL mode at same time")
 		}
 		cert, err := elstack.ReadCertFile(*elServerCACert)
 		if err != nil {
-			log.Warn("boot without a specified cert file", "reason", err)
-			cert = ""
+			utils.Fatalf("EL servercacert: %v", err)
 		}
 		vc, err := elstack.ReadSecretFile(*elHolderVC)
 		if err != nil {
-			utils.Fatalf("EL vc: %v", err)
+			utils.Fatalf("EL holdervc: %v", err)
 		}
 		vcPriv, err := elstack.ReadSecretFile(*elHolderPriv)
 		if err != nil {
-			utils.Fatalf("EL vcprivkey: %v", err)
+			utils.Fatalf("EL holderprivkey: %v", err)
 		}
 		issuerPub, err := elstack.ReadSecretFile(*elIssuerPub)
 		if err != nil {
@@ -143,9 +141,9 @@ func main() {
 		}
 		antiOverlap, err := elstack.ReadOrCreateAntiOverlap(*elAntiOverlap)
 		if err != nil {
-			utils.Fatalf("EL antiOverlap: %v", err)
+			utils.Fatalf("EL antioverlap: %v", err)
 		}
-		elCfg = &elstack.ELConfig{
+		elCfg := &elstack.ELConfig{
 			Use:           true,
 			HolderVC:      vc,
 			HolderPrivKey: vcPriv,

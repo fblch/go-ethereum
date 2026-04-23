@@ -140,11 +140,6 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	if resultStream == nil {
 		return
 	}
-	if err := ValidateELConfig(cfg); err != nil {
-		_ = resultStream.SendCritical(LinkedResult{Err: err})
-		resultStream.Close()
-		return
-	}
 
 	// We intentionally panic on missing required values earlier so failures are
 	// loud during startup rather than surfacing deep in the networking stack.

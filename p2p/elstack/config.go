@@ -30,9 +30,6 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if cfg == nil {
 		return ErrELConfigNil
 	}
-	if !cfg.Use {
-		return ErrELDisabled
-	}
 	if strings.TrimSpace(cfg.HolderVC) == "" {
 		return fmt.Errorf("HolderVC content is empty")
 	}

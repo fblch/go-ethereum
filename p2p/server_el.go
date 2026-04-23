@@ -12,8 +12,8 @@ import (
 const initialELResultsBufferSize = 8
 
 func (srv *Server) setupEL() error {
-	if err := elstack.ValidateELConfig(srv.EL); err != nil {
-		return err
+	if srv.EL == nil || !srv.EL.Use {
+		return nil
 	}
 
 	baseListen := srv.ListenAddr

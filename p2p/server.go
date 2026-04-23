@@ -423,12 +423,8 @@ func (srv *Server) Start() (err error) {
 	}
 	srv.setupPortMapping()
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
-	if srv.EL != nil && srv.EL.Use {
-		if err := srv.setupEL(); err != nil {
-			// If EL setup fails, log the reason and abort startup.
-			srv.log.Error("EL setup failed", "err", err)
-			return err
-		}
+	if err := srv.setupEL(); err != nil {
+		return err
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 
