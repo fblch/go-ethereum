@@ -268,6 +268,8 @@ func buildFlags(env build.Environment, staticLinking bool, buildTags []string) (
 	// and there is no downside to this, so we just keep doing it.
 	if runtime.GOOS == "darwin" {
 		ld = append(ld, "-s")
+		// ADDED by Jakub Pajek (macOS make fix)
+		ld = append(ld, "-B", "gobuildid")
 	}
 	if runtime.GOOS == "linux" {
 		// Enforce the stacksize to 8M, which is the case on most platforms apart from
@@ -1244,7 +1246,18 @@ func doXCodeFramework(cmdline []string) {
 	build.MustRun(tc.Install(GOBIN, "golang.org/x/mobile/cmd/gomobile@latest", "golang.org/x/mobile/cmd/gobind@latest"))
 
 	// Build the iOS XCode framework
-	bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
+	// MODIFIED by Jakub Pajek (mobile make ios)
+	// Mobile make fails with the following error:
+	//	env GO111MODULE=on go run build/ci.go xcode --local
+	//	dyld[54117]: missing LC_UUID load command in /private/var/folders/b_/t6qtwsv90vg_vs__rmg7jqdw0000gq/T/go-build3308928920/b001/exe/ci
+	//	dyld[54117]: missing LC_UUID load command
+	//	signal: abort trap
+	//	make: *** [ios] Error 1
+	// Generate a UUID (the Mach-O LC_UUID load command) on macOS (derive from the Go build ID)
+	// https://tip.golang.org/doc/go1.24#linker
+	// https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems
+	//bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
+	bind := gomobileTool("bind", "-ldflags", "-s -w -B gobuildid", "--target", "ios", "-v", "github.com/ethereum/go-ethereum/mobile")
 	// MEMO by Jakub Pajek (mobile make ios)
 	//bind := gomobileTool("bind", "-ldflags", "-s -w", "--target", "ios/arm64", "-v", "github.com/ethereum/go-ethereum/mobile")
 

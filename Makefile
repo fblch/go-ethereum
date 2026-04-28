@@ -6,7 +6,9 @@
 
 GOBIN = ./build/bin
 GO ?= latest
-GORUN = env GO111MODULE=on go run
+# MODIFIED by Jakub Pajek (macOS make fix)
+#GORUN = env GO111MODULE=on go run
+GORUN = env GO111MODULE=on go run -ldflags "-B gobuildid"
 
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
