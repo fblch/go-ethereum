@@ -236,17 +236,3 @@ func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
 		}
 	}
 }
-
-// StopElStack stops the EL stack.
-func StopElStack() {
-	start := time.Now()
-	elLog.Trace("StopElStack START")
-	el_stack.Stop()
-	elLog.Trace("StopElStack DONE", "elapsed", time.Since(start))
-}
-
-// StopElStackSafe stops the EL stack.
-// Channel close is intentionally owned by SetupEL to avoid close/send races.
-func StopElStackSafe(_ chan LinkedResult) {
-	StopElStack()
-}
