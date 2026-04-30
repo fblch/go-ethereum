@@ -155,6 +155,11 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	antiOverlap := cfg.AntiOverlap
 
+	var capturePath *string
+	if cfg.CapturePath != "" {
+		capturePath = &cfg.CapturePath
+	}
+
 	vpnKeepAliveSec := uint64(60)
 	vpnTimeoutSec := uint64(180)
 
@@ -196,7 +201,7 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	delegate := &VpnDelegate{results: resultStream}
 
-	if err := el_stack.Start(delegate, vpnCfg, vcCfg, &cfg.CapturePath); err != nil {
+	if err := el_stack.Start(delegate, vpnCfg, vcCfg, capturePath); err != nil {
 		el_stack.Stop()
 		elLog.Error("SetupEL ERROR", "err", err)
 		_ = resultStream.SendCritical(LinkedResult{Err: err})
