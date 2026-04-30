@@ -155,13 +155,13 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	antiOverlap := cfg.AntiOverlap
 
-	vpnKeepAliveSec := uint64(10)
-	vpnTimeoutSec := uint64(30)
+	vpnKeepAliveSec := uint64(60)
+	vpnTimeoutSec := uint64(180)
 
 	vpnCfg := el_stack.NewElStackVpnConfig(
 		vpnHost, vpnPort, antiOverlap,
 		vpnTimeoutSec, vpnKeepAliveSec,
-		el_stack.ElStackVpnConnectionTypeQuic,
+		el_stack.ElStackVpnConnectionTypeTls,
 	)
 
 	productName := "go-ethereum-el"
