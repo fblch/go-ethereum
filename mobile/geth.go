@@ -497,6 +497,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				return nil, fmt.Errorf("ethereum init: %v", err)
 			}
 			ethBackend = backend
+			// Set the gas price to the limits from the config
+			ethBackend.TxPool().SetGasPrice(ethConf.Miner.GasPrice)
 			// Register log filter RPC API.
 			filterSystem := filters.NewFilterSystem(backend.APIBackend, filters.Config{
 				LogCacheSize: ethConf.FilterLogCacheSize,
@@ -551,6 +553,9 @@ func (n *Node) StartSealer(passphrase string) error {
 	if err := n.node.Start(); err != nil {
 		return err
 	}
+	// Set the gas price to the limits from the config
+	// We don't have access to config's gasPrice here, so this logic was moved to NewNode
+	//n.eth.TxPool().SetGasPrice(n.eth.gasPrice)
 	// Start mining
 	threads := 0
 	if err := n.eth.StartMining(threads); err != nil {
@@ -566,10 +571,7 @@ func (n *Node) StartSealer(passphrase string) error {
 		stack.AccountManager().Subscribe(events)
 
 		// Create a client to interact with local geth node.
-		rpcClient, err := stack.Attach()
-		if err != nil {
-			utils.Fatalf("Failed to attach to self: %v", err)
-		}
+		rpcClient := stack.Attach()
 		ethClient := ethclient.NewClient(rpcClient)
 
 		go func() {
@@ -607,7 +609,7 @@ func (n *Node) StartSealer(passphrase string) error {
 
 		// Spawn a standalone goroutine for status synchronization monitoring,
 		// close the node when synchronization is complete if user required.
-		if ctx.GlobalBool(utils.ExitWhenSyncedFlag.Name) {
+		if ctx.Bool(utils.ExitWhenSyncedFlag.Name) {
 			go func() {
 				sub := stack.EventMux().Subscribe(downloader.DoneEvent{})
 				defer sub.Unsubscribe()
@@ -630,20 +632,20 @@ func (n *Node) StartSealer(passphrase string) error {
 		}
 
 		// Start auxiliary services if enabled
-		if ctx.GlobalBool(utils.MiningEnabledFlag.Name) || ctx.GlobalBool(utils.DeveloperFlag.Name) {
+		if ctx.Bool(utils.MiningEnabledFlag.Name) || ctx.Bool(utils.DeveloperFlag.Name) {
 			// Mining only makes sense if a full Ethereum node is running
-			if ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
+			if ctx.String(utils.SyncModeFlag.Name) == "light" {
 				utils.Fatalf("Light clients do not support mining")
 			}
 			ethBackend, ok := backend.(*eth.EthAPIBackend)
 			if !ok {
-				utils.Fatalf("Ethereum service not running: %v", err)
+				utils.Fatalf("Ethereum service not running")
 			}
 			// Set the gas price to the limits from the CLI and start mining
-			gasprice := utils.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
+			gasprice := flags.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
 			ethBackend.TxPool().SetGasPrice(gasprice)
 			// start mining
-			threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name)
+			threads := ctx.Int(utils.MinerThreadsFlag.Name)
 			if err := ethBackend.StartMining(threads); err != nil {
 				utils.Fatalf("Failed to start mining: %v", err)
 			}
