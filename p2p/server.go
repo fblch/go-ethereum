@@ -400,6 +400,8 @@ func (srv *Server) Start() (err error) {
 	srv.peerOp = make(chan peerOpFunc)
 	srv.peerOpDone = make(chan struct{})
 
+	// MEMO by Jakub Pajek (failed p2p server start fix)
+	// setupLocalNode opens the node database, which needs to be closed if any of the subsequent setup steps fail.
 	if err := srv.setupLocalNode(); err != nil {
 		return err
 	}
@@ -407,10 +409,14 @@ func (srv *Server) Start() (err error) {
 
 	if srv.ListenAddr != "" {
 		if err := srv.setupListening(); err != nil {
+			// ADDED by Jakub Pajek (failed p2p server start fix)
+			srv.nodedb.Close()
 			return err
 		}
 	}
 	if err := srv.setupDiscovery(); err != nil {
+		// ADDED by Jakub Pajek (failed p2p server start fix)
+		srv.nodedb.Close()
 		return err
 	}
 	srv.setupDialScheduler()
