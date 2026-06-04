@@ -424,6 +424,7 @@ func (srv *Server) Start() (err error) {
 	srv.setupPortMapping()
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	if err := srv.setupEL(); err != nil {
+		srv.nodedb.Close()
 		return err
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
