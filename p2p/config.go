@@ -127,6 +127,7 @@ type Config struct {
 	Logger log.Logger `toml:"-"`
 
 	// ADDED by Hinata AWAIISHIMA (EL)
+	// EL holds Emotion Link related configuration.
 	EL *elstack.ELConfig
 
 	clock mclock.Clock

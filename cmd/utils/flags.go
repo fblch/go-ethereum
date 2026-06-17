@@ -903,40 +903,48 @@ var (
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	UseELFlag = &cli.BoolFlag{
 		Name:     "el.use",
+		Usage:    "Enable p2p networking over Emotion Link",
 		Value:    false,
 		Category: flags.NetworkingCategory,
 	}
-	ELHolderVCFlag = &cli.StringFlag{
+	ELHolderVCFlag = &cli.PathFlag{
 		Name:     "el.holdervc",
+		Usage:    "File containing EL client's VC required for connecting to the EL server",
 		Category: flags.NetworkingCategory,
 	}
-	ELHolderPrivKeyFlag = &cli.StringFlag{
+	ELHolderPrivKeyFlag = &cli.PathFlag{
 		Name:     "el.holderprivkey",
+		Usage:    "File containing EL client's private key",
 		Category: flags.NetworkingCategory,
 	}
-	ELAntiOverlapFlag = &cli.StringFlag{
+	ELAntiOverlapFlag = &cli.PathFlag{
 		Name:     "el.antioverlap",
+		Usage:    "File containing EL client's anti-overlap value",
 		Category: flags.NetworkingCategory,
 	}
-	ELIssuerPubKeyFlag = &cli.StringFlag{
+	ELIssuerPubKeyFlag = &cli.PathFlag{
 		Name:     "el.issuerpubkey",
+		Usage:    "File containing VC issuer's public key",
 		Category: flags.NetworkingCategory,
 	}
 	ELServerAddrFlag = &cli.StringFlag{
 		Name:     "el.serveraddr",
+		Usage:    "Address of the EL server",
 		Category: flags.NetworkingCategory,
 	}
 	ELServerPortFlag = &cli.IntFlag{
 		Name:     "el.serverport",
+		Usage:    "Port of the EL server",
 		Category: flags.NetworkingCategory,
 	}
-	ELServerCACertFlag = &cli.StringFlag{
+	ELServerCACertFlag = &cli.PathFlag{
 		Name:     "el.servercacert",
+		Usage:    "File containing EL server's CA certificate",
 		Category: flags.NetworkingCategory,
 	}
-	ELCapturePathFlag = &cli.StringFlag{
+	ELCapturePathFlag = &cli.PathFlag{
 		Name:     "el.capturepath",
-		Usage:    "File path to store EL packet captures (set to enable capture)",
+		Usage:    "File to store EL packet capture (set to enable packet capture)",
 		Category: flags.NetworkingCategory,
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
@@ -1235,7 +1243,7 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 }
 
 // ADDED by Hinata AWAIISHIMA (EL)
-// setEL creates a config structure for emotion-link in p2p.Config
+// setEL creates EL configuration from command line flags.
 func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if cfg.EL == nil {
 		cfg.EL = &elstack.ELConfig{}
@@ -1247,60 +1255,51 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		return
 	}
 	if ctx.IsSet(ELHolderVCFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderVCFlag.Name))
+		value, err := elstack.ReadTrimmedFile(ctx.Path(ELHolderVCFlag.Name), false)
 		if err != nil {
-			Fatalf("Failed to read VC: %v", err)
+			Fatalf("Failed to read EL holder's VC: %v", err)
 		}
 		cfg.EL.HolderVC = value
 	}
 	if ctx.IsSet(ELHolderPrivKeyFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderPrivKeyFlag.Name))
+		value, err := elstack.ReadTrimmedFile(ctx.Path(ELHolderPrivKeyFlag.Name), false)
 		if err != nil {
-			Fatalf("Failed to read VCPrivKey: %v", err)
+			Fatalf("Failed to read EL holder's private key: %v", err)
 		}
 		cfg.EL.HolderPrivKey = value
 	}
 	if ctx.IsSet(ELAntiOverlapFlag.Name) {
-		path := ctx.Path(ELAntiOverlapFlag.Name)
-		token, err := elstack.ReadOrCreateAntiOverlap(path)
+		value, err := elstack.ReadOrCreateAntiOverlap(ctx.Path(ELAntiOverlapFlag.Name))
 		if err != nil {
-			Fatalf("Failed to prepare AntiOverlap: %v", err)
+			Fatalf("Failed to initialize EL anti-overlap: %v", err)
 		}
-		cfg.EL.AntiOverlap = token
+		cfg.EL.AntiOverlap = value
 	}
 	if ctx.IsSet(ELIssuerPubKeyFlag.Name) {
-		value, err := elstack.ReadSecretFile(ctx.Path(ELIssuerPubKeyFlag.Name))
+		value, err := elstack.ReadTrimmedFile(ctx.Path(ELIssuerPubKeyFlag.Name), false)
 		if err != nil {
-			Fatalf("Failed to read IssuerPubkey: %v", err)
+			Fatalf("Failed to read VC issuer's public key: %v", err)
 		}
 		cfg.EL.IssuerPubKey = value
 	}
 	if ctx.IsSet(ELServerAddrFlag.Name) {
-		if elServerAddr := ctx.String(ELServerAddrFlag.Name); elServerAddr != "" {
-			cfg.EL.ServerAddr = elServerAddr
-		}
+		cfg.EL.ServerAddr = ctx.String(ELServerAddrFlag.Name)
 	}
 	if ctx.IsSet(ELServerPortFlag.Name) {
-		elServerPort := ctx.Int(ELServerPortFlag.Name)
-		if elServerPort <= 0 {
-			Fatalf("EL server port must be positive")
-		}
-		cfg.EL.ServerPort = elServerPort
+		cfg.EL.ServerPort = ctx.Int(ELServerPortFlag.Name)
 	}
 	if ctx.IsSet(ELServerCACertFlag.Name) {
-		certPath := ctx.Path(ELServerCACertFlag.Name)
-		cert, err := elstack.ReadCertFile(certPath)
+		value, err := elstack.ReadTrimmedFile(ctx.Path(ELServerCACertFlag.Name), true)
 		if err != nil {
-			Fatalf("Failed to read EL certificate: %v", err)
+			Fatalf("Failed to read EL server's cert: %v", err)
 		}
-		cfg.EL.ServerCACert = cert
+		cfg.EL.ServerCACert = value
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
-		capturePath := ctx.String(ELCapturePathFlag.Name)
-		cfg.EL.CapturePath = capturePath
+		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)
 	}
 	if err := elstack.ValidateELConfig(cfg.EL); err != nil {
-		Fatalf("invalid EL config: %v", err)
+		Fatalf("Invalid EL config: %v", err)
 	}
 }
 

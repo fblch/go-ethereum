@@ -11,56 +11,47 @@ import (
 	"strings"
 )
 
-// ReadCertFile loads a certificate file as string. Empty content is allowed.
-func ReadCertFile(path string) (string, error) {
+// ReadTrimmedFile reads a file and returns its trimmed contents.
+// If the trimmed path or content is empty and allowEmpty is false, it returns an error.
+func ReadTrimmedFile(path string, allowEmpty bool) (string, error) {
 	if strings.TrimSpace(path) == "" {
+		if !allowEmpty {
+			return "", fmt.Errorf("file path is empty")
+		}
 		return "", nil
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read certificate file %s: %w", path, err)
-	}
-	// トリムは行うが、空でもエラーにしない
-	return strings.TrimSpace(string(content)), nil
-}
-
-// ReadSecretFile reads a file and returns its trimmed contents.
-func ReadSecretFile(path string) (string, error) {
-	if strings.TrimSpace(path) == "" {
-		return "", fmt.Errorf("secret file path is empty")
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read secret file: %w", err)
+		return "", fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 	value := strings.TrimSpace(string(content))
-	if value == "" {
-		return "", fmt.Errorf("secret file %s is empty", path)
+	if value == "" && !allowEmpty {
+		return "", fmt.Errorf("file %s is empty", path)
 	}
 	return value, nil
 }
 
-// ReadOrCreateAntiOverlap loads an anti-overlap token from the given path.
+// ReadOrCreateAntiOverlap reads anti-overlap token from a given file.
 // If the file is missing or invalid, it generates a new token, saves it, and returns it.
 func ReadOrCreateAntiOverlap(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return "", fmt.Errorf("anti-overlap file path is empty")
+		return "", fmt.Errorf("file path is empty")
 	}
 	content, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("read anti-overlap file: %w", err)
+		return "", fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 	token := strings.TrimSpace(string(content))
 	if !isAlphaNumeric32(token) {
 		token, err = randomAlphaNumeric32()
 		if err != nil {
-			return "", fmt.Errorf("generate anti-overlap token: %w", err)
+			return "", fmt.Errorf("failed to generate anti-overlap token: %w", err)
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return "", fmt.Errorf("create anti-overlap directory: %w", err)
+			return "", fmt.Errorf("failed to create anti-overlap token directory: %w", err)
 		}
 		if err := os.WriteFile(path, []byte(token), 0o600); err != nil {
-			return "", fmt.Errorf("write anti-overlap token: %w", err)
+			return "", fmt.Errorf("failed to write anti-overlap token to file: %w", err)
 		}
 	}
 	return token, nil
