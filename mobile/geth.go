@@ -50,6 +50,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -191,6 +192,44 @@ type NodeConfig struct {
 	// CliqueSnapshotCacheCount is the maximal number of recent snapshots
 	// to keep in clique snapshot cache (default: 128).
 	CliqueSnapshotCacheCount int
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELUse is the bool flag that the client uses emotion-link connections or not
+	ELUse bool
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELHolderVC is the client verifiable credential of emotion-link
+	ELHolderVC string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELHolderPrivKey is the private key string of the VC holder
+	ELHolderPrivKey string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELAntiOverlap blocks Duplicating of the connection from same client
+	// This value is a number, but when setting it, it needs to be a string.
+	ELAntiOverlap string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELIssuerPubKey is the VC Issuer's public key string
+	ELIssuerPubKey string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELServerAddr is the emotion-link host server name
+	ELServerAddr string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELServerPort is the emotion-link port of host server
+	// This value is a number, but when setting it, it needs to be a string.
+	ELServerPort int
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELServerCACert is the CA certs to connect to the emotion-link server
+	ELServerCACert string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELCapturePath is the file path to store packet captures for emotion-link
+	ELCapturePath string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -222,6 +261,8 @@ var defaultNodeConfig = &NodeConfig{
 	CliqueSnapshotCacheSize:  128,
 	CliqueSnapshotCacheCount: 128,
 	// ADDED by Jakub Pajek END
+	// ADDED by Hinata AWAIISHIMA (EL)
+	ELUse: false,
 }
 
 // NewNodeConfig creates a new node option set, initialized to the default values.
@@ -344,6 +385,29 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		return nil, err
 	}
 	// ADDED by Jakub Pajek END
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	el := elstack.ELConfig{}
+	if config.ELUse {
+		if natif != nil {
+			return nil, errors.New("invalid config: NAT mode and EL mode can't use at same time")
+		}
+		el = elstack.ELConfig{
+			Use:           config.ELUse,
+			HolderVC:      config.ELHolderVC,
+			HolderPrivKey: config.ELHolderPrivKey,
+			AntiOverlap:   config.ELAntiOverlap,
+			IssuerPubKey:  config.ELIssuerPubKey,
+			ServerAddr:    config.ELServerAddr,
+			ServerPort:    config.ELServerPort,
+			ServerCACert:  config.ELServerCACert,
+			CapturePath:   config.ELCapturePath,
+		}
+
+		if err := elstack.ValidateMobileELConfig(&el); err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
+		}
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	// Create the empty networking stack
 	nodeConf := &node.Config{
@@ -372,6 +436,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			// MODIFIED by Jakub Pajek END
 			BootstrapNodesV5: config.BootstrapNodes.nodes,
 			MaxPeers:         config.MaxPeers,
+			// ADDED by Hinata AWAIISHIMA (EL)
+			EL: &el,
 		},
 	}
 

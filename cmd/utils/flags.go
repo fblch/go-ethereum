@@ -67,6 +67,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -899,6 +900,47 @@ var (
 		Category: flags.NetworkingCategory,
 	}
 
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	UseELFlag = &cli.BoolFlag{
+		Name:     "el.use",
+		Value:    false,
+		Category: flags.NetworkingCategory,
+	}
+	ELHolderVCFlag = &cli.StringFlag{
+		Name:     "el.holdervc",
+		Category: flags.NetworkingCategory,
+	}
+	ELHolderPrivKeyFlag = &cli.StringFlag{
+		Name:     "el.holderprivkey",
+		Category: flags.NetworkingCategory,
+	}
+	ELAntiOverlapFlag = &cli.StringFlag{
+		Name:     "el.antioverlap",
+		Category: flags.NetworkingCategory,
+	}
+	ELIssuerPubKeyFlag = &cli.StringFlag{
+		Name:     "el.issuerpubkey",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerAddrFlag = &cli.StringFlag{
+		Name:     "el.serveraddr",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerPortFlag = &cli.IntFlag{
+		Name:     "el.serverport",
+		Category: flags.NetworkingCategory,
+	}
+	ELServerCACertFlag = &cli.StringFlag{
+		Name:     "el.servercacert",
+		Category: flags.NetworkingCategory,
+	}
+	ELCapturePathFlag = &cli.StringFlag{
+		Name:     "el.capturepath",
+		Usage:    "File path to store EL packet captures (set to enable capture)",
+		Category: flags.NetworkingCategory,
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
+
 	// Console
 	JSpathFlag = &flags.DirectoryFlag{
 		Name:     "jspath",
@@ -1192,6 +1234,76 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+// ADDED by Hinata AWAIISHIMA (EL)
+// setEL creates a config structure for emotion-link in p2p.Config
+func setEL(ctx *cli.Context, cfg *p2p.Config) {
+	if cfg.EL == nil {
+		cfg.EL = &elstack.ELConfig{}
+	}
+	if ctx.IsSet(UseELFlag.Name) {
+		cfg.EL.Use = ctx.Bool(UseELFlag.Name)
+	}
+	if !cfg.EL.Use {
+		return
+	}
+	if ctx.IsSet(ELHolderVCFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderVCFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read VC: %v", err)
+		}
+		cfg.EL.HolderVC = value
+	}
+	if ctx.IsSet(ELHolderPrivKeyFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELHolderPrivKeyFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read VCPrivKey: %v", err)
+		}
+		cfg.EL.HolderPrivKey = value
+	}
+	if ctx.IsSet(ELAntiOverlapFlag.Name) {
+		path := ctx.Path(ELAntiOverlapFlag.Name)
+		token, err := elstack.ReadOrCreateAntiOverlap(path)
+		if err != nil {
+			Fatalf("Failed to prepare AntiOverlap: %v", err)
+		}
+		cfg.EL.AntiOverlap = token
+	}
+	if ctx.IsSet(ELIssuerPubKeyFlag.Name) {
+		value, err := elstack.ReadSecretFile(ctx.Path(ELIssuerPubKeyFlag.Name))
+		if err != nil {
+			Fatalf("Failed to read IssuerPubkey: %v", err)
+		}
+		cfg.EL.IssuerPubKey = value
+	}
+	if ctx.IsSet(ELServerAddrFlag.Name) {
+		if elServerAddr := ctx.String(ELServerAddrFlag.Name); elServerAddr != "" {
+			cfg.EL.ServerAddr = elServerAddr
+		}
+	}
+	if ctx.IsSet(ELServerPortFlag.Name) {
+		elServerPort := ctx.Int(ELServerPortFlag.Name)
+		if elServerPort <= 0 {
+			Fatalf("EL server port must be positive")
+		}
+		cfg.EL.ServerPort = elServerPort
+	}
+	if ctx.IsSet(ELServerCACertFlag.Name) {
+		certPath := ctx.Path(ELServerCACertFlag.Name)
+		cert, err := elstack.ReadCertFile(certPath)
+		if err != nil {
+			Fatalf("Failed to read EL certificate: %v", err)
+		}
+		cfg.EL.ServerCACert = cert
+	}
+	if ctx.IsSet(ELCapturePathFlag.Name) {
+		capturePath := ctx.String(ELCapturePathFlag.Name)
+		cfg.EL.CapturePath = capturePath
+	}
+	if err := elstack.ValidateELConfig(cfg.EL); err != nil {
+		Fatalf("invalid EL config: %v", err)
+	}
+}
+
 // SplitAndTrim splits input separated by a comma
 // and trims excessive white space from the substrings.
 func SplitAndTrim(input string) (ret []string) {
@@ -1454,6 +1566,13 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setListenAddress(ctx, cfg)
 	setBootstrapNodes(ctx, cfg)
 	setBootstrapNodesV5(ctx, cfg)
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	setEL(ctx, cfg)
+
+	if cfg.NAT != nil && cfg.EL != nil && cfg.EL.Use {
+		Fatalf("Cannot use NAT mode and EL mode at same time")
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	lightClient := ctx.String(SyncModeFlag.Name) == "light"
 	lightServer := (ctx.Int(LightServeFlag.Name) != 0)

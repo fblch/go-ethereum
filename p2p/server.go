@@ -117,6 +117,9 @@ type Server struct {
 
 	// State of run loop and listenLoop.
 	inboundHistory expHeap
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	listenUDPFunc func(network string, addr *net.UDPAddr) (discover.UDPConn, error)
 }
 
 type peerOpFunc func(map[enode.ID]*Peer)
@@ -338,7 +341,9 @@ func (srv *Server) Stop() {
 // sharedUDPConn implements a shared connection. Write sends messages to the underlying connection while read returns
 // messages that were found unprocessable and sent to the unhandled channel by the primary listener.
 type sharedUDPConn struct {
-	*net.UDPConn
+	// MODIFIED by Hinata AWAIISHIMA (EL)
+	// *net.UDPConn
+	discover.UDPConn
 	unhandled chan discover.ReadPacket
 }
 
@@ -380,6 +385,11 @@ func (srv *Server) Start() (err error) {
 	if srv.NoDial && srv.ListenAddr == "" {
 		srv.log.Warn("P2P server will be useless, neither dialing nor listening")
 	}
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	if srv.NAT != nil && srv.EL != nil && srv.EL.Use {
+		return errors.New("cannot use NAT mode and EL mode at same time")
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	// static fields
 	if srv.PrivateKey == nil {
@@ -391,6 +401,12 @@ func (srv *Server) Start() (err error) {
 	if srv.listenFunc == nil {
 		srv.listenFunc = net.Listen
 	}
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	// Server has listenUDPFunc as same as listenFunc for TCP
+	if srv.listenUDPFunc == nil {
+		srv.listenUDPFunc = ListenUDP
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 	srv.quit = make(chan struct{})
 	srv.delpeer = make(chan peerDrop)
 	srv.checkpointPostHandshake = make(chan *conn)
@@ -406,6 +422,12 @@ func (srv *Server) Start() (err error) {
 		return err
 	}
 	srv.setupPortMapping()
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	if err := srv.setupEL(); err != nil {
+		srv.nodedb.Close()
+		return err
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	if srv.ListenAddr != "" {
 		if err := srv.setupListening(); err != nil {
@@ -424,6 +446,12 @@ func (srv *Server) Start() (err error) {
 	srv.loopWG.Add(1)
 	go srv.run()
 	return nil
+}
+
+// ADDED by Hinata AWAIISHIMA (EL)
+// function of wrapper to return discover.UDPConn interface
+func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+	return net.ListenUDP(network, addr)
 }
 
 func (srv *Server) setupLocalNode() error {
@@ -583,7 +611,10 @@ func (srv *Server) setupListening() error {
 	return nil
 }
 
-func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
+// MODIFIED by Hinata AWAIISHIMA (EL)
+// Change the return value type to use this method with el_stack UDPConn
+// func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
+func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	listenAddr := srv.ListenAddr
 
 	// Use an alternate listening address for UDP if
@@ -595,7 +626,10 @@ func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := net.ListenUDP("udp", addr)
+	// MODIFIED by Hinata AWAIISHIMA (EL)
+	// Because modified Server struct that it has listenUDPFunc field as same as TCP's listenFunc
+	// conn, err := net.ListenUDP("udp", addr)
+	conn, err := srv.listenUDPFunc("udp", addr)
 	if err != nil {
 		return nil, err
 	}
