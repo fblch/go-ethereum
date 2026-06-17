@@ -194,41 +194,39 @@ type NodeConfig struct {
 	CliqueSnapshotCacheCount int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELUse is the bool flag that the client uses emotion-link connections or not
+	// ELUse is the flag for enabling p2p networking over Emotion Link.
 	ELUse bool
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELHolderVC is the client verifiable credential of emotion-link
+	// ELHolderVC is the EL client's VC required for connecting to the EL server.
 	ELHolderVC string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELHolderPrivKey is the private key string of the VC holder
+	// ELHolderPrivKey is the EL client's private key.
 	ELHolderPrivKey string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELAntiOverlap blocks Duplicating of the connection from same client
-	// This value is a number, but when setting it, it needs to be a string.
+	// ELAntiOverlap is the EL client's anti-overlap value.
 	ELAntiOverlap string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELIssuerPubKey is the VC Issuer's public key string
+	// ELIssuerPubKey is the VC issuer's public key.
 	ELIssuerPubKey string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELServerAddr is the emotion-link host server name
+	// ELServerAddr is the EL server's address (hostname).
 	ELServerAddr string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELServerPort is the emotion-link port of host server
-	// This value is a number, but when setting it, it needs to be a string.
+	// ELServerPort is the EL server's port number.
 	ELServerPort int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELServerCACert is the CA certs to connect to the emotion-link server
+	// ELServerCACert is the EL server's CA certificate.
 	ELServerCACert string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELCapturePath is the file path to store packet captures for emotion-link
+	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
 	ELCapturePath string
 }
 
@@ -389,22 +387,20 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 	el := elstack.ELConfig{}
 	if config.ELUse {
 		if natif != nil {
-			return nil, errors.New("invalid config: NAT mode and EL mode can't use at same time")
+			return nil, errors.New("invalid config: cannot use NAT mode and EL mode at same time")
 		}
-		el = elstack.ELConfig{
-			Use:           config.ELUse,
-			HolderVC:      config.ELHolderVC,
-			HolderPrivKey: config.ELHolderPrivKey,
-			AntiOverlap:   config.ELAntiOverlap,
-			IssuerPubKey:  config.ELIssuerPubKey,
-			ServerAddr:    config.ELServerAddr,
-			ServerPort:    config.ELServerPort,
-			ServerCACert:  config.ELServerCACert,
-			CapturePath:   config.ELCapturePath,
-		}
+		el.Use = config.ELUse
+		el.HolderVC = config.ELHolderVC
+		el.HolderPrivKey = config.ELHolderPrivKey
+		el.AntiOverlap = config.ELAntiOverlap
+		el.IssuerPubKey = config.ELIssuerPubKey
+		el.ServerAddr = config.ELServerAddr
+		el.ServerPort = config.ELServerPort
+		el.ServerCACert = config.ELServerCACert
+		el.CapturePath = config.ELCapturePath
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
-			return nil, fmt.Errorf("invalid config: %w", err)
+			return nil, fmt.Errorf("invalid config: %v", err)
 		}
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
