@@ -53,15 +53,15 @@ func main() {
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-5)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
 		// ADDED by Hinata AWAIISHIMA BEG (EL)
-		elUse          = flag.Bool("el.use", false, "enable emotion link support")
-		elHolderVC     = flag.String("el.holdervc", "", "emotion link verifiable credential file path")
-		elHolderPriv   = flag.String("el.holderprivkey", "", "emotion link VC holder private key file path")
-		elAntiOverlap  = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
-		elIssuerPub    = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
-		elServerAddr   = flag.String("el.serveraddr", "", "emotion link server host")
-		elServerPort   = flag.Int("el.serverport", 0, "emotion link server service port")
-		elServerCACert = flag.String("el.servercacert", "", "using server CA certificate")
-		elCapturePath  = flag.String("el.capturepath", "", "path to store el packet capture file path")
+		elUse           = flag.Bool("el.use", false, "enable p2p networking over Emotion Link")
+		elHolderVC      = flag.String("el.holdervc", "", "file containing EL client's VC required for connecting to the EL server")
+		elHolderPrivKey = flag.String("el.holderprivkey", "", "file containing EL client's private key")
+		elAntiOverlap   = flag.String("el.antioverlap", "", "file containing EL client's anti-overlap value")
+		elIssuerPubKey  = flag.String("el.issuerpubkey", "", "file containing VC issuer's public key")
+		elServerAddr    = flag.String("el.serveraddr", "", "address of the EL server")
+		elServerPort    = flag.Int("el.serverport", 0, "port of the EL server")
+		elServerCACert  = flag.String("el.servercacert", "", "file containing EL server's CA certificate")
+		elCapturePath   = flag.String("el.capturepath", "", "file to store EL packet capture (set to enable packet capture)")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
 		nodeKey *ecdsa.PrivateKey
@@ -121,41 +121,41 @@ func main() {
 	listenUDPFunc := ListenUDP
 	if *elUse {
 		if natm != nil {
-			utils.Fatalf("cannot use NAT mode and EL mode at same time")
+			utils.Fatalf("Cannot use NAT mode and EL mode at same time")
 		}
-		cert, err := elstack.ReadCertFile(*elServerCACert)
+		holderVC, err := elstack.ReadTrimmedFile(*elHolderVC, false)
 		if err != nil {
-			utils.Fatalf("EL servercacert: %v", err)
+			utils.Fatalf("Failed to read EL holder's VC: %v", err)
 		}
-		vc, err := elstack.ReadSecretFile(*elHolderVC)
+		holderPrivKey, err := elstack.ReadTrimmedFile(*elHolderPrivKey, false)
 		if err != nil {
-			utils.Fatalf("EL holdervc: %v", err)
-		}
-		vcPriv, err := elstack.ReadSecretFile(*elHolderPriv)
-		if err != nil {
-			utils.Fatalf("EL holderprivkey: %v", err)
-		}
-		issuerPub, err := elstack.ReadSecretFile(*elIssuerPub)
-		if err != nil {
-			utils.Fatalf("EL issuerpubkey: %v", err)
+			utils.Fatalf("Failed to read EL holder's private key: %v", err)
 		}
 		antiOverlap, err := elstack.ReadOrCreateAntiOverlap(*elAntiOverlap)
 		if err != nil {
-			utils.Fatalf("EL antioverlap: %v", err)
+			utils.Fatalf("Failed to initialize EL anti-overlap: %v", err)
+		}
+		issuerPubKey, err := elstack.ReadTrimmedFile(*elIssuerPubKey, false)
+		if err != nil {
+			utils.Fatalf("Failed to read VC issuer's public key: %v", err)
+		}
+		serverCACert, err := elstack.ReadTrimmedFile(*elServerCACert, true)
+		if err != nil {
+			utils.Fatalf("Failed to read EL server's cert: %v", err)
 		}
 		elCfg := &elstack.ELConfig{
 			Use:           true,
-			HolderVC:      vc,
-			HolderPrivKey: vcPriv,
+			HolderVC:      holderVC,
+			HolderPrivKey: holderPrivKey,
 			AntiOverlap:   antiOverlap,
-			IssuerPubKey:  issuerPub,
+			IssuerPubKey:  issuerPubKey,
 			ServerAddr:    *elServerAddr,
 			ServerPort:    *elServerPort,
-			ServerCACert:  cert,
+			ServerCACert:  serverCACert,
 			CapturePath:   *elCapturePath,
 		}
 		if err := elstack.ValidateELConfig(elCfg); err != nil {
-			utils.Fatalf("invalid EL config: %v", err)
+			utils.Fatalf("Invalid EL config: %v", err)
 		}
 
 		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
