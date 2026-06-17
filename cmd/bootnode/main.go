@@ -29,10 +29,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/elstack"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 )
+
+// ADDED by Hinata AWAIISHIMA (EL)
+const initialELResultsBufferSize = 8
 
 func main() {
 	var (
@@ -48,6 +52,17 @@ func main() {
 		runv5       = flag.Bool("v5", false, "run a v5 topic discovery bootnode")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-5)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
+		// ADDED by Hinata AWAIISHIMA BEG (EL)
+		elUse          = flag.Bool("el.use", false, "enable emotion link support")
+		elHolderVC     = flag.String("el.holdervc", "", "emotion link verifiable credential file path")
+		elHolderPriv   = flag.String("el.holderprivkey", "", "emotion link VC holder private key file path")
+		elAntiOverlap  = flag.String("el.antioverlap", "", "emotion link anti overlap token file path")
+		elIssuerPub    = flag.String("el.issuerpubkey", "", "emotion link issuer public key file path")
+		elServerAddr   = flag.String("el.serveraddr", "", "emotion link server host")
+		elServerPort   = flag.Int("el.serverport", 0, "emotion link server service port")
+		elServerCACert = flag.String("el.servercacert", "", "using server CA certificate")
+		elCapturePath  = flag.String("el.capturepath", "", "path to store el packet capture file path")
+		// ADDED by Hinata AWAIISHIMA END (EL)
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
@@ -102,11 +117,74 @@ func main() {
 		}
 	}
 
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	listenUDPFunc := ListenUDP
+	if *elUse {
+		if natm != nil {
+			utils.Fatalf("cannot use NAT mode and EL mode at same time")
+		}
+		cert, err := elstack.ReadCertFile(*elServerCACert)
+		if err != nil {
+			utils.Fatalf("EL servercacert: %v", err)
+		}
+		vc, err := elstack.ReadSecretFile(*elHolderVC)
+		if err != nil {
+			utils.Fatalf("EL holdervc: %v", err)
+		}
+		vcPriv, err := elstack.ReadSecretFile(*elHolderPriv)
+		if err != nil {
+			utils.Fatalf("EL holderprivkey: %v", err)
+		}
+		issuerPub, err := elstack.ReadSecretFile(*elIssuerPub)
+		if err != nil {
+			utils.Fatalf("EL issuerpubkey: %v", err)
+		}
+		antiOverlap, err := elstack.ReadOrCreateAntiOverlap(*elAntiOverlap)
+		if err != nil {
+			utils.Fatalf("EL antioverlap: %v", err)
+		}
+		elCfg := &elstack.ELConfig{
+			Use:           true,
+			HolderVC:      vc,
+			HolderPrivKey: vcPriv,
+			AntiOverlap:   antiOverlap,
+			IssuerPubKey:  issuerPub,
+			ServerAddr:    *elServerAddr,
+			ServerPort:    *elServerPort,
+			ServerCACert:  cert,
+			CapturePath:   *elCapturePath,
+		}
+		if err := elstack.ValidateELConfig(elCfg); err != nil {
+			utils.Fatalf("invalid EL config: %v", err)
+		}
+
+		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
+		go elstack.SetupEL(elCfg, results, nil)
+		addr, err := elstack.WaitInitialEL(results)
+		if err != nil {
+			utils.Fatalf("EL setup failed: %v", err)
+		}
+		baseListen := *listenAddr
+		if baseListen == "" {
+			utils.Fatalf("EL enabled requires non-empty -addr")
+		}
+		_, port, err := net.SplitHostPort(baseListen)
+		if err != nil {
+			utils.Fatalf("invalid -addr %q: %v", baseListen, err)
+		}
+		*listenAddr = net.JoinHostPort(addr.String(), port)
+		go monitorEL(results)
+		listenUDPFunc = elstack.ListenELUDP
+	}
+	// ADDED by Hinata AWAIISHIMA END (EL)
+
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
 	if err != nil {
 		utils.Fatalf("-ResolveUDPAddr: %v", err)
 	}
-	conn, err := net.ListenUDP("udp", addr)
+	// MODIFIED by Hinata AWAIISHIMA (EL)
+	// conn, err := net.ListenUDP("udp", addr)
+	conn, err := listenUDPFunc("udp", addr)
 	if err != nil {
 		utils.Fatalf("-ListenUDP: %v", err)
 	}
@@ -141,6 +219,12 @@ func main() {
 	select {}
 }
 
+// ADDED by Hinata AWAIISHIMA (EL)
+// function of wrapper to return discover.UDPConn interface
+func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+	return net.ListenUDP(network, addr)
+}
+
 func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
 	if addr.IP.IsUnspecified() {
 		addr.IP = net.IP{127, 0, 0, 1}
@@ -149,6 +233,16 @@ func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
 	fmt.Println(n.URLv4())
 	fmt.Println("Note: you're using cmd/bootnode, a developer tool.")
 	fmt.Println("We recommend using a regular node as bootstrap node for production deployments.")
+}
+
+// ADDED by Hinata AWAIISHIMA (EL)
+func monitorEL(results <-chan elstack.LinkedResult) {
+	for result := range results {
+		if result.Err != nil {
+			log.Error("EL link disconnected", "reason", result.Err)
+		}
+	}
+	log.Error("LinkedResult channel is disabled")
 }
 
 func doPortMapping(natm nat.Interface, ln *enode.LocalNode, addr *net.UDPAddr) *net.UDPAddr {
