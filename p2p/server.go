@@ -85,6 +85,8 @@ type Server struct {
 	newTransport func(net.Conn, *ecdsa.PublicKey) transport
 	newPeerHook  func(*Peer)
 	listenFunc   func(network, addr string) (net.Listener, error)
+	// ADDED by Hinata AWAIISHIMA (EL)
+	listenUDPFunc func(network string, addr *net.UDPAddr) (discover.UDPConn, error)
 
 	lock    sync.Mutex // protects running
 	running bool
@@ -117,9 +119,6 @@ type Server struct {
 
 	// State of run loop and listenLoop.
 	inboundHistory expHeap
-
-	// ADDED by Hinata AWAIISHIMA (EL)
-	listenUDPFunc func(network string, addr *net.UDPAddr) (discover.UDPConn, error)
 }
 
 type peerOpFunc func(map[enode.ID]*Peer)
@@ -387,7 +386,7 @@ func (srv *Server) Start() (err error) {
 	}
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
 	if srv.NAT != nil && srv.EL != nil && srv.EL.Use {
-		return errors.New("cannot use NAT mode and EL mode at same time")
+		return errors.New("Cannot use NAT mode and EL mode at same time")
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 
@@ -402,9 +401,9 @@ func (srv *Server) Start() (err error) {
 		srv.listenFunc = net.Listen
 	}
 	// ADDED by Hinata AWAIISHIMA BEG (EL)
-	// Server has listenUDPFunc as same as listenFunc for TCP
+	// Same as server's listenFunc, but for UDP.
 	if srv.listenUDPFunc == nil {
-		srv.listenUDPFunc = ListenUDP
+		srv.listenUDPFunc = listenUDP
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 	srv.quit = make(chan struct{})
@@ -449,8 +448,9 @@ func (srv *Server) Start() (err error) {
 }
 
 // ADDED by Hinata AWAIISHIMA (EL)
-// function of wrapper to return discover.UDPConn interface
-func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
+// listenUDP directly calls net.ListenUDP
+// and casts the returned net.UDPConn pointer to discover.UDPConn interface.
+func listenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return net.ListenUDP(network, addr)
 }
 
@@ -612,7 +612,8 @@ func (srv *Server) setupListening() error {
 }
 
 // MODIFIED by Hinata AWAIISHIMA (EL)
-// Change the return value type to use this method with el_stack UDPConn
+// net.ListenUDP returns net.UDPConn pointer, el_stack.NewElStackUdpConn returns el_stack.ElStackUdpConn pointer,
+// but both implement discover.UDPConn interface, so we can use it as in order to abstract the implementation.
 // func (srv *Server) setupUDPListening() (*net.UDPConn, error) {
 func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 	listenAddr := srv.ListenAddr
@@ -627,7 +628,6 @@ func (srv *Server) setupUDPListening() (discover.UDPConn, error) {
 		return nil, err
 	}
 	// MODIFIED by Hinata AWAIISHIMA (EL)
-	// Because modified Server struct that it has listenUDPFunc field as same as TCP's listenFunc
 	// conn, err := net.ListenUDP("udp", addr)
 	conn, err := srv.listenUDPFunc("udp", addr)
 	if err != nil {
