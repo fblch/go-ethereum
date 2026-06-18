@@ -7,7 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/elstack/el_stack"
 )
 
-// ListenELUDP directly creates an el_stack UDP connection and adapts it to discover.UDPConn.
+// ListenELUDP directly creates an el_stack.NewElStackUdpConn
+// and adapts returned el_stack.ElStackUdpConn to discover.UDPConn.
 func ListenELUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return el_stack.NewElStackUdpConn(network, addr)
 }

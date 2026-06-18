@@ -20,7 +20,7 @@ type ElStackTcpDialer struct {
 	Timeout time.Duration
 }
 
-// Dial implements NodeDialer interface using EL tunneled TCP connections.
+// Dial implements NodeDialer using EL tunneled TCP connections.
 func (d ElStackTcpDialer) Dial(ctx context.Context, dest *enode.Node) (net.Conn, error) {
 	// net.Dailer.DialContext also panics if ctx is nil, so we do the same here for consistency.
 	if ctx == nil {
