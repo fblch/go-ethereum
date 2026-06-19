@@ -554,7 +554,7 @@ void uniffi_el_stack_fn_free_elstackvpnconfig(void* ptr, RustCallStatus *out_sta
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKVPNCONFIG_NEW
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKVPNCONFIG_NEW
-void* uniffi_el_stack_fn_constructor_elstackvpnconfig_new(RustBuffer server_host, RustBuffer server_serv, RustBuffer anti_overlap, uint64_t recv_timeout, uint64_t keepalive_interval, RustBuffer connection_type, RustCallStatus *out_status
+void* uniffi_el_stack_fn_constructor_elstackvpnconfig_new(RustBuffer server_host, RustBuffer server_serv, RustBuffer anti_overlap, uint64_t recv_timeout, RustBuffer connection_timeout, uint64_t keepalive_interval, RustBuffer connection_type, RustCallStatus *out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_TCPLISTENER

@@ -5,7 +5,7 @@ package el_stack
 // #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack_v1.14.23.a -lm
 // #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack_v1.14.23.a -lm
 // #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack_v1.14.23.a -lm -framework SystemConfiguration -framework CoreFoundation
-// #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack_v1.14.23.a -lm
+// #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack_v1.15.0.a -lm
 // #cgo !android,linux,amd64 LDFLAGS: ${SRCDIR}/libs/linux_amd64/libel_stack_v1.14.23.a -lm
 // #cgo !android,linux,arm64 LDFLAGS: ${SRCDIR}/libs/linux_arm64/libel_stack_v1.14.23.a -lm
 // #include <el_stack.h>
@@ -40,7 +40,29 @@ type RustBufferI interface {
 	Capacity() uint64
 }
 
-func RustBufferFromExternal(b RustBufferI) GoRustBuffer {
+// C.RustBuffer fields exposed as an interface so they can be accessed in different Go packages.
+// See https://github.com/golang/go/issues/13467
+type ExternalCRustBuffer interface {
+	Data() unsafe.Pointer
+	Len() uint64
+	Capacity() uint64
+}
+
+func RustBufferFromC(b C.RustBuffer) ExternalCRustBuffer {
+	return GoRustBuffer{
+		inner: b,
+	}
+}
+
+func CFromRustBuffer(b ExternalCRustBuffer) C.RustBuffer {
+	return C.RustBuffer{
+		capacity: C.uint64_t(b.Capacity()),
+		len:      C.uint64_t(b.Len()),
+		data:     (*C.uchar)(b.Data()),
+	}
+}
+
+func RustBufferFromExternal(b ExternalCRustBuffer) GoRustBuffer {
 	return GoRustBuffer{
 		inner: C.RustBuffer{
 			capacity: C.uint64_t(b.Capacity()),
@@ -349,7 +371,7 @@ func init() {
 
 func uniffiCheckChecksums() {
 	// Get the bindings contract version from our ComponentInterface
-	bindingsContractVersion := 26
+	bindingsContractVersion := 29
 	// Get the scaffolding contract version by calling the into the dylib
 	scaffoldingContractVersion := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint32_t {
 		return C.ffi_el_stack_uniffi_contract_version()
@@ -605,7 +627,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_el_stack_checksum_constructor_elstackvpnconfig_new()
 		})
-		if checksum != 41342 {
+		if checksum != 58538 {
 			// If this happens try cleaning and rebuilding your project
 			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackvpnconfig_new: UniFFI API checksum mismatch")
 		}
@@ -732,7 +754,7 @@ func (FfiConverterString) Read(reader io.Reader) string {
 	length := readInt32(reader)
 	buffer := make([]byte, length)
 	read_length, err := reader.Read(buffer)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 	if read_length != int(length) {
@@ -743,6 +765,10 @@ func (FfiConverterString) Read(reader io.Reader) string {
 
 func (FfiConverterString) Lower(value string) C.RustBuffer {
 	return stringToRustBuffer(value)
+}
+
+func (c FfiConverterString) LowerExternal(value string) ExternalCRustBuffer {
+	return RustBufferFromC(stringToRustBuffer(value))
 }
 
 func (FfiConverterString) Write(writer io.Writer, value string) {
@@ -772,6 +798,10 @@ func (c FfiConverterBytes) Lower(value []byte) C.RustBuffer {
 	return LowerIntoRustBuffer[[]byte](c, value)
 }
 
+func (c FfiConverterBytes) LowerExternal(value []byte) ExternalCRustBuffer {
+	return RustBufferFromC(c.Lower(value))
+}
+
 func (c FfiConverterBytes) Write(writer io.Writer, value []byte) {
 	if len(value) > math.MaxInt32 {
 		panic("[]byte is too large to fit into Int32")
@@ -795,7 +825,7 @@ func (c FfiConverterBytes) Read(reader io.Reader) []byte {
 	length := readInt32(reader)
 	buffer := make([]byte, length)
 	read_length, err := reader.Read(buffer)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 	if read_length != int(length) {
@@ -1121,9 +1151,9 @@ type ElStackVpnConfig struct {
 	ffiObject FfiObject
 }
 
-func NewElStackVpnConfig(serverHost string, serverServ string, antiOverlap string, recvTimeout uint64, keepaliveInterval uint64, connectionType ElStackVpnConnectionType) *ElStackVpnConfig {
+func NewElStackVpnConfig(serverHost string, serverServ string, antiOverlap string, recvTimeout uint64, connectionTimeout *uint64, keepaliveInterval uint64, connectionType ElStackVpnConnectionType) *ElStackVpnConfig {
 	return FfiConverterElStackVpnConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
-		return C.uniffi_el_stack_fn_constructor_elstackvpnconfig_new(FfiConverterStringINSTANCE.Lower(serverHost), FfiConverterStringINSTANCE.Lower(serverServ), FfiConverterStringINSTANCE.Lower(antiOverlap), FfiConverterUint64INSTANCE.Lower(recvTimeout), FfiConverterUint64INSTANCE.Lower(keepaliveInterval), FfiConverterElStackVpnConnectionTypeINSTANCE.Lower(connectionType), _uniffiStatus)
+		return C.uniffi_el_stack_fn_constructor_elstackvpnconfig_new(FfiConverterStringINSTANCE.Lower(serverHost), FfiConverterStringINSTANCE.Lower(serverServ), FfiConverterStringINSTANCE.Lower(antiOverlap), FfiConverterUint64INSTANCE.Lower(recvTimeout), FfiConverterOptionalUint64INSTANCE.Lower(connectionTimeout), FfiConverterUint64INSTANCE.Lower(keepaliveInterval), FfiConverterElStackVpnConnectionTypeINSTANCE.Lower(connectionType), _uniffiStatus)
 	}))
 }
 
@@ -1177,14 +1207,14 @@ func (_ FfiDestroyerElStackVpnConfig) Destroy(value *ElStackVpnConfig) {
 }
 
 type TcpListenerInterface interface {
-	Accept(timeoutMsecs uint64) (*TcpStream, *SocketError)
+	Accept(timeoutMsecs uint64) (*TcpStream, error)
 	BindAddr() string
 }
 type TcpListener struct {
 	ffiObject FfiObject
 }
 
-func (_self *TcpListener) Accept(timeoutMsecs uint64) (*TcpStream, *SocketError) {
+func (_self *TcpListener) Accept(timeoutMsecs uint64) (*TcpStream, error) {
 	_pointer := _self.ffiObject.incrementPointer("*TcpListener")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1209,6 +1239,10 @@ func (_self *TcpListener) Accept(timeoutMsecs uint64) (*TcpStream, *SocketError)
 			C.ffi_el_stack_rust_future_free_pointer(handle)
 		},
 	)
+
+	if err == nil {
+		return res, nil
+	}
 
 	return res, err
 }
@@ -1276,8 +1310,8 @@ type TcpStreamInterface interface {
 	Close()
 	LocalAddr() string
 	PeerAddr() string
-	Recv(timeoutSecs uint64) ([]byte, *SocketError)
-	Send(buf []byte, timeoutSecs uint64) *SocketError
+	Recv(timeoutSecs uint64) ([]byte, error)
+	Send(buf []byte, timeoutSecs uint64) error
 }
 type TcpStream struct {
 	ffiObject FfiObject
@@ -1286,7 +1320,7 @@ type TcpStream struct {
 func (_self *TcpStream) Close() {
 	_pointer := _self.ffiObject.incrementPointer("*TcpStream")
 	defer _self.ffiObject.decrementPointer()
-	uniffiRustCallAsync[struct{}](
+	uniffiRustCallAsync[error](
 		nil,
 		// completeFn
 		func(handle C.uint64_t, status *C.RustCallStatus) struct{} {
@@ -1331,7 +1365,7 @@ func (_self *TcpStream) PeerAddr() string {
 	}))
 }
 
-func (_self *TcpStream) Recv(timeoutSecs uint64) ([]byte, *SocketError) {
+func (_self *TcpStream) Recv(timeoutSecs uint64) ([]byte, error) {
 	_pointer := _self.ffiObject.incrementPointer("*TcpStream")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1359,10 +1393,14 @@ func (_self *TcpStream) Recv(timeoutSecs uint64) ([]byte, *SocketError) {
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
-func (_self *TcpStream) Send(buf []byte, timeoutSecs uint64) *SocketError {
+func (_self *TcpStream) Send(buf []byte, timeoutSecs uint64) error {
 	_pointer := _self.ffiObject.incrementPointer("*TcpStream")
 	defer _self.ffiObject.decrementPointer()
 	_, err := uniffiRustCallAsync[SocketError](
@@ -1385,6 +1423,10 @@ func (_self *TcpStream) Send(buf []byte, timeoutSecs uint64) *SocketError {
 			C.ffi_el_stack_rust_future_free_void(handle)
 		},
 	)
+
+	if err == nil {
+		return nil
+	}
 
 	return err
 }
@@ -1441,8 +1483,8 @@ type TlsStreamInterface interface {
 	Close()
 	LocalAddr() string
 	PeerAddr() string
-	Recv(timeoutSecs uint64) ([]byte, *SocketError)
-	Send(buf []byte, timeoutSecs uint64) *SocketError
+	Recv(timeoutSecs uint64) ([]byte, error)
+	Send(buf []byte, timeoutSecs uint64) error
 }
 type TlsStream struct {
 	ffiObject FfiObject
@@ -1451,7 +1493,7 @@ type TlsStream struct {
 func (_self *TlsStream) Close() {
 	_pointer := _self.ffiObject.incrementPointer("*TlsStream")
 	defer _self.ffiObject.decrementPointer()
-	uniffiRustCallAsync[struct{}](
+	uniffiRustCallAsync[error](
 		nil,
 		// completeFn
 		func(handle C.uint64_t, status *C.RustCallStatus) struct{} {
@@ -1496,7 +1538,7 @@ func (_self *TlsStream) PeerAddr() string {
 	}))
 }
 
-func (_self *TlsStream) Recv(timeoutSecs uint64) ([]byte, *SocketError) {
+func (_self *TlsStream) Recv(timeoutSecs uint64) ([]byte, error) {
 	_pointer := _self.ffiObject.incrementPointer("*TlsStream")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1524,10 +1566,14 @@ func (_self *TlsStream) Recv(timeoutSecs uint64) ([]byte, *SocketError) {
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
-func (_self *TlsStream) Send(buf []byte, timeoutSecs uint64) *SocketError {
+func (_self *TlsStream) Send(buf []byte, timeoutSecs uint64) error {
 	_pointer := _self.ffiObject.incrementPointer("*TlsStream")
 	defer _self.ffiObject.decrementPointer()
 	_, err := uniffiRustCallAsync[SocketError](
@@ -1550,6 +1596,10 @@ func (_self *TlsStream) Send(buf []byte, timeoutSecs uint64) *SocketError {
 			C.ffi_el_stack_rust_future_free_void(handle)
 		},
 	)
+
+	if err == nil {
+		return nil
+	}
 
 	return err
 }
@@ -1604,8 +1654,8 @@ func (_ FfiDestroyerTlsStream) Destroy(value *TlsStream) {
 
 type UdpSocketInterface interface {
 	LocalAddr() string
-	RecvFrom(timeoutSecs uint64) (RecvFromResult, *SocketError)
-	SendTo(buf []byte, target string, timeoutSecs uint64) (uint32, *SocketError)
+	RecvFrom(timeoutSecs uint64) (RecvFromResult, error)
+	SendTo(buf []byte, target string, timeoutSecs uint64) (uint32, error)
 }
 type UdpSocket struct {
 	ffiObject FfiObject
@@ -1622,7 +1672,7 @@ func (_self *UdpSocket) LocalAddr() string {
 	}))
 }
 
-func (_self *UdpSocket) RecvFrom(timeoutSecs uint64) (RecvFromResult, *SocketError) {
+func (_self *UdpSocket) RecvFrom(timeoutSecs uint64) (RecvFromResult, error) {
 	_pointer := _self.ffiObject.incrementPointer("*UdpSocket")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1650,10 +1700,14 @@ func (_self *UdpSocket) RecvFrom(timeoutSecs uint64) (RecvFromResult, *SocketErr
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
-func (_self *UdpSocket) SendTo(buf []byte, target string, timeoutSecs uint64) (uint32, *SocketError) {
+func (_self *UdpSocket) SendTo(buf []byte, target string, timeoutSecs uint64) (uint32, error) {
 	_pointer := _self.ffiObject.incrementPointer("*UdpSocket")
 	defer _self.ffiObject.decrementPointer()
 	res, err := uniffiRustCallAsync[SocketError](
@@ -1678,6 +1732,10 @@ func (_self *UdpSocket) SendTo(buf []byte, target string, timeoutSecs uint64) (u
 			C.ffi_el_stack_rust_future_free_u32(handle)
 		},
 	)
+
+	if err == nil {
+		return res, nil
+	}
 
 	return res, err
 }
@@ -1757,6 +1815,10 @@ func (c FfiConverterRecvFromResult) Read(reader io.Reader) RecvFromResult {
 
 func (c FfiConverterRecvFromResult) Lower(value RecvFromResult) C.RustBuffer {
 	return LowerIntoRustBuffer[RecvFromResult](c, value)
+}
+
+func (c FfiConverterRecvFromResult) LowerExternal(value RecvFromResult) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[RecvFromResult](c, value))
 }
 
 func (c FfiConverterRecvFromResult) Write(writer io.Writer, value RecvFromResult) {
@@ -2377,6 +2439,10 @@ func (c FfiConverterConnectionError) Lower(value *ConnectionError) C.RustBuffer 
 	return LowerIntoRustBuffer[*ConnectionError](c, value)
 }
 
+func (c FfiConverterConnectionError) LowerExternal(value *ConnectionError) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*ConnectionError](c, value))
+}
+
 func (c FfiConverterConnectionError) Read(reader io.Reader) *ConnectionError {
 	errorID := readUint32(reader)
 
@@ -2601,6 +2667,10 @@ func (c FfiConverterElStackVpnConnectionType) Lift(rb RustBufferI) ElStackVpnCon
 
 func (c FfiConverterElStackVpnConnectionType) Lower(value ElStackVpnConnectionType) C.RustBuffer {
 	return LowerIntoRustBuffer[ElStackVpnConnectionType](c, value)
+}
+
+func (c FfiConverterElStackVpnConnectionType) LowerExternal(value ElStackVpnConnectionType) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[ElStackVpnConnectionType](c, value))
 }
 func (FfiConverterElStackVpnConnectionType) Read(reader io.Reader) ElStackVpnConnectionType {
 	id := readInt32(reader)
@@ -3071,6 +3141,10 @@ func (c FfiConverterSocketError) Lower(value *SocketError) C.RustBuffer {
 	return LowerIntoRustBuffer[*SocketError](c, value)
 }
 
+func (c FfiConverterSocketError) LowerExternal(value *SocketError) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*SocketError](c, value))
+}
+
 func (c FfiConverterSocketError) Read(reader io.Reader) *SocketError {
 	errorID := readUint32(reader)
 
@@ -3248,6 +3322,10 @@ func (c FfiConverterVpnStatus) Lift(rb RustBufferI) VpnStatus {
 
 func (c FfiConverterVpnStatus) Lower(value VpnStatus) C.RustBuffer {
 	return LowerIntoRustBuffer[VpnStatus](c, value)
+}
+
+func (c FfiConverterVpnStatus) LowerExternal(value VpnStatus) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[VpnStatus](c, value))
 }
 func (FfiConverterVpnStatus) Read(reader io.Reader) VpnStatus {
 	id := readInt32(reader)
@@ -3611,6 +3689,10 @@ func (c FfiConverterOptionalUint64) Lower(value *uint64) C.RustBuffer {
 	return LowerIntoRustBuffer[*uint64](c, value)
 }
 
+func (c FfiConverterOptionalUint64) LowerExternal(value *uint64) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*uint64](c, value))
+}
+
 func (_ FfiConverterOptionalUint64) Write(writer io.Writer, value *uint64) {
 	if value == nil {
 		writeInt8(writer, 0)
@@ -3646,6 +3728,10 @@ func (_ FfiConverterOptionalString) Read(reader io.Reader) *string {
 
 func (c FfiConverterOptionalString) Lower(value *string) C.RustBuffer {
 	return LowerIntoRustBuffer[*string](c, value)
+}
+
+func (c FfiConverterOptionalString) LowerExternal(value *string) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*string](c, value))
 }
 
 func (_ FfiConverterOptionalString) Write(writer io.Writer, value *string) {
@@ -3687,6 +3773,10 @@ func (c FfiConverterSequenceString) Read(reader io.Reader) []string {
 
 func (c FfiConverterSequenceString) Lower(value []string) C.RustBuffer {
 	return LowerIntoRustBuffer[[]string](c, value)
+}
+
+func (c FfiConverterSequenceString) LowerExternal(value []string) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[[]string](c, value))
 }
 
 func (c FfiConverterSequenceString) Write(writer io.Writer, value []string) {
@@ -3785,7 +3875,7 @@ func Restart() {
 	})
 }
 
-func Start(vpnDelegate ElStackVpnEventDelegate, vpnConfig *ElStackVpnConfig, vcConfig *ElStackVcConfig, capturePath *string) *ConnectionError {
+func Start(vpnDelegate ElStackVpnEventDelegate, vpnConfig *ElStackVpnConfig, vcConfig *ElStackVcConfig, capturePath *string) error {
 	_, err := uniffiRustCallAsync[ConnectionError](
 		FfiConverterConnectionErrorINSTANCE,
 		// completeFn
@@ -3806,6 +3896,10 @@ func Start(vpnDelegate ElStackVpnEventDelegate, vpnConfig *ElStackVpnConfig, vcC
 		},
 	)
 
+	if err == nil {
+		return nil
+	}
+
 	return err
 }
 
@@ -3817,7 +3911,7 @@ func Stop() {
 }
 
 // TCPのbind(for tcp server)
-func TcpBind(bindAddr string) (*TcpListener, *SocketError) {
+func TcpBind(bindAddr string) (*TcpListener, error) {
 	res, err := uniffiRustCallAsync[SocketError](
 		FfiConverterSocketErrorINSTANCE,
 		// completeFn
@@ -3840,11 +3934,15 @@ func TcpBind(bindAddr string) (*TcpListener, *SocketError) {
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
 // TCPの接続(for tcp client)
-func TcpConnect(host string, serv string, timeoutInterval uint64) (*TcpStream, *SocketError) {
+func TcpConnect(host string, serv string, timeoutInterval uint64) (*TcpStream, error) {
 	res, err := uniffiRustCallAsync[SocketError](
 		FfiConverterSocketErrorINSTANCE,
 		// completeFn
@@ -3867,11 +3965,15 @@ func TcpConnect(host string, serv string, timeoutInterval uint64) (*TcpStream, *
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
 // TLSの接続
-func TlsConnect(host string, serv string, timeoutInterval uint64) (*TlsStream, *SocketError) {
+func TlsConnect(host string, serv string, timeoutInterval uint64) (*TlsStream, error) {
 	res, err := uniffiRustCallAsync[SocketError](
 		FfiConverterSocketErrorINSTANCE,
 		// completeFn
@@ -3894,11 +3996,15 @@ func TlsConnect(host string, serv string, timeoutInterval uint64) (*TlsStream, *
 		},
 	)
 
+	if err == nil {
+		return res, nil
+	}
+
 	return res, err
 }
 
 // UDPのbind(for udp server/client)
-func UdpBind(bindAddr string) (*UdpSocket, *SocketError) {
+func UdpBind(bindAddr string) (*UdpSocket, error) {
 	res, err := uniffiRustCallAsync[SocketError](
 		FfiConverterSocketErrorINSTANCE,
 		// completeFn
@@ -3920,6 +4026,10 @@ func UdpBind(bindAddr string) (*UdpSocket, *SocketError) {
 			C.ffi_el_stack_rust_future_free_pointer(handle)
 		},
 	)
+
+	if err == nil {
+		return res, nil
+	}
 
 	return res, err
 }
