@@ -390,6 +390,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			return nil, errors.New("invalid config: cannot use NAT mode and EL mode at same time")
 		}
 		el.Use = config.ELUse
+		el.ProductName = clientIdentifier
 		el.HolderVC = config.ELHolderVC
 		el.HolderPrivKey = config.ELHolderPrivKey
 		el.AntiOverlap = config.ELAntiOverlap

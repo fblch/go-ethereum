@@ -11,6 +11,9 @@ type ELConfig struct {
 	// Use is the flag for enabling p2p networking over Emotion Link.
 	Use bool
 
+	// ProductName is the name of the product using the EL stack.
+	ProductName string
+
 	// HolderVC is the EL client's VC required for connecting to the EL server.
 	HolderVC string
 
@@ -43,6 +46,9 @@ func ValidateELConfig(cfg *ELConfig) error {
 	}
 	if !cfg.Use {
 		return fmt.Errorf("EL is disabled")
+	}
+	if strings.TrimSpace(cfg.ProductName) == "" {
+		return fmt.Errorf("ProductName is not set")
 	}
 	if strings.TrimSpace(cfg.HolderVC) == "" {
 		return fmt.Errorf("HolderVC is not set")
