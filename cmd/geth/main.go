@@ -167,6 +167,7 @@ var (
 		utils.ELServerAddrFlag,
 		utils.ELServerPortFlag,
 		utils.ELServerCACertFlag,
+		utils.ELConnectionTimeoutFlag,
 		utils.ELCapturePathFlag,
 		// ADDED by Hinata AWAIISHIMA END (EL)
 		configFileFlag,

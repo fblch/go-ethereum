@@ -37,6 +37,9 @@ type ELConfig struct {
 
 	// CapturePath is the file to store EL packet capture (set to enable packet capture).
 	CapturePath string
+
+	// ConnectionTimeout is the optional timeout for initial EL connection establishment.
+	ConnectionTimeout *uint64
 }
 
 // ValidateELConfig validates EL config before starting EL stack.

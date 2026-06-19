@@ -148,9 +148,10 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 
 	vpnRecvTimeoutSec := uint64(180)
 	vpnKeepAliveIntervalSec := uint64(60)
+	vpnConnectionTimeoutSec := cfg.ConnectionTimeout
 
 	vpnConfig := el_stack.NewElStackVpnConfig(cfg.ServerAddr, strconv.Itoa(cfg.ServerPort), cfg.AntiOverlap,
-		vpnRecvTimeoutSec, nil, vpnKeepAliveIntervalSec, el_stack.ElStackVpnConnectionTypeQuic,
+		vpnRecvTimeoutSec, vpnConnectionTimeoutSec, vpnKeepAliveIntervalSec, el_stack.ElStackVpnConnectionTypeQuic,
 	)
 
 	// Create product config
