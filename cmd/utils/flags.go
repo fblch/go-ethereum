@@ -1254,6 +1254,8 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	if !cfg.EL.Use {
 		return
 	}
+	// Same as node.Config.Name, which is set to main.clientIdentifier
+	cfg.EL.ProductName = "geth"
 	if ctx.IsSet(ELHolderVCFlag.Name) {
 		value, err := elstack.ReadTrimmedFile(ctx.Path(ELHolderVCFlag.Name), false)
 		if err != nil {

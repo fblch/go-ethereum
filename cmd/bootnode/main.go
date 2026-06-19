@@ -145,6 +145,7 @@ func main() {
 		}
 		elCfg := &elstack.ELConfig{
 			Use:           true,
+			ProductName:   "bootnode",
 			HolderVC:      holderVC,
 			HolderPrivKey: holderPrivKey,
 			AntiOverlap:   antiOverlap,
