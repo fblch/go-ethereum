@@ -10,6 +10,7 @@ import (
 const initialELResultsBufferSize = 8
 
 func (srv *Server) setupEL() error {
+	// Don't do anything if EL is not configured or disabled.
 	if srv.EL == nil || !srv.EL.Use {
 		return nil
 	}
@@ -42,7 +43,7 @@ func (srv *Server) setupEL() error {
 		stopEL()
 		return err
 	}
-	go srv.monitorEL(results)
+	go elstack.MonitorEL(results, srv.quit)
 
 	return nil
 }
@@ -58,21 +59,4 @@ func (srv *Server) applyELBindings(addr net.IP) error {
 	srv.Dialer = elstack.ElStackTcpDialer{Timeout: defaultDialTimeout}
 	srv.listenUDPFunc = elstack.ListenELUDP
 	return nil
-}
-
-func (srv *Server) monitorEL(results chan elstack.LinkedResult) {
-	for {
-		select {
-		case result, ok := <-results:
-			if !ok {
-				srv.log.Error("LinkedResult channel is disabled")
-				return
-			}
-			if result.Err != nil {
-				srv.log.Error("EL link disconnected", "reason", result.Err)
-			}
-		case <-srv.quit:
-			return
-		}
-	}
 }
