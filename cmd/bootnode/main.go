@@ -167,11 +167,11 @@ func main() {
 		}
 		baseListen := *listenAddr
 		if baseListen == "" {
-			utils.Fatalf("EL enabled requires non-empty -addr")
+			utils.Fatalf("EL requires non-empty listen address")
 		}
 		_, port, err := net.SplitHostPort(baseListen)
 		if err != nil {
-			utils.Fatalf("invalid -addr %q: %v", baseListen, err)
+			utils.Fatalf("Invalid listen address %q: %v", baseListen, err)
 		}
 		*listenAddr = net.JoinHostPort(addr.String(), port)
 		go elstack.MonitorEL(results, nil)
@@ -221,7 +221,8 @@ func main() {
 }
 
 // ADDED by Hinata AWAIISHIMA (EL)
-// function of wrapper to return discover.UDPConn interface
+// ListenUDP directly calls net.ListenUDP
+// and casts the returned net.UDPConn pointer to discover.UDPConn interface.
 func ListenUDP(network string, addr *net.UDPAddr) (discover.UDPConn, error) {
 	return net.ListenUDP(network, addr)
 }
