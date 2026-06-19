@@ -241,3 +241,34 @@ func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
 		}
 	}
 }
+
+// MonitorEL keeps monitoring the EL link status and logs any disconnections or re-establishments.
+func MonitorEL(results <-chan LinkedResult, srvQuit <-chan struct{}) {
+	for {
+		select {
+		case result, ok := <-results:
+			if !ok {
+				elLog.Error("LinkedResult channel closed! Stopping EL monitoring...")
+				return
+			}
+			if result.Err != nil {
+				elLog.Error("EL link disconnected! Waiting for retry...", "err", result.Err)
+				continue
+			}
+			if result.Addr != nil {
+				// TODO by Jakub Pajek (EL): what if the IP changes?
+				// We should update staticIP and rebind listeners,
+				// but is it possible without stopping the Server object?
+				// (Server object can not be re-used after stopping)
+				elLog.Info("EL link re-established", "ip", result.Addr)
+				continue
+			}
+		case <-srvQuit:
+			// srvQuit will be nil when MonitorEL is called from bootnode.
+			// Any send or receive operation on a nil channel blocks forever.
+			// When used inside a select statement, the select simply ignores
+			// that case and it will never be chosen.
+			return
+		}
+	}
+}

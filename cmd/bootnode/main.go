@@ -174,7 +174,7 @@ func main() {
 			utils.Fatalf("invalid -addr %q: %v", baseListen, err)
 		}
 		*listenAddr = net.JoinHostPort(addr.String(), port)
-		go monitorEL(results)
+		go elstack.MonitorEL(results, nil)
 		listenUDPFunc = elstack.ListenELUDP
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
@@ -234,16 +234,6 @@ func printNotice(nodeKey *ecdsa.PublicKey, addr net.UDPAddr) {
 	fmt.Println(n.URLv4())
 	fmt.Println("Note: you're using cmd/bootnode, a developer tool.")
 	fmt.Println("We recommend using a regular node as bootstrap node for production deployments.")
-}
-
-// ADDED by Hinata AWAIISHIMA (EL)
-func monitorEL(results <-chan elstack.LinkedResult) {
-	for result := range results {
-		if result.Err != nil {
-			log.Error("EL link disconnected", "reason", result.Err)
-		}
-	}
-	log.Error("LinkedResult channel is disabled")
 }
 
 func doPortMapping(natm nat.Interface, ln *enode.LocalNode, addr *net.UDPAddr) *net.UDPAddr {
