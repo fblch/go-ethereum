@@ -394,13 +394,6 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if natif != nil {
 			return nil, errors.New("invalid config: cannot use NAT mode and EL mode at same time")
 		}
-		var connectionTimeout *uint64
-		if config.ELConnectionTimeout < 0 {
-			return nil, errors.New("invalid config: EL connection timeout must be non-negative")
-		} else if config.ELConnectionTimeout > 0 {
-			timeout := uint64(config.ELConnectionTimeout)
-			connectionTimeout = &timeout
-		}
 
 		el.Use = config.ELUse
 		el.ProductName = clientIdentifier
@@ -412,7 +405,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.ServerPort = config.ELServerPort
 		el.ServerCACert = config.ELServerCACert
 		el.CapturePath = config.ELCapturePath
-		el.ConnectionTimeout = connectionTimeout
+		el.ConnectionTimeout = config.ELConnectionTimeout
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
 			return nil, fmt.Errorf("invalid config: %v", err)

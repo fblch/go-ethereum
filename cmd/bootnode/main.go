@@ -144,14 +144,6 @@ func main() {
 		if err != nil {
 			utils.Fatalf("Failed to read EL server's cert: %v", err)
 		}
-		var connectionTimeout *uint64
-		if *elConnTimeout < 0 {
-			utils.Fatalf("EL connection timeout must be non-negative")
-		}
-		if *elConnTimeout > 0 {
-			timeout := uint64(*elConnTimeout)
-			connectionTimeout = &timeout
-		}
 		elCfg := &elstack.ELConfig{
 			Use:               true,
 			ProductName:       "bootnode",
@@ -163,7 +155,7 @@ func main() {
 			ServerPort:        *elServerPort,
 			ServerCACert:      serverCACert,
 			CapturePath:       *elCapturePath,
-			ConnectionTimeout: connectionTimeout,
+			ConnectionTimeout: *elConnTimeout,
 		}
 		if err := elstack.ValidateELConfig(elCfg); err != nil {
 			utils.Fatalf("Invalid EL config: %v", err)

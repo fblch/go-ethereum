@@ -1303,16 +1303,7 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		cfg.EL.ServerCACert = value
 	}
 	if ctx.IsSet(ELConnectionTimeoutFlag.Name) {
-		connectionTimeout := ctx.Int64(ELConnectionTimeoutFlag.Name)
-		if connectionTimeout < 0 {
-			Fatalf("EL connection timeout must be non-negative")
-		}
-		if connectionTimeout > 0 {
-			timeout := uint64(connectionTimeout)
-			cfg.EL.ConnectionTimeout = &timeout
-		} else {
-			cfg.EL.ConnectionTimeout = nil
-		}
+		cfg.EL.ConnectionTimeout = ctx.Int64(ELConnectionTimeoutFlag.Name)
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)

@@ -39,7 +39,7 @@ type ELConfig struct {
 	CapturePath string
 
 	// ConnectionTimeout is the optional timeout for initial EL connection establishment.
-	ConnectionTimeout *uint64
+	ConnectionTimeout int64
 }
 
 // ValidateELConfig validates EL config before starting EL stack.
@@ -70,6 +70,9 @@ func ValidateELConfig(cfg *ELConfig) error {
 	}
 	if cfg.ServerPort <= 0 {
 		return fmt.Errorf("ServerPort is not set or invalid")
+	}
+	if cfg.ConnectionTimeout < 0 {
+		return fmt.Errorf("ConnectionTimeout is not positive")
 	}
 	return nil
 }
