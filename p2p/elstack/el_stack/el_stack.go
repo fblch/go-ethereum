@@ -1,7 +1,7 @@
 package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
-// #cgo windows,amd64 LDFLAGS: ${SRCDIR}/libs/windows_amd64/libel_stack_v1.14.23.a -lm -liphlpapi -luserenv -lntdll
+// #cgo windows,amd64 LDFLAGS: ${SRCDIR}/libs/windows_amd64/libel_stack_v1.15.0.a -lm -liphlpapi -luserenv -lntdll
 // #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack_v1.14.23.a -lm
 // #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack_v1.14.23.a -lm
 // #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack_v1.14.23.a -lm -framework SystemConfiguration -framework CoreFoundation
