@@ -2,9 +2,9 @@ package el_stack
 
 // #cgo CFLAGS: -I${SRCDIR}
 // #cgo windows,amd64 LDFLAGS: ${SRCDIR}/libs/windows_amd64/libel_stack_v1.15.0.a -lm -liphlpapi -luserenv -lntdll
-// #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack_v1.14.23.a -lm
-// #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack_v1.14.23.a -lm
-// #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack_v1.14.23.a -lm -framework SystemConfiguration -framework CoreFoundation
+// #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack_v1.15.0.a -lm
+// #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack_v1.15.0.a -lm
+// #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack_v1.15.0.a -lm -framework SystemConfiguration -framework CoreFoundation
 // #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack_v1.15.0.a -lm
 // #cgo !android,linux,amd64 LDFLAGS: ${SRCDIR}/libs/linux_amd64/libel_stack_v1.15.0.a -lm
 // #cgo !android,linux,arm64 LDFLAGS: ${SRCDIR}/libs/linux_arm64/libel_stack_v1.15.0.a -lm
