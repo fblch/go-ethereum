@@ -226,13 +226,12 @@ type NodeConfig struct {
 	ELServerCACert string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
-	ELCapturePath string
+	// ELConnTimeout is the EL server connection timeout in seconds (0 = infinite).
+	ELConnTimeout int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
-	// ELConnectionTimeout is the optional emotion-link connection timeout in seconds.
-	// Zero means unset.
-	ELConnectionTimeout int64
+	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
+	ELCapturePath string
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -404,8 +403,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.ServerAddr = config.ELServerAddr
 		el.ServerPort = config.ELServerPort
 		el.ServerCACert = config.ELServerCACert
+		el.ConnTimeout = config.ELConnTimeout
 		el.CapturePath = config.ELCapturePath
-		el.ConnectionTimeout = config.ELConnectionTimeout
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
 			return nil, fmt.Errorf("invalid config: %v", err)

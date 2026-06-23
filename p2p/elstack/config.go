@@ -35,11 +35,12 @@ type ELConfig struct {
 	// ServerCACert is the EL server's CA certificate.
 	ServerCACert string
 
+	// ConnTimeout is the EL server connection timeout in seconds (0 = infinite).
+	// Note that the effective connection timeout is the smaller of ConnTimeout and RecvTimeout.
+	ConnTimeout int
+
 	// CapturePath is the file to store EL packet capture (set to enable packet capture).
 	CapturePath string
-
-	// ConnectionTimeout is the optional timeout for initial EL connection establishment.
-	ConnectionTimeout int64
 }
 
 // ValidateELConfig validates EL config before starting EL stack.
@@ -71,8 +72,8 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if cfg.ServerPort <= 0 {
 		return fmt.Errorf("ServerPort is not set or invalid")
 	}
-	if cfg.ConnectionTimeout < 0 {
-		return fmt.Errorf("ConnectionTimeout is not positive")
+	if cfg.ConnTimeout < 0 {
+		return fmt.Errorf("ConnTimeout is negative")
 	}
 	return nil
 }

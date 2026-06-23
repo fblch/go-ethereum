@@ -942,14 +942,14 @@ var (
 		Usage:    "File containing EL server's CA certificate",
 		Category: flags.NetworkingCategory,
 	}
+	ELConnTimeoutFlag = &cli.IntFlag{
+		Name:     "el.conntimeout",
+		Usage:    "EL server connection timeout in seconds (0 = infinite)",
+		Category: flags.NetworkingCategory,
+	}
 	ELCapturePathFlag = &cli.PathFlag{
 		Name:     "el.capturepath",
 		Usage:    "File to store EL packet capture (set to enable packet capture)",
-		Category: flags.NetworkingCategory,
-	}
-	ELConnectionTimeoutFlag = &cli.Int64Flag{
-		Name:     "el.connectiontimeout",
-		Usage:    "Optional EL connection timeout in seconds (0 disables override)",
 		Category: flags.NetworkingCategory,
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
@@ -1302,8 +1302,8 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.EL.ServerCACert = value
 	}
-	if ctx.IsSet(ELConnectionTimeoutFlag.Name) {
-		cfg.EL.ConnectionTimeout = ctx.Int64(ELConnectionTimeoutFlag.Name)
+	if ctx.IsSet(ELConnTimeoutFlag.Name) {
+		cfg.EL.ConnTimeout = ctx.Int(ELConnTimeoutFlag.Name)
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)

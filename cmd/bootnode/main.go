@@ -61,8 +61,8 @@ func main() {
 		elServerAddr    = flag.String("el.serveraddr", "", "address of the EL server")
 		elServerPort    = flag.Int("el.serverport", 0, "port of the EL server")
 		elServerCACert  = flag.String("el.servercacert", "", "file containing EL server's CA certificate")
+		elConnTimeout   = flag.Int("el.conntimeout", 0, "EL server connection timeout in seconds (0 = infinite)")
 		elCapturePath   = flag.String("el.capturepath", "", "file to store EL packet capture (set to enable packet capture)")
-		elConnTimeout   = flag.Int64("el.connectiontimeout", 0, "optional emotion link connection timeout in seconds")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
 		nodeKey *ecdsa.PrivateKey
@@ -145,17 +145,17 @@ func main() {
 			utils.Fatalf("Failed to read EL server's cert: %v", err)
 		}
 		elCfg := &elstack.ELConfig{
-			Use:               true,
-			ProductName:       "bootnode",
-			HolderVC:          holderVC,
-			HolderPrivKey:     holderPrivKey,
-			AntiOverlap:       antiOverlap,
-			IssuerPubKey:      issuerPubKey,
-			ServerAddr:        *elServerAddr,
-			ServerPort:        *elServerPort,
-			ServerCACert:      serverCACert,
-			CapturePath:       *elCapturePath,
-			ConnectionTimeout: *elConnTimeout,
+			Use:           true,
+			ProductName:   "bootnode",
+			HolderVC:      holderVC,
+			HolderPrivKey: holderPrivKey,
+			AntiOverlap:   antiOverlap,
+			IssuerPubKey:  issuerPubKey,
+			ServerAddr:    *elServerAddr,
+			ServerPort:    *elServerPort,
+			ServerCACert:  serverCACert,
+			ConnTimeout:   *elConnTimeout,
+			CapturePath:   *elCapturePath,
 		}
 		if err := elstack.ValidateELConfig(elCfg); err != nil {
 			utils.Fatalf("Invalid EL config: %v", err)
