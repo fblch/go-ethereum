@@ -228,6 +228,11 @@ type NodeConfig struct {
 	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
 	ELCapturePath string
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELConnectionTimeout is the optional emotion-link connection timeout in seconds.
+	// Zero means unset.
+	ELConnectionTimeout int64
 }
 
 // defaultNodeConfig contains the default node configuration values to use if all
@@ -389,6 +394,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		if natif != nil {
 			return nil, errors.New("invalid config: cannot use NAT mode and EL mode at same time")
 		}
+
 		el.Use = config.ELUse
 		el.ProductName = clientIdentifier
 		el.HolderVC = config.ELHolderVC
@@ -399,6 +405,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.ServerPort = config.ELServerPort
 		el.ServerCACert = config.ELServerCACert
 		el.CapturePath = config.ELCapturePath
+		el.ConnectionTimeout = config.ELConnectionTimeout
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
 			return nil, fmt.Errorf("invalid config: %v", err)

@@ -947,6 +947,11 @@ var (
 		Usage:    "File to store EL packet capture (set to enable packet capture)",
 		Category: flags.NetworkingCategory,
 	}
+	ELConnectionTimeoutFlag = &cli.Int64Flag{
+		Name:     "el.connectiontimeout",
+		Usage:    "Optional EL connection timeout in seconds (0 disables override)",
+		Category: flags.NetworkingCategory,
+	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 
 	// Console
@@ -1296,6 +1301,9 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 			Fatalf("Failed to read EL server's cert: %v", err)
 		}
 		cfg.EL.ServerCACert = value
+	}
+	if ctx.IsSet(ELConnectionTimeoutFlag.Name) {
+		cfg.EL.ConnectionTimeout = ctx.Int64(ELConnectionTimeoutFlag.Name)
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)
