@@ -35,9 +35,17 @@ type ELConfig struct {
 	// ServerCACert is the EL server's CA certificate.
 	ServerCACert string
 
+	// RecvTimeout is the EL server receive timeout in seconds.
+	// Recommended value: 180.
+	RecvTimeout int
+
 	// ConnTimeout is the EL server connection timeout in seconds (0 = infinite).
 	// Note that the effective connection timeout is the smaller of ConnTimeout and RecvTimeout.
 	ConnTimeout int
+
+	// KeepAliveInterval is the EL keepalive interval in seconds.
+	// Recommended value: 60.
+	KeepAliveInterval int
 
 	// CapturePath is the file to store EL packet capture (set to enable packet capture).
 	CapturePath string
@@ -72,8 +80,17 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if cfg.ServerPort <= 0 {
 		return fmt.Errorf("ServerPort is not set or invalid")
 	}
+	if cfg.RecvTimeout < 0 {
+		return fmt.Errorf("RecvTimeout is negative")
+	}
 	if cfg.ConnTimeout < 0 {
 		return fmt.Errorf("ConnTimeout is negative")
+	}
+	if cfg.KeepAliveInterval < 0 {
+		return fmt.Errorf("KeepAliveInterval is negative")
+	}
+	if cfg.RecvTimeout < cfg.KeepAliveInterval {
+		return fmt.Errorf("KeepAliveInterval has to be smaller than RecvTimeout")
 	}
 	return nil
 }
