@@ -944,17 +944,20 @@ var (
 	}
 	ELRecvTimeoutFlag = &cli.IntFlag{
 		Name:     "el.recvtimeout",
-		Usage:    "EL server receive timeout in seconds (recommended: 180)",
+		Value:    180,
+		Usage:    "EL server receive timeout in seconds",
 		Category: flags.NetworkingCategory,
 	}
 	ELConnTimeoutFlag = &cli.IntFlag{
 		Name:     "el.conntimeout",
+		Value:    60,
 		Usage:    "EL server connection timeout in seconds (0 = infinite)",
 		Category: flags.NetworkingCategory,
 	}
 	ELKeepAliveIntervalFlag = &cli.IntFlag{
 		Name:     "el.keepaliveinterval",
-		Usage:    "EL keepalive interval in seconds (recommended: 60)",
+		Value:    60,
+		Usage:    "EL keepalive interval in seconds",
 		Category: flags.NetworkingCategory,
 	}
 	ELCapturePathFlag = &cli.PathFlag{

@@ -61,9 +61,9 @@ func main() {
 		elServerAddr    = flag.String("el.serveraddr", "", "address of the EL server")
 		elServerPort    = flag.Int("el.serverport", 0, "port of the EL server")
 		elServerCACert  = flag.String("el.servercacert", "", "file containing EL server's CA certificate")
-		elRecvTimeout   = flag.Int("el.recvtimeout", 0, "EL server receive timeout in seconds (recommended: 180)")
-		elConnTimeout   = flag.Int("el.conntimeout", 0, "EL server connection timeout in seconds (0 = infinite)")
-		elKeepAliveInt  = flag.Int("el.keepaliveinterval", 0, "EL keepalive interval in seconds (recommended: 60)")
+		elRecvTimeout   = flag.Int("el.recvtimeout", 180, "EL server receive timeout in seconds")
+		elConnTimeout   = flag.Int("el.conntimeout", 60, "EL server connection timeout in seconds (0 = infinite)")
+		elKeepAliveInt  = flag.Int("el.keepaliveinterval", 60, "EL keepalive interval in seconds")
 		elCapturePath   = flag.String("el.capturepath", "", "file to store EL packet capture (set to enable packet capture)")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
