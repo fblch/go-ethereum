@@ -942,9 +942,19 @@ var (
 		Usage:    "File containing EL server's CA certificate",
 		Category: flags.NetworkingCategory,
 	}
+	ELRecvTimeoutFlag = &cli.IntFlag{
+		Name:     "el.recvtimeout",
+		Usage:    "EL server receive timeout in seconds (recommended: 180)",
+		Category: flags.NetworkingCategory,
+	}
 	ELConnTimeoutFlag = &cli.IntFlag{
 		Name:     "el.conntimeout",
 		Usage:    "EL server connection timeout in seconds (0 = infinite)",
+		Category: flags.NetworkingCategory,
+	}
+	ELKeepAliveIntervalFlag = &cli.IntFlag{
+		Name:     "el.keepaliveinterval",
+		Usage:    "EL keepalive interval in seconds (recommended: 60)",
 		Category: flags.NetworkingCategory,
 	}
 	ELCapturePathFlag = &cli.PathFlag{
@@ -1302,8 +1312,14 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.EL.ServerCACert = value
 	}
+	if ctx.IsSet(ELRecvTimeoutFlag.Name) {
+		cfg.EL.RecvTimeout = ctx.Int(ELRecvTimeoutFlag.Name)
+	}
 	if ctx.IsSet(ELConnTimeoutFlag.Name) {
 		cfg.EL.ConnTimeout = ctx.Int(ELConnTimeoutFlag.Name)
+	}
+	if ctx.IsSet(ELKeepAliveIntervalFlag.Name) {
+		cfg.EL.KeepAliveInterval = ctx.Int(ELKeepAliveIntervalFlag.Name)
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)

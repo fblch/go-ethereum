@@ -61,7 +61,9 @@ func main() {
 		elServerAddr    = flag.String("el.serveraddr", "", "address of the EL server")
 		elServerPort    = flag.Int("el.serverport", 0, "port of the EL server")
 		elServerCACert  = flag.String("el.servercacert", "", "file containing EL server's CA certificate")
+		elRecvTimeout   = flag.Int("el.recvtimeout", 0, "EL server receive timeout in seconds (recommended: 180)")
 		elConnTimeout   = flag.Int("el.conntimeout", 0, "EL server connection timeout in seconds (0 = infinite)")
+		elKeepAliveInt  = flag.Int("el.keepaliveinterval", 0, "EL keepalive interval in seconds (recommended: 60)")
 		elCapturePath   = flag.String("el.capturepath", "", "file to store EL packet capture (set to enable packet capture)")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
@@ -145,17 +147,19 @@ func main() {
 			utils.Fatalf("Failed to read EL server's cert: %v", err)
 		}
 		elCfg := &elstack.ELConfig{
-			Use:           true,
-			ProductName:   "bootnode",
-			HolderVC:      holderVC,
-			HolderPrivKey: holderPrivKey,
-			AntiOverlap:   antiOverlap,
-			IssuerPubKey:  issuerPubKey,
-			ServerAddr:    *elServerAddr,
-			ServerPort:    *elServerPort,
-			ServerCACert:  serverCACert,
-			ConnTimeout:   *elConnTimeout,
-			CapturePath:   *elCapturePath,
+			Use:               true,
+			ProductName:       "bootnode",
+			HolderVC:          holderVC,
+			HolderPrivKey:     holderPrivKey,
+			AntiOverlap:       antiOverlap,
+			IssuerPubKey:      issuerPubKey,
+			ServerAddr:        *elServerAddr,
+			ServerPort:        *elServerPort,
+			ServerCACert:      serverCACert,
+			RecvTimeout:       *elRecvTimeout,
+			ConnTimeout:       *elConnTimeout,
+			KeepAliveInterval: *elKeepAliveInt,
+			CapturePath:       *elCapturePath,
 		}
 		if err := elstack.ValidateELConfig(elCfg); err != nil {
 			utils.Fatalf("Invalid EL config: %v", err)

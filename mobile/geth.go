@@ -226,8 +226,18 @@ type NodeConfig struct {
 	ELServerCACert string
 
 	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELRecvTimeout is the EL server receive timeout in seconds.
+	// Recommended value: 180.
+	ELRecvTimeout int
+
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELConnTimeout is the EL server connection timeout in seconds (0 = infinite).
 	ELConnTimeout int
+
+	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELKeepAliveInterval is the EL keepalive interval in seconds.
+	// Recommended value: 60.
+	ELKeepAliveInterval int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
@@ -403,7 +413,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.ServerAddr = config.ELServerAddr
 		el.ServerPort = config.ELServerPort
 		el.ServerCACert = config.ELServerCACert
+		el.RecvTimeout = config.ELRecvTimeout
 		el.ConnTimeout = config.ELConnTimeout
+		el.KeepAliveInterval = config.ELKeepAliveInterval
 		el.CapturePath = config.ELCapturePath
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
