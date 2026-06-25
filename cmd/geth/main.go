@@ -170,6 +170,7 @@ var (
 		utils.ELRecvTimeoutFlag,
 		utils.ELConnTimeoutFlag,
 		utils.ELKeepAliveIntervalFlag,
+		utils.ELRetryPolicyFlag,
 		utils.ELCapturePathFlag,
 		// ADDED by Hinata AWAIISHIMA END (EL)
 		configFileFlag,

@@ -44,10 +44,19 @@ type ELConfig struct {
 
 	// KeepAliveInterval is the EL keepalive interval in seconds.
 	KeepAliveInterval int
+	
+	// RetryPolicy controls how the client behaves when the initial EL link fails.
+	RetryPolicy int
 
 	// CapturePath is the file to store EL packet capture (set to enable packet capture).
 	CapturePath string
 }
+
+const (
+	ELRetryPolicyRetry = iota
+	ELRetryPolicyFailFast
+	ELRetryPolicyFallback
+)
 
 // ValidateELConfig validates EL config before starting EL stack.
 func ValidateELConfig(cfg *ELConfig) error {
@@ -92,6 +101,11 @@ func ValidateELConfig(cfg *ELConfig) error {
 	}
 	if cfg.RecvTimeout <= cfg.KeepAliveInterval {
 		return fmt.Errorf("RecvTimeout has to be longer than KeepAliveInterval")
+	}
+	switch cfg.RetryPolicy {
+	case ELRetryPolicyRetry, ELRetryPolicyFailFast, ELRetryPolicyFallback:
+	default:
+		return fmt.Errorf("EL retry policy is invalid: %d", cfg.RetryPolicy)
 	}
 	return nil
 }

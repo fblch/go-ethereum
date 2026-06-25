@@ -64,6 +64,7 @@ func main() {
 		elRecvTimeout   = flag.Int("el.recvtimeout", 180, "EL server receive timeout in seconds")
 		elConnTimeout   = flag.Int("el.conntimeout", 60, "EL server connection timeout in seconds (0 = infinite)")
 		elKeepAliveInt  = flag.Int("el.keepaliveinterval", 60, "EL keepalive interval in seconds")
+		elRetryPolicy   = flag.Int("el.retrypolicy", elstack.ELRetryPolicyRetry, "emotion link retry policy (0 retry, 1 failfast, 2 fallback)")
 		elCapturePath   = flag.String("el.capturepath", "", "file to store EL packet capture (set to enable packet capture)")
 		// ADDED by Hinata AWAIISHIMA END (EL)
 
@@ -159,6 +160,7 @@ func main() {
 			RecvTimeout:       *elRecvTimeout,
 			ConnTimeout:       *elConnTimeout,
 			KeepAliveInterval: *elKeepAliveInt,
+			RetryPolicy:       *elRetryPolicy,
 			CapturePath:       *elCapturePath,
 		}
 		if err := elstack.ValidateELConfig(elCfg); err != nil {
@@ -167,21 +169,24 @@ func main() {
 
 		results := make(chan elstack.LinkedResult, initialELResultsBufferSize)
 		go elstack.SetupEL(elCfg, results, nil)
-		addr, err := elstack.WaitInitialEL(results)
-		if err != nil {
-			utils.Fatalf("EL setup failed: %v", err)
+		addr, linked, err := elstack.WaitInitialEL(elCfg, results)
+		if !linked {
+			if err != nil {
+				utils.Fatalf("EL setup failed: %v", err)
+			}
+		} else {
+			baseListen := *listenAddr
+			if baseListen == "" {
+				utils.Fatalf("EL requires non-empty listen address")
+			}
+			_, port, err := net.SplitHostPort(baseListen)
+			if err != nil {
+				utils.Fatalf("Invalid listen address %q: %v", baseListen, err)
+			}
+			*listenAddr = net.JoinHostPort(addr.String(), port)
+			go elstack.MonitorEL(results, nil)
+			listenUDPFunc = elstack.ListenELUDP
 		}
-		baseListen := *listenAddr
-		if baseListen == "" {
-			utils.Fatalf("EL requires non-empty listen address")
-		}
-		_, port, err := net.SplitHostPort(baseListen)
-		if err != nil {
-			utils.Fatalf("Invalid listen address %q: %v", baseListen, err)
-		}
-		*listenAddr = net.JoinHostPort(addr.String(), port)
-		go elstack.MonitorEL(results, nil)
-		listenUDPFunc = elstack.ListenELUDP
 	}
 	// ADDED by Hinata AWAIISHIMA END (EL)
 

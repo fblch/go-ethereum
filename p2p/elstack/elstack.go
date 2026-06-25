@@ -227,21 +227,38 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 }
 
 // WaitInitialEL keeps waiting until initial link with the EL server is established.
-// Error events are logged and ignored so that transient failures can recover.
-func WaitInitialEL(results <-chan LinkedResult) (net.IP, error) {
+// Error handling follows the configured retry policy.
+func WaitInitialEL(cfg *ELConfig, results <-chan LinkedResult) (net.IP, bool, error) {
 	for {
 		result, ok := <-results
 		if !ok {
-			return nil, fmt.Errorf("EL setup terminated before initial link established")
+			return nil, false, fmt.Errorf("EL setup terminated before initial link established")
 		}
 		if result.Err != nil {
-			elLog.Warn("EL initial link failed! Waiting for retry...", "err", result.Err)
+			shouldReturn, err := handleInitialELFailure(cfg.RetryPolicy, result.Err)
+			if shouldReturn {
+				return nil, false, err
+			}
 			continue
 		}
 		if result.Addr != nil {
 			elLog.Info("EL initial link established", "ip", result.Addr)
-			return result.Addr, nil
+			return result.Addr, true, nil
 		}
+	}
+}
+
+func handleInitialELFailure(policy int, err error) (bool, error) {
+	elLog.Error("EL initial link failed", "err", err)
+	switch policy {
+	case ELRetryPolicyRetry:
+		return false, nil
+	case ELRetryPolicyFailFast:
+		return true, err
+	case ELRetryPolicyFallback:
+		return true, nil
+	default:
+		return true, fmt.Errorf("unknown EL retry policy is set")
 	}
 }
 
