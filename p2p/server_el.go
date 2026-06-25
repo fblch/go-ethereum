@@ -33,10 +33,13 @@ func (srv *Server) setupEL() error {
 		}
 	}()
 	go elstack.SetupEL(srv.EL, results, setupQuit)
-	addr, err := elstack.WaitInitialEL(results)
-	if err != nil {
+	addr, linked, err := elstack.WaitInitialEL(srv.EL, results)
+	if !linked {
 		stopEL()
-		return err
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if err := srv.applyELBindings(addr); err != nil {

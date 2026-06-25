@@ -238,6 +238,10 @@ type NodeConfig struct {
 	ELKeepAliveInterval int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
+	// ELRetryPolicy controls how the client behaves when the initial EL link fails.
+	ELRetryPolicy int
+
+	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELCapturePath is the file to store EL packet capture (set to enable packet capture).
 	ELCapturePath string
 }
@@ -418,6 +422,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.RecvTimeout = config.ELRecvTimeout
 		el.ConnTimeout = config.ELConnTimeout
 		el.KeepAliveInterval = config.ELKeepAliveInterval
+		el.RetryPolicy = config.ELRetryPolicy
 		el.CapturePath = config.ELCapturePath
 
 		// Follow the above convention and treat zero values as defaults.

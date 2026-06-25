@@ -958,6 +958,10 @@ var (
 		Name:     "el.keepaliveinterval",
 		Value:    60,
 		Usage:    "EL keepalive interval in seconds",
+	}
+	ELRetryPolicyFlag = &cli.IntFlag{
+		Name:     "el.retrypolicy",
+		Usage:    "EL retry policy (0 retry, 1 failfast, 2 fallback)",
 		Category: flags.NetworkingCategory,
 	}
 	ELCapturePathFlag = &cli.PathFlag{
@@ -1323,6 +1327,9 @@ func setEL(ctx *cli.Context, cfg *p2p.Config) {
 	}
 	if ctx.IsSet(ELKeepAliveIntervalFlag.Name) {
 		cfg.EL.KeepAliveInterval = ctx.Int(ELKeepAliveIntervalFlag.Name)
+	}
+	if ctx.IsSet(ELRetryPolicyFlag.Name) {
+		cfg.EL.RetryPolicy = ctx.Int(ELRetryPolicyFlag.Name)
 	}
 	if ctx.IsSet(ELCapturePathFlag.Name) {
 		cfg.EL.CapturePath = ctx.Path(ELCapturePathFlag.Name)
