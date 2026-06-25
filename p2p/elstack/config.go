@@ -36,7 +36,6 @@ type ELConfig struct {
 	ServerCACert string
 
 	// RecvTimeout is the EL server receive timeout in seconds.
-	// Recommended value: 180.
 	RecvTimeout int
 
 	// ConnTimeout is the EL server connection timeout in seconds (0 = infinite).
@@ -44,7 +43,6 @@ type ELConfig struct {
 	ConnTimeout int
 
 	// KeepAliveInterval is the EL keepalive interval in seconds.
-	// Recommended value: 60.
 	KeepAliveInterval int
 
 	// CapturePath is the file to store EL packet capture (set to enable packet capture).
@@ -80,17 +78,20 @@ func ValidateELConfig(cfg *ELConfig) error {
 	if cfg.ServerPort <= 0 {
 		return fmt.Errorf("ServerPort is not set or invalid")
 	}
-	if cfg.RecvTimeout < 0 {
-		return fmt.Errorf("RecvTimeout is negative")
+	// Note: zero causes connection failure, so we don't allow it.
+	if cfg.RecvTimeout <= 0 {
+		return fmt.Errorf("RecvTimeout is too short")
 	}
+	// Note: zero means infinite timeout, so we allow it.
 	if cfg.ConnTimeout < 0 {
 		return fmt.Errorf("ConnTimeout is negative")
 	}
-	if cfg.KeepAliveInterval < 0 {
-		return fmt.Errorf("KeepAliveInterval is negative")
+	// Note: zero causes constant transmissions, so we don't allow it.
+	if cfg.KeepAliveInterval <= 0 {
+		return fmt.Errorf("KeepAliveInterval is too short")
 	}
-	if cfg.RecvTimeout < cfg.KeepAliveInterval {
-		return fmt.Errorf("KeepAliveInterval has to be smaller than RecvTimeout")
+	if cfg.RecvTimeout <= cfg.KeepAliveInterval {
+		return fmt.Errorf("RecvTimeout has to be longer than KeepAliveInterval")
 	}
 	return nil
 }

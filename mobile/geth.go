@@ -227,7 +227,6 @@ type NodeConfig struct {
 
 	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELRecvTimeout is the EL server receive timeout in seconds.
-	// Recommended value: 180.
 	ELRecvTimeout int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
@@ -236,7 +235,6 @@ type NodeConfig struct {
 
 	// ADDED by Hinata AWAIISHIMA (EL)
 	// ELKeepAliveInterval is the EL keepalive interval in seconds.
-	// Recommended value: 60.
 	ELKeepAliveInterval int
 
 	// ADDED by Hinata AWAIISHIMA (EL)
@@ -273,8 +271,12 @@ var defaultNodeConfig = &NodeConfig{
 	CliqueSnapshotCacheSize:  128,
 	CliqueSnapshotCacheCount: 128,
 	// ADDED by Jakub Pajek END
-	// ADDED by Hinata AWAIISHIMA (EL)
-	ELUse: false,
+	// ADDED by Hinata AWAIISHIMA BEG (EL)
+	ELUse:               false,
+	ELRecvTimeout:       180,
+	ELConnTimeout:       60,
+	ELKeepAliveInterval: 60,
+	// ADDED by Hinata AWAIISHIMA END (EL)
 }
 
 // NewNodeConfig creates a new node option set, initialized to the default values.
@@ -417,6 +419,19 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		el.ConnTimeout = config.ELConnTimeout
 		el.KeepAliveInterval = config.ELKeepAliveInterval
 		el.CapturePath = config.ELCapturePath
+
+		// Follow the above convention and treat zero values as defaults.
+		// (negative values will be cheched for later in elstack.ValidateMobileELConfig)
+		if el.RecvTimeout == 0 {
+			el.RecvTimeout = defaultNodeConfig.ELRecvTimeout
+		}
+		// Zero is a valid value for ConnTimeout (infinite timeout), so use defaults when value is negative.
+		if el.ConnTimeout < 0 {
+			el.ConnTimeout = defaultNodeConfig.ELConnTimeout
+		}
+		if el.KeepAliveInterval == 0 {
+			el.KeepAliveInterval = defaultNodeConfig.ELKeepAliveInterval
+		}
 
 		if err := elstack.ValidateMobileELConfig(&el); err != nil {
 			return nil, fmt.Errorf("invalid config: %v", err)
