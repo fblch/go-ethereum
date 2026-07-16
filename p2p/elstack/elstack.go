@@ -161,38 +161,12 @@ func SetupEL(cfg *ELConfig, results chan LinkedResult, quit <-chan struct{}) {
 	git, _ := version.VCS()
 	productVersion := params.VersionWithCommit(git.Commit, git.Date)
 	productPlatform := runtime.GOOS + "-" + runtime.GOARCH + "/" + runtime.Version()
-	mtu := uint64(1280)
 
-	prodConfig := el_stack.NewElStackProductConfig(cfg.ProductName, productVersion, productPlatform, cfg.ServerCACert, mtu)
-
-	// Create socket buffer config
-
-	maxBurstSize := uint64(1024)
-
-	// TODO by Jakub Pajek (EL): check runtime.GOOS (linux, darwin, windows, android, ios) and set buffer sizes accordingly.
-
-	// EL stack defaults:
-	// tcpBuffSize := uint64(16384)
-	// udpBuffSize := uint64(8192)
-	// udpMetaSize := uint64(32)
-	// buffCfg := el_stack.NewElStackSocketBufferConfig(maxBurstSize, nil, nil, nil)
-
-	// Android defaults:
-	tcpBuffSize := uint64(131072)
-	udpBuffSize := uint64(212992)
-	udpMetaSize := uint64(32)
-
-	// iOS defaults:
-	// tcpBuffSize := uint64(65536)
-	// udpBuffSize := uint64(65536)
-	// udpMetaSize := uint64(32)
-	// udpMetaSize := uint64(2048)
-
-	buffConfig := el_stack.NewElStackSocketBufferConfig(maxBurstSize, &tcpBuffSize, &udpBuffSize, &udpMetaSize)
+	prodConfig := el_stack.NewElStackProductConfig(cfg.ProductName, productVersion, productPlatform, cfg.ServerCACert)
+	runtimeCfg := el_stack.NewDefaultElStackRuntimeConfig()
 
 	// Initialize EL stack
-
-	el_stack.Initialize(prodConfig, buffConfig)
+	el_stack.Initialize(prodConfig, runtimeCfg)
 
 	// Create VC config
 

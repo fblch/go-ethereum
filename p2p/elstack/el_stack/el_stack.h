@@ -482,6 +482,27 @@ typedef struct UniffiVTableCallbackInterfaceElStackVpnEventDelegate {
 } UniffiVTableCallbackInterfaceElStackVpnEventDelegate;
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKBUFFERPOOLCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKBUFFERPOOLCONFIG
+void* uniffi_el_stack_fn_clone_elstackbufferpoolconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKBUFFERPOOLCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKBUFFERPOOLCONFIG
+void uniffi_el_stack_fn_free_elstackbufferpoolconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW
+void* uniffi_el_stack_fn_constructor_elstackbufferpoolconfig_new(uint64_t buffers, uint64_t buffer_len, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW_DEFAULT
+void* uniffi_el_stack_fn_constructor_elstackbufferpoolconfig_new_default(RustCallStatus *out_status
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKISSUECONFIG
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKISSUECONFIG
 void* uniffi_el_stack_fn_clone_elstackissueconfig(void* ptr, RustCallStatus *out_status
@@ -497,6 +518,27 @@ void uniffi_el_stack_fn_free_elstackissueconfig(void* ptr, RustCallStatus *out_s
 void* uniffi_el_stack_fn_constructor_elstackissueconfig_new(RustBuffer el_issuer_url_prefix, RustBuffer el_issuer_pub_key, RustBuffer client_id, RustCallStatus *out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKNICCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKNICCONFIG
+void* uniffi_el_stack_fn_clone_elstacknicconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKNICCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKNICCONFIG
+void uniffi_el_stack_fn_free_elstacknicconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKNICCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKNICCONFIG_NEW
+void* uniffi_el_stack_fn_constructor_elstacknicconfig_new(uint64_t mtu, uint64_t rx_batch_size, uint64_t tx_batch_size, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKNICCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKNICCONFIG_NEW_DEFAULT
+void* uniffi_el_stack_fn_constructor_elstacknicconfig_new_default(RustCallStatus *out_status
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKPRODUCTCONFIG
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKPRODUCTCONFIG
 void* uniffi_el_stack_fn_clone_elstackproductconfig(void* ptr, RustCallStatus *out_status
@@ -509,22 +551,49 @@ void uniffi_el_stack_fn_free_elstackproductconfig(void* ptr, RustCallStatus *out
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKPRODUCTCONFIG_NEW
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKPRODUCTCONFIG_NEW
-void* uniffi_el_stack_fn_constructor_elstackproductconfig_new(RustBuffer product_name, RustBuffer product_version, RustBuffer os, RustBuffer ca_cert, uint64_t mtu, RustCallStatus *out_status
+void* uniffi_el_stack_fn_constructor_elstackproductconfig_new(RustBuffer product_name, RustBuffer product_version, RustBuffer os, RustBuffer ca_cert, RustCallStatus *out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKSOCKETBUFFERCONFIG
-#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKSOCKETBUFFERCONFIG
-void* uniffi_el_stack_fn_clone_elstacksocketbufferconfig(void* ptr, RustCallStatus *out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKRUNTIMECONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKRUNTIMECONFIG
+void* uniffi_el_stack_fn_clone_elstackruntimeconfig(void* ptr, RustCallStatus *out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKSOCKETBUFFERCONFIG
-#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKSOCKETBUFFERCONFIG
-void uniffi_el_stack_fn_free_elstacksocketbufferconfig(void* ptr, RustCallStatus *out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKRUNTIMECONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKRUNTIMECONFIG
+void uniffi_el_stack_fn_free_elstackruntimeconfig(void* ptr, RustCallStatus *out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSOCKETBUFFERCONFIG_NEW
-#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSOCKETBUFFERCONFIG_NEW
-void* uniffi_el_stack_fn_constructor_elstacksocketbufferconfig_new(uint64_t max_burst_size, RustBuffer tcp_buff_size, RustBuffer udp_buff_size, RustBuffer udp_meta_size, RustCallStatus *out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW
+void* uniffi_el_stack_fn_constructor_elstackruntimeconfig_new(void* nic, void* stack, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW_DEFAULT
+void* uniffi_el_stack_fn_constructor_elstackruntimeconfig_new_default(RustCallStatus *out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKSTACKCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKSTACKCONFIG
+void* uniffi_el_stack_fn_clone_elstackstackconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKSTACKCONFIG
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FREE_ELSTACKSTACKCONFIG
+void uniffi_el_stack_fn_free_elstackstackconfig(void* ptr, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW
+void* uniffi_el_stack_fn_constructor_elstackstackconfig_new(void* datagram_pool, void* receive_pool, void* send_pool, uint64_t max_sockets, uint64_t tcp_receive_buffer, uint64_t tcp_send_buffer, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW_DEFAULT
+void* uniffi_el_stack_fn_constructor_elstackstackconfig_new_default(RustCallStatus *out_status
+    
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_CLONE_ELSTACKVCCONFIG
@@ -684,7 +753,7 @@ void uniffi_el_stack_fn_init_callback_vtable_elstackvpneventdelegate(UniffiVTabl
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FUNC_INITIALIZE
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FUNC_INITIALIZE
-void uniffi_el_stack_fn_func_initialize(void* product_config, void* socket_buffer_config, RustCallStatus *out_status
+void uniffi_el_stack_fn_func_initialize(void* product_config, void* runtime_config, RustCallStatus *out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_FN_FUNC_RESTART
@@ -1142,9 +1211,33 @@ uint16_t uniffi_el_stack_checksum_method_udpsocket_send_to(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW
+uint16_t uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKBUFFERPOOLCONFIG_NEW_DEFAULT
+uint16_t uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new_default(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKISSUECONFIG_NEW
 #define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKISSUECONFIG_NEW
 uint16_t uniffi_el_stack_checksum_constructor_elstackissueconfig_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKNICCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKNICCONFIG_NEW
+uint16_t uniffi_el_stack_checksum_constructor_elstacknicconfig_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKNICCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKNICCONFIG_NEW_DEFAULT
+uint16_t uniffi_el_stack_checksum_constructor_elstacknicconfig_new_default(void
     
 );
 #endif
@@ -1154,9 +1247,27 @@ uint16_t uniffi_el_stack_checksum_constructor_elstackproductconfig_new(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSOCKETBUFFERCONFIG_NEW
-#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSOCKETBUFFERCONFIG_NEW
-uint16_t uniffi_el_stack_checksum_constructor_elstacksocketbufferconfig_new(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW
+uint16_t uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKRUNTIMECONFIG_NEW_DEFAULT
+uint16_t uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new_default(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW
+uint16_t uniffi_el_stack_checksum_constructor_elstackstackconfig_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW_DEFAULT
+#define UNIFFI_FFIDEF_UNIFFI_EL_STACK_CHECKSUM_CONSTRUCTOR_ELSTACKSTACKCONFIG_NEW_DEFAULT
+uint16_t uniffi_el_stack_checksum_constructor_elstackstackconfig_new_default(void
     
 );
 #endif

@@ -5,7 +5,7 @@ package el_stack
 // #cgo ios,arm64 LDFLAGS: ${SRCDIR}/libs/ios_arm64/libel_stack_v1.15.0.a -lm
 // #cgo iossimulator,arm64 LDFLAGS: ${SRCDIR}/libs/iossimulator_arm64/libel_stack_v1.15.0.a -lm
 // #cgo darwin,arm64 LDFLAGS: ${SRCDIR}/libs/darwin_arm64/libel_stack_v1.15.0.a -lm -framework SystemConfiguration -framework CoreFoundation
-// #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack_v1.15.0.a -lm
+// #cgo android,arm64 LDFLAGS: ${SRCDIR}/libs/android_arm64/libel_stack_v2.2.4.a -lm
 // #cgo !android,linux,amd64 LDFLAGS: ${SRCDIR}/libs/linux_amd64/libel_stack_v1.15.0.a -lm
 // #cgo !android,linux,arm64 LDFLAGS: ${SRCDIR}/libs/linux_arm64/libel_stack_v1.15.0.a -lm
 // #include <el_stack.h>
@@ -384,7 +384,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_el_stack_checksum_func_initialize()
 		})
-		if checksum != 5191 {
+		if checksum != 2024 {
 			// If this happens try cleaning and rebuilding your project
 			panic("el_stack: uniffi_el_stack_checksum_func_initialize: UniFFI API checksum mismatch")
 		}
@@ -589,6 +589,24 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new()
+		})
+		if checksum != 48473 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new_default()
+		})
+		if checksum != 34893 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackbufferpoolconfig_new_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_el_stack_checksum_constructor_elstackissueconfig_new()
 		})
 		if checksum != 52850 {
@@ -598,20 +616,65 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstacknicconfig_new()
+		})
+		if checksum != 61799 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstacknicconfig_new: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstacknicconfig_new_default()
+		})
+		if checksum != 18882 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstacknicconfig_new_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_el_stack_checksum_constructor_elstackproductconfig_new()
 		})
-		if checksum != 20203 {
+		if checksum != 53644 {
 			// If this happens try cleaning and rebuilding your project
 			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackproductconfig_new: UniFFI API checksum mismatch")
 		}
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
-			return C.uniffi_el_stack_checksum_constructor_elstacksocketbufferconfig_new()
+			return C.uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new()
 		})
-		if checksum != 34062 {
+		if checksum != 28668 {
 			// If this happens try cleaning and rebuilding your project
-			panic("el_stack: uniffi_el_stack_checksum_constructor_elstacksocketbufferconfig_new: UniFFI API checksum mismatch")
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new_default()
+		})
+		if checksum != 18192 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackruntimeconfig_new_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstackstackconfig_new()
+		})
+		if checksum != 12445 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackstackconfig_new: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_el_stack_checksum_constructor_elstackstackconfig_new_default()
+		})
+		if checksum != 32331 {
+			// If this happens try cleaning and rebuilding your project
+			panic("el_stack: uniffi_el_stack_checksum_constructor_elstackstackconfig_new_default: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -901,6 +964,73 @@ func (ffiObject *FfiObject) freeRustArcPtr() {
 	})
 }
 
+type ElStackBufferPoolConfigInterface interface {
+}
+type ElStackBufferPoolConfig struct {
+	ffiObject FfiObject
+}
+
+func NewElStackBufferPoolConfig(buffers uint64, bufferLen uint64) *ElStackBufferPoolConfig {
+	return FfiConverterElStackBufferPoolConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackbufferpoolconfig_new(FfiConverterUint64INSTANCE.Lower(buffers), FfiConverterUint64INSTANCE.Lower(bufferLen), _uniffiStatus)
+	}))
+}
+
+func ElStackBufferPoolConfigNewDefault() *ElStackBufferPoolConfig {
+	return FfiConverterElStackBufferPoolConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackbufferpoolconfig_new_default(_uniffiStatus)
+	}))
+}
+
+func (object *ElStackBufferPoolConfig) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterElStackBufferPoolConfig struct{}
+
+var FfiConverterElStackBufferPoolConfigINSTANCE = FfiConverterElStackBufferPoolConfig{}
+
+func (c FfiConverterElStackBufferPoolConfig) Lift(pointer unsafe.Pointer) *ElStackBufferPoolConfig {
+	result := &ElStackBufferPoolConfig{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_el_stack_fn_clone_elstackbufferpoolconfig(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_el_stack_fn_free_elstackbufferpoolconfig(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*ElStackBufferPoolConfig).Destroy)
+	return result
+}
+
+func (c FfiConverterElStackBufferPoolConfig) Read(reader io.Reader) *ElStackBufferPoolConfig {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterElStackBufferPoolConfig) Lower(value *ElStackBufferPoolConfig) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*ElStackBufferPoolConfig")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterElStackBufferPoolConfig) Write(writer io.Writer, value *ElStackBufferPoolConfig) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerElStackBufferPoolConfig struct{}
+
+func (_ FfiDestroyerElStackBufferPoolConfig) Destroy(value *ElStackBufferPoolConfig) {
+	value.Destroy()
+}
+
 type ElStackIssueConfigInterface interface {
 }
 type ElStackIssueConfig struct {
@@ -962,15 +1092,82 @@ func (_ FfiDestroyerElStackIssueConfig) Destroy(value *ElStackIssueConfig) {
 	value.Destroy()
 }
 
+type ElStackNicConfigInterface interface {
+}
+type ElStackNicConfig struct {
+	ffiObject FfiObject
+}
+
+func NewElStackNicConfig(mtu uint64, rxBatchSize uint64, txBatchSize uint64) *ElStackNicConfig {
+	return FfiConverterElStackNicConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstacknicconfig_new(FfiConverterUint64INSTANCE.Lower(mtu), FfiConverterUint64INSTANCE.Lower(rxBatchSize), FfiConverterUint64INSTANCE.Lower(txBatchSize), _uniffiStatus)
+	}))
+}
+
+func ElStackNicConfigNewDefault() *ElStackNicConfig {
+	return FfiConverterElStackNicConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstacknicconfig_new_default(_uniffiStatus)
+	}))
+}
+
+func (object *ElStackNicConfig) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterElStackNicConfig struct{}
+
+var FfiConverterElStackNicConfigINSTANCE = FfiConverterElStackNicConfig{}
+
+func (c FfiConverterElStackNicConfig) Lift(pointer unsafe.Pointer) *ElStackNicConfig {
+	result := &ElStackNicConfig{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_el_stack_fn_clone_elstacknicconfig(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_el_stack_fn_free_elstacknicconfig(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*ElStackNicConfig).Destroy)
+	return result
+}
+
+func (c FfiConverterElStackNicConfig) Read(reader io.Reader) *ElStackNicConfig {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterElStackNicConfig) Lower(value *ElStackNicConfig) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*ElStackNicConfig")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterElStackNicConfig) Write(writer io.Writer, value *ElStackNicConfig) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerElStackNicConfig struct{}
+
+func (_ FfiDestroyerElStackNicConfig) Destroy(value *ElStackNicConfig) {
+	value.Destroy()
+}
+
 type ElStackProductConfigInterface interface {
 }
 type ElStackProductConfig struct {
 	ffiObject FfiObject
 }
 
-func NewElStackProductConfig(productName string, productVersion string, os string, caCert string, mtu uint64) *ElStackProductConfig {
+func NewElStackProductConfig(productName string, productVersion string, os string, caCert string) *ElStackProductConfig {
 	return FfiConverterElStackProductConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
-		return C.uniffi_el_stack_fn_constructor_elstackproductconfig_new(FfiConverterStringINSTANCE.Lower(productName), FfiConverterStringINSTANCE.Lower(productVersion), FfiConverterStringINSTANCE.Lower(os), FfiConverterStringINSTANCE.Lower(caCert), FfiConverterUint64INSTANCE.Lower(mtu), _uniffiStatus)
+		return C.uniffi_el_stack_fn_constructor_elstackproductconfig_new(FfiConverterStringINSTANCE.Lower(productName), FfiConverterStringINSTANCE.Lower(productVersion), FfiConverterStringINSTANCE.Lower(os), FfiConverterStringINSTANCE.Lower(caCert), _uniffiStatus)
 	}))
 }
 
@@ -1023,64 +1220,137 @@ func (_ FfiDestroyerElStackProductConfig) Destroy(value *ElStackProductConfig) {
 	value.Destroy()
 }
 
-type ElStackSocketBufferConfigInterface interface {
+type ElStackRuntimeConfigInterface interface {
 }
-type ElStackSocketBufferConfig struct {
+type ElStackRuntimeConfig struct {
 	ffiObject FfiObject
 }
 
-func NewElStackSocketBufferConfig(maxBurstSize uint64, tcpBuffSize *uint64, udpBuffSize *uint64, udpMetaSize *uint64) *ElStackSocketBufferConfig {
-	return FfiConverterElStackSocketBufferConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
-		return C.uniffi_el_stack_fn_constructor_elstacksocketbufferconfig_new(FfiConverterUint64INSTANCE.Lower(maxBurstSize), FfiConverterOptionalUint64INSTANCE.Lower(tcpBuffSize), FfiConverterOptionalUint64INSTANCE.Lower(udpBuffSize), FfiConverterOptionalUint64INSTANCE.Lower(udpMetaSize), _uniffiStatus)
+func NewElStackRuntimeConfig(nic *ElStackNicConfig, stack *ElStackStackConfig) *ElStackRuntimeConfig {
+	return FfiConverterElStackRuntimeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackruntimeconfig_new(FfiConverterElStackNicConfigINSTANCE.Lower(nic), FfiConverterElStackStackConfigINSTANCE.Lower(stack), _uniffiStatus)
 	}))
 }
 
-func (object *ElStackSocketBufferConfig) Destroy() {
+func ElStackRuntimeConfigNewDefault() *ElStackRuntimeConfig {
+	return FfiConverterElStackRuntimeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackruntimeconfig_new_default(_uniffiStatus)
+	}))
+}
+
+func (object *ElStackRuntimeConfig) Destroy() {
 	runtime.SetFinalizer(object, nil)
 	object.ffiObject.destroy()
 }
 
-type FfiConverterElStackSocketBufferConfig struct{}
+type FfiConverterElStackRuntimeConfig struct{}
 
-var FfiConverterElStackSocketBufferConfigINSTANCE = FfiConverterElStackSocketBufferConfig{}
+var FfiConverterElStackRuntimeConfigINSTANCE = FfiConverterElStackRuntimeConfig{}
 
-func (c FfiConverterElStackSocketBufferConfig) Lift(pointer unsafe.Pointer) *ElStackSocketBufferConfig {
-	result := &ElStackSocketBufferConfig{
+func (c FfiConverterElStackRuntimeConfig) Lift(pointer unsafe.Pointer) *ElStackRuntimeConfig {
+	result := &ElStackRuntimeConfig{
 		newFfiObject(
 			pointer,
 			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
-				return C.uniffi_el_stack_fn_clone_elstacksocketbufferconfig(pointer, status)
+				return C.uniffi_el_stack_fn_clone_elstackruntimeconfig(pointer, status)
 			},
 			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
-				C.uniffi_el_stack_fn_free_elstacksocketbufferconfig(pointer, status)
+				C.uniffi_el_stack_fn_free_elstackruntimeconfig(pointer, status)
 			},
 		),
 	}
-	runtime.SetFinalizer(result, (*ElStackSocketBufferConfig).Destroy)
+	runtime.SetFinalizer(result, (*ElStackRuntimeConfig).Destroy)
 	return result
 }
 
-func (c FfiConverterElStackSocketBufferConfig) Read(reader io.Reader) *ElStackSocketBufferConfig {
+func (c FfiConverterElStackRuntimeConfig) Read(reader io.Reader) *ElStackRuntimeConfig {
 	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
 }
 
-func (c FfiConverterElStackSocketBufferConfig) Lower(value *ElStackSocketBufferConfig) unsafe.Pointer {
+func (c FfiConverterElStackRuntimeConfig) Lower(value *ElStackRuntimeConfig) unsafe.Pointer {
 	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
 	// because the pointer will be decremented immediately after this function returns,
 	// and someone will be left holding onto a non-locked pointer.
-	pointer := value.ffiObject.incrementPointer("*ElStackSocketBufferConfig")
+	pointer := value.ffiObject.incrementPointer("*ElStackRuntimeConfig")
 	defer value.ffiObject.decrementPointer()
 	return pointer
 
 }
 
-func (c FfiConverterElStackSocketBufferConfig) Write(writer io.Writer, value *ElStackSocketBufferConfig) {
+func (c FfiConverterElStackRuntimeConfig) Write(writer io.Writer, value *ElStackRuntimeConfig) {
 	writeUint64(writer, uint64(uintptr(c.Lower(value))))
 }
 
-type FfiDestroyerElStackSocketBufferConfig struct{}
+type FfiDestroyerElStackRuntimeConfig struct{}
 
-func (_ FfiDestroyerElStackSocketBufferConfig) Destroy(value *ElStackSocketBufferConfig) {
+func (_ FfiDestroyerElStackRuntimeConfig) Destroy(value *ElStackRuntimeConfig) {
+	value.Destroy()
+}
+
+type ElStackStackConfigInterface interface {
+}
+type ElStackStackConfig struct {
+	ffiObject FfiObject
+}
+
+func NewElStackStackConfig(datagramPool *ElStackBufferPoolConfig, receivePool *ElStackBufferPoolConfig, sendPool *ElStackBufferPoolConfig, maxSockets uint64, tcpReceiveBuffer uint64, tcpSendBuffer uint64) *ElStackStackConfig {
+	return FfiConverterElStackStackConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackstackconfig_new(FfiConverterElStackBufferPoolConfigINSTANCE.Lower(datagramPool), FfiConverterElStackBufferPoolConfigINSTANCE.Lower(receivePool), FfiConverterElStackBufferPoolConfigINSTANCE.Lower(sendPool), FfiConverterUint64INSTANCE.Lower(maxSockets), FfiConverterUint64INSTANCE.Lower(tcpReceiveBuffer), FfiConverterUint64INSTANCE.Lower(tcpSendBuffer), _uniffiStatus)
+	}))
+}
+
+func ElStackStackConfigNewDefault() *ElStackStackConfig {
+	return FfiConverterElStackStackConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_el_stack_fn_constructor_elstackstackconfig_new_default(_uniffiStatus)
+	}))
+}
+
+func (object *ElStackStackConfig) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterElStackStackConfig struct{}
+
+var FfiConverterElStackStackConfigINSTANCE = FfiConverterElStackStackConfig{}
+
+func (c FfiConverterElStackStackConfig) Lift(pointer unsafe.Pointer) *ElStackStackConfig {
+	result := &ElStackStackConfig{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_el_stack_fn_clone_elstackstackconfig(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_el_stack_fn_free_elstackstackconfig(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*ElStackStackConfig).Destroy)
+	return result
+}
+
+func (c FfiConverterElStackStackConfig) Read(reader io.Reader) *ElStackStackConfig {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterElStackStackConfig) Lower(value *ElStackStackConfig) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*ElStackStackConfig")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterElStackStackConfig) Write(writer io.Writer, value *ElStackStackConfig) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerElStackStackConfig struct{}
+
+func (_ FfiDestroyerElStackStackConfig) Destroy(value *ElStackStackConfig) {
 	value.Destroy()
 }
 
@@ -3861,9 +4131,9 @@ func el_stack_uniffiFreeGorutine(data C.uint64_t) {
 	guard <- struct{}{}
 }
 
-func Initialize(productConfig *ElStackProductConfig, socketBufferConfig *ElStackSocketBufferConfig) {
+func Initialize(productConfig *ElStackProductConfig, runtimeConfig *ElStackRuntimeConfig) {
 	rustCall(func(_uniffiStatus *C.RustCallStatus) bool {
-		C.uniffi_el_stack_fn_func_initialize(FfiConverterElStackProductConfigINSTANCE.Lower(productConfig), FfiConverterElStackSocketBufferConfigINSTANCE.Lower(socketBufferConfig), _uniffiStatus)
+		C.uniffi_el_stack_fn_func_initialize(FfiConverterElStackProductConfigINSTANCE.Lower(productConfig), FfiConverterElStackRuntimeConfigINSTANCE.Lower(runtimeConfig), _uniffiStatus)
 		return false
 	})
 }
