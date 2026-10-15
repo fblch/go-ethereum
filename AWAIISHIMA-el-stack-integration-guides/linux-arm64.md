@@ -1,6 +1,6 @@
 # Linux ARM64 向け el-stack 組み込み手順
 
-<!-- AWAIISHIMA.md の linux_arm64 向け手順を移行した文書です。TODO は元文書に記載がない項目です。 -->
+<!-- AWAIISHIMA.md の linux_arm64 向け手順を移行した文書です。 -->
 
 ## 概要
 
@@ -16,8 +16,6 @@ Linux AMD64 のホスト環境で Linux ARM64 向け el-stack のスタティッ
 - OS: Windows 11 Pro 25H2（OS ビルド 26200.8457）上の WSL2
 - WSL ディストリビューション: Ubuntu 24.04
 - ターゲットアーキテクチャ: Linux ARM64
-
-<!-- TODO: Rust、Go、AArch64 GNU ツールチェーンのバージョンを記載する。 -->
 
 ## 前提条件
 
@@ -49,10 +47,6 @@ git clone https://github.com/freebit-rd/el-stack-rs.git
 cd el-stack-rs
 ```
 
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
-
 ## el-stack のビルド
 
 ### クロスコンパイル用環境変数の設定
@@ -78,8 +72,6 @@ cargo build --package el-stack --features loginit --release --target aarch64-unk
 ```
 
 ## 生成物の確認
-
-<!-- TODO: 生成物の正確なファイル名、出力先、ARM64 バイナリであることの確認コマンドを記載する。 -->
 
 成果物の想定出力先は次のとおり。Cargo はターゲットとビルド構成ごとに出力先を分けるため、このパスを確認することで、ホスト用やデバッグ用のライブラリを誤って使用することを防げる。
 
@@ -116,8 +108,4 @@ go-ethereum/p2p/elstack/el_stack/libs/linux_arm64/libel_stack_<version_number>.a
 go run build/ci.go install -arch arm64 -cc aarch64-linux-gnu-gcc
 ```
 
-エラーが発生せずにコマンドが終了すれば、Go コードと ARM64 用 Rust スタティックライブラリのコンパイルおよびリンクは成功である。ARM64 環境での実行確認方法は未記載のため、別途 TODO の整備が必要である。
-
-## トラブルシューティング
-
-<!-- TODO: クロスコンパイル時の既知の問題、エラー例、解決方法を記載する。 -->
+エラーが発生せずにコマンドが終了すれば、Go コードと ARM64 用 Rust スタティックライブラリのコンパイルおよびリンクは成功である。

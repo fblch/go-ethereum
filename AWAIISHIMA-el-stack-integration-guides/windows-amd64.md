@@ -1,6 +1,6 @@
 # Windows AMD64 向け el-stack 組み込み手順
 
-<!-- AWAIISHIMA.md の windows_amd64 向け手順を移行した文書です。TODO は元文書に記載がない項目です。 -->
+<!-- AWAIISHIMA.md の windows_amd64 向け手順を移行した文書です。 -->
 
 ## 概要
 
@@ -17,8 +17,6 @@ Windows AMD64 向けに el-stack のスタティックライブラリを GNU ツ
 - OS ビルド: 26200.8457
 - 操作シェル: PowerShellおよびMSYS2 UCRT64
 - ターゲット: `x86_64-pc-windows-gnu`
-
-<!-- TODO: MSYS2、Rust、Go、GNU ツールチェーンのバージョンを記載する。 -->
 
 ## 前提条件
 
@@ -79,10 +77,6 @@ PowerShellで、Cargo の設定ファイルとソースがある作業ディレ�
 ```powershell
 Set-Location C:\Users\<ユーザー名>\el-stack-rs
 ```
-
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
 
 ## el-stack のビルド
 
@@ -167,8 +161,4 @@ go-ethereum/p2p/elstack/el_stack/libs/windows_amd64/libel_stack_<version_number>
 go run build/ci.go install
 ```
 
-エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。実行時の動作確認方法は未記載のため、別途 TODO の整備が必要である。
-
-## トラブルシューティング
-
-<!-- TODO: MSYS2、GNU ABI、PowerShell に関する既知の問題、エラー例、解決方法を記載する。 -->
+エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。

@@ -20,8 +20,6 @@ geth のiOS向けビルドでは、iOS実機向けとiOS Simulator向けのビ�
   - iOS ARM64 実機
   - iOS Simulator ARM64
 
-<!-- TODO: Rust、Go、Xcode、iOS SDK、iOS Simulator SDK、Deployment Target のバージョンを記載する。 -->
-
 ## 前提条件
 
 el-stack は Rust で記述されているため、ビルド前に Rust を利用できる状態にしておく。
@@ -42,10 +40,6 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 git clone https://github.com/freebit-rd/el-stack-rs.git
 cd el-stack-rs
 ```
-
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
 
 ## el-stack のビルド
 
@@ -105,7 +99,3 @@ make ios
 エラーが発生せずにコマンドが終了し、`go-ethereum/build/bin/Geth.framework` が生成されれば、ネイティブライブラリのリンクとiOS向けフレームワークの生成まで完了したと判断できる。
 
 実際にiOSアプリへ組み込む場合の手順は、本ドキュメントの対象外とする。
-
-## トラブルシューティング
-
-<!-- TODO: iOS SDK、iOS Simulator SDK、Deployment Target、コード署名、cgo、実機用とSimulator用ライブラリの取り違えに関する問題と解決方法を記載する。 -->

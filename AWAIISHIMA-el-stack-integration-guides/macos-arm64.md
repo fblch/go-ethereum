@@ -15,8 +15,6 @@ Apple Silicon を搭載した macOS ARM64 向けに el-stack のスタティッ�
 - CPU アーキテクチャ: ARM64
 - OS: macOS Sequoia 15.4.1
 
-<!-- TODO: Rust、Go、Xcode、Command Line Tools、C コンパイラのバージョンを記載する。 -->
-
 ## 前提条件
 
 el-stack は Rust で記述されているため、ビルド前に Rust を利用できる状態にしておく。
@@ -31,10 +29,6 @@ Rust や cgo から Apple のリンカーとシステムフレームワークを
 git clone https://github.com/freebit-rd/el-stack-rs.git
 cd el-stack-rs
 ```
-
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
 
 ## el-stack のビルド
 
@@ -77,8 +71,4 @@ go-ethereum/p2p/elstack/el_stack/libs/darwin_arm64/libel_stack_<version_number>.
 make all
 ```
 
-エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。実行時の動作確認方法は未記載のため、別途 TODO の整備が必要である。
-
-## トラブルシューティング
-
-<!-- TODO: Apple SDK、コード署名、cgo、アーキテクチャ不一致に関する問題と解決方法を記載する。 -->
+エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。

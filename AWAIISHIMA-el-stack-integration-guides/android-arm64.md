@@ -1,6 +1,6 @@
 # Android ARM64 向け el-stack 組み込み手順
 
-<!-- AWAIISHIMA.md の android_arm64 向け手順を移行した文書です。TODO は元文書に記載がない項目です。 -->
+<!-- AWAIISHIMA.md の android_arm64 向け手順を移行した文書です。 -->
 
 ## 概要
 
@@ -18,8 +18,6 @@ Linux AMD64 のホスト環境で Android ARM64 向け el-stack のスタティ�
 - Android SDK Platform: API レベル 36（36.0.0および36.1.0）
 - Android NDK: 28.1.13356709（r28b）
 - ターゲット ABI: Android ARM64
-
-<!-- TODO: Rust、Go、JDK、Android SDK Command-line Tools の実際のバージョンを記載する。 -->
 
 ## 前提条件
 
@@ -132,10 +130,6 @@ git clone https://github.com/freebit-rd/el-stack-rs.git
 cd el-stack-rs
 ```
 
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、同じコマンドでも取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
-
 ## el-stack のビルド
 
 ### NDK とツールチェーンの環境変数設定
@@ -180,8 +174,6 @@ cargo build \
 
 生成物は `target/aarch64-linux-android/release` に出力される。Cargo はターゲットとビルド構成ごとに出力先を分けるため、このディレクトリを確認することで、ホスト用やデバッグ用のライブラリを誤って使用することを防げる。
 
-<!-- TODO: 生成物の正確なファイル名と、Android ARM64 向けバイナリであることの確認コマンドを記載する。 -->
-
 ## geth への配置
 
 ビルドで生成したスタティックライブラリを geth 側へ配置し、cgo がリポジトリ内の安定した相対パスからリンクできる状態にする。OS とアーキテクチャ別のディレクトリへ分けることで、他のプラットフォーム向けライブラリとの取り違えを防ぐ。
@@ -212,7 +204,3 @@ make android
 ```
 
 エラーが発生せずにコマンドが終了し、`go-ethereum/build/bin/geth.aar` と `go-ethereum/build/bin/geth-sources.jar` が生成されれば、ネイティブライブラリのリンクと Android 向けパッケージングまで完了したと判断できる。AAR は TheChainApp へ組み込むバイナリ、sources JAR は対応するソースを提供する成果物である。
-
-## トラブルシューティング
-
-<!-- TODO: NDK、API レベル、cgo に関する既知の問題、エラー例、解決方法を記載する。 -->

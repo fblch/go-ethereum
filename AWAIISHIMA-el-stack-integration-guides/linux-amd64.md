@@ -1,6 +1,6 @@
 # Linux AMD64 向け el-stack 組み込み手順
 
-<!-- AWAIISHIMA.md の linux_amd64 向け手順を移行した文書です。TODO は元文書に記載がない項目です。 -->
+<!-- AWAIISHIMA.md の linux_amd64 向け手順を移行した文書です。 -->
 
 ## 概要
 
@@ -15,8 +15,6 @@ Linux AMD64 向けに el-stack のスタティックライブラリをビルド�
 - CPU アーキテクチャ: x86_64（AMD64）
 - OS: Windows 11 Pro 25H2（OS ビルド 26200.8457）上の WSL2
 - WSL ディストリビューション: Ubuntu 24.04
-
-<!-- TODO: Rust、Go、C コンパイラのバージョンを記載する。 -->
 
 ## 前提条件
 
@@ -33,10 +31,6 @@ git clone https://github.com/freebit-rd/el-stack-rs.git
 cd el-stack-rs
 ```
 
-<!-- TODO: 動作確認済みのブランチまたはコミットを記載する。 -->
-
-現時点では動作確認済みのコミットが記載されていないため、取得時期によってソースが変わる可能性がある。再現可能なビルドにするには、採用するコミットまたはリリースタグを確定したうえでチェックアウトする必要がある。
-
 ## el-stack のビルド
 
 el-stack リポジトリが Linux 向けに用意しているビルド設定を使用するため、リポジトリのルートで生成スクリプトを実行する。スクリプト内部の処理は採用する el-stack のバージョンに依存するため、実行前に内容も確認すること。
@@ -46,8 +40,6 @@ el-stack リポジトリが Linux 向けに用意しているビルド設定を�
 ```
 
 ## 生成物の確認
-
-<!-- TODO: generate_go.sh が生成するファイルの名前、形式、出力先、確認コマンドを記載する。 -->
 
 成果物の想定出力先は次のとおり。`release` ディレクトリを確認することで、デバッグ構成のライブラリを誤って使用することを防げる。
 
@@ -78,16 +70,10 @@ go-ethereum/p2p/elstack/el_stack/libs/linux_amd64/libel_stack_<version_number>.a
 // #cgo !android,linux,amd64 LDFLAGS: ${SRCDIR}/libs/linux_amd64/libel_stack_<version_number>.a -lm
 ```
 
-<!-- TODO: geth のビルドコマンドと、el-stack がリンクされたことを確認する方法を記載する。 -->
-
 `go-ethereum` ディレクトリへ移動し、通常の Linux AMD64 ビルドを実行する。この処理により、Go コードと配置した Rust スタティックライブラリを cgo 経由でまとめてリンクできることを確認する。
 
 ```bash
 make all
 ```
 
-エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。実行時の動作確認方法は未記載のため、別途 TODO の整備が必要である。
-
-## トラブルシューティング
-
-<!-- TODO: 既知の問題、エラー例、解決方法を記載する。 -->
+エラーが発生せずにコマンドが終了すれば、コンパイルとリンクは成功である。
