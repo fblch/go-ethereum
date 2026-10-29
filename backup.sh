@@ -22,8 +22,16 @@ case $CHAIN_ID in
 		CHAIN_NAME='tcoin-tnet'
 		;;
 
+	116111110107)
+		CHAIN_NAME='tcoin-l2-tnet'
+		;;
+
 	116111110101)
 		CHAIN_NAME='tcoin-mnet'
+		;;
+
+	116111110102)
+		CHAIN_NAME='tcoin-l2-mnet'
 		;;
 
 	10298105116)
@@ -42,16 +50,12 @@ case $CHAIN_ID in
 		CHAIN_NAME='testchain2-tnet'
 		;;
 
-	949394939494)
-		CHAIN_NAME='testchain2-tnet'
+	949394939496)
+		CHAIN_NAME='testchain2-l2-tnet'
 		;;
 
 	949394939495)
 		CHAIN_NAME='white_tnet'
-		;;
-
-	949394939496)
-		CHAIN_NAME='testchain2-tnet-l2'
 		;;
 
 	*)
